@@ -159,7 +159,7 @@ manifest safe to commit, and it is also the thing the agents disagree about:
 | Claude Code | `$CLAUDE_CONFIG_DIR/.claude.json` → `mcpServers` | `${NAME}` | `${NAME}` |
 | opencode | `~/.config/opencode/opencode.json` → `mcp` | `{env:NAME}` | `{env:NAME}` |
 | VS Code | `~/.config/Code/User/mcp.json` → `servers` | `${env:NAME}` | `${env:NAME}` |
-| Codex | `~/.codex/config.toml` → `[mcp_servers]` | literal only | `env_http_headers`, `bearer_token_env_var` |
+| Codex | `~/.codex/config.toml` → `[mcp_servers]` | literal only — shimmed, see below | `env_http_headers`, `bearer_token_env_var` |
 | Cursor | `~/.cursor/mcp.json` → `mcpServers` | `${env:NAME}` | unresolved for remote servers |
 | Gemini CLI | `~/.gemini/settings.json` → `mcpServers` | `$NAME` | literal only |
 
@@ -168,10 +168,24 @@ received; the rest are the agents' own documentation and open issues. Fifteen of
 servers are HTTP with the secret in a header, so those last two rows are not a detail — **Cursor
 and Gemini CLI can only take the two stdio servers.** They are skipped with a printed reason
 rather than written with a literal `${TOKEN}` that would go out as a credential. Codex is the
-mirror image: its `env_http_headers` covers all fifteen HTTP servers, and only the two stdio ones
-drop out. (Those may work anyway by process inheritance — Claude Code passes the full parent
-environment to stdio servers, and the variable names already match. Untested for Codex, so the
-renderer does not claim it.)
+mirror image: its `env_http_headers` covers all fifteen HTTP servers, and its stdio `env` covers
+none of them.
+
+Process inheritance does not save the stdio ones there, as it does elsewhere — Claude Code hands a
+stdio server the full parent environment, but **Codex scrubs it**. Probed on codex-cli 0.146.0 with
+a server whose command was `env`: the child sees exactly `HOME LANG LOGNAME PATH PWD SHELL TERM
+USER` plus the literal `[mcp_servers.x.env]` table, and nothing the launching shell exported.
+`shell_environment_policy.inherit = "all"` does not reach it either — the probed environment was
+identical.
+
+So for Codex the reference is resolved one level down, by the launch instead of by the agent
+(`env: 'shim'`, `envShimCommand` in the renderer). The command becomes `sh -c`, which sources the
+same `~/.config/secrets.zsh` and re-execs the real program through `env -i` carrying Codex's own
+core set plus *only* the variables that server's manifest entry names — so config.toml still holds
+no secret, and sourcing a file of thirty-odd exports leaks none of the others into the server. A
+variable unset at spawn time is dropped rather than passed empty: `BW_SESSION` is minted per shell
+by `bwunlock` and exists on no disk, so under Codex the Bitwarden server starts locked and its own
+`unlock` tool establishes the session.
 
 `--materialize` writes the real values instead, for a target that cannot reference them. It is
 opt-in, chmods the file to `0600`, and warns: it turns a committed-safe reference into a secret at

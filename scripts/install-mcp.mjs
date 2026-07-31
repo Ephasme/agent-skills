@@ -15,6 +15,7 @@
 //   opencode      {env:NAME}       in env and headers
 //   VS Code       ${env:NAME}      in env and headers
 //   Codex         env_http_headers / bearer_token_env_var for headers; env is literal
+//                 — a stdio server is launched through a shim instead, see below
 //   Cursor        ${env:NAME}      in env only — unresolved for remote servers
 //   Gemini CLI    $NAME            in env only — headers are literal strings
 //
@@ -24,6 +25,11 @@
 // that and inlines the real values, which is why it is opt-in, chmods the file to
 // 0600, and says so loudly: it turns a committed-safe reference into a secret at
 // rest, and rotating a credential then means re-running this script.
+//
+// One slot has a third answer. When the agent cannot reference a variable but *does*
+// let the manifest choose the program it spawns, the reference can be resolved one
+// level down — by the launch itself rather than by the agent. That is `env: 'shim'`
+// (Codex, stdio only); `envShimCommand` below is the whole mechanism.
 //
 // A server carrying `"enabled": false` is parked: not rendered anywhere, and removed
 // from every agent that has it on the next run. Its definition stays in the manifest,
@@ -151,6 +157,57 @@ function resolve(value, cap, adapter, slot, opts) {
 // Deliberately coarse: the reason a server is skipped is the *slot*, not the
 // particular variable, so every server that fails the same way collapses to one line.
 const SLOT = { env: 'a stdio server\'s env', headers: 'request headers' };
+
+// ---------------------------------------------------------------------------
+// The stdio env shim (`env: 'shim'`)
+// ---------------------------------------------------------------------------
+//
+// Codex spawns a stdio MCP server with a *scrubbed* environment. Verified on
+// codex-cli 0.146.0 by pointing a probe server at `env`: the child sees exactly
+// HOME, LANG, LOGNAME, PATH, PWD, SHELL, TERM, USER — plus whatever literal
+// `[mcp_servers.x.env]` holds — and nothing else the launching shell exported.
+// `shell_environment_policy.inherit = "all"` does not reach it either (probed
+// separately; the child's env was byte-for-byte the same). So there is no way to
+// hand Codex a *reference*: whatever value it passes, it passes literally.
+//
+// But the manifest chooses the program, and the program's own launch runs in a
+// shell. So the reference is resolved one level down: `sh -c` sources the same
+// ~/.config/secrets.zsh every other agent resolves its `${NAME}` against, then
+// re-execs the real command through `env -i` carrying Codex's own core set plus
+// *only* the variables this server's manifest entry names. Two properties matter —
+// nothing secret is written to config.toml (the point of the whole reference
+// model), and sourcing a file of 30-odd exports does not leak the other 27 into
+// the server's environment.
+//
+// A variable that is unset at spawn time is simply not passed, rather than passed
+// empty: BW_SESSION is minted per-shell by `bwunlock` and lives nowhere on disk, so
+// for Codex it is usually absent — the Bitwarden server then starts locked and its
+// own `unlock` tool establishes the session.
+const SECRETS_FILE = process.env.AGENT_SECRETS_FILE ?? '$HOME/.config/secrets.zsh';
+
+// Codex's own core set, minus PWD (which `env -i` re-derives and which no server
+// should be told to trust anyway).
+const SHIM_CORE_ENV = ['HOME', 'PATH', 'USER', 'LOGNAME', 'LANG', 'SHELL', 'TERM'];
+
+const shQuote = (s) => `'${String(s).replace(/'/g, `'\\''`)}'`;
+
+// `refs` is [[targetVariable, sourceVariable]] — the manifest may rename, so the
+// left-hand side is what the server reads and the right-hand side is what the
+// secrets file exports.
+function envShimCommand(def, refs) {
+  const script = [
+    // `.` is a special builtin: a missing file would *exit* the shell in dash, so
+    // the guard is what keeps a machine without the secrets file merely credential-
+    // less rather than unable to start the server at all.
+    `[ -r "${SECRETS_FILE}" ] && . "${SECRETS_FILE}"`,
+    'set --',
+    ...refs.map(([target, source]) =>
+      `[ -n "\${${source}:-}" ] && set -- "$@" "${target}=\$${source}"`),
+    `exec env -i ${SHIM_CORE_ENV.map((v) => `${v}="\$${v}"`).join(' ')} "$@" ` +
+      [def.command, ...(def.args ?? [])].map(shQuote).join(' '),
+  ].join('; ');
+  return { command: '/bin/sh', args: ['-c', script] };
+}
 
 // ---------------------------------------------------------------------------
 // TOML emission (Codex only)
@@ -375,14 +432,18 @@ const ADAPTERS = [
     // `env_http_headers` maps a header name to an environment variable name, and
     // `bearer_token_env_var` does the same for bearer auth — so headers are fully
     // expressible. `[mcp_servers.x.env]` takes literal values only (openai/codex
-    // #24401), so stdio secrets are not.
-    caps: { env: 'unsupported', headers: 'named' },
+    // #24401), so a stdio secret is resolved by the launch instead — see
+    // `envShimCommand`.
+    caps: { env: 'shim', headers: 'named' },
     targets: () => (existsSync(join(HOME, '.codex')) ? [{ id: 'codex', file: join(HOME, '.codex', 'config.toml') }] : []),
     server(def, r, name) {
       const lines = [`[mcp_servers.${tomlKey(name)}]`];
       if (def.transport === 'stdio') {
-        lines.push(`command = ${tomlString(def.command)}`);
-        if (def.args?.length) lines.push(`args = [${def.args.map(tomlString).join(', ')}]`);
+        // A shimmed server is spawned through `sh -c`; the manifest's command becomes
+        // the tail of that script, so it is never both.
+        const spawn = r.shim ? envShimCommand(def, r.shim) : { command: def.command, args: def.args };
+        lines.push(`command = ${tomlString(spawn.command)}`);
+        if (spawn.args?.length) lines.push(`args = [${spawn.args.map(tomlString).join(', ')}]`);
         if (r.env && Object.keys(r.env).length) lines.push(`env = ${tomlInline(r.env)}`);
       } else {
         lines.push(`url = ${tomlString(def.url)}`);
@@ -502,11 +563,17 @@ function renderServer(adapter, name, def, opts) {
     if (def.env) {
       const out = {};
       for (const [k, v] of Object.entries(def.env)) {
+        // `--materialize` deliberately outranks the shim: the whole point of that
+        // flag is a config that stands alone, with no secrets file to read.
+        if (isRef(v) && adapter.caps.env === 'shim' && !opts.materialize) {
+          (r.shim ??= []).push([k, v.env]);
+          continue;
+        }
         const got = resolve(v, adapter.caps.env, adapter, SLOT.env, opts);
         if (!got.ok) return { skip: got.reason };
         out[k] = got.value;
       }
-      r.env = out;
+      if (Object.keys(out).length) r.env = out;
     }
     return { entry: adapter.server(def, r, name) };
   }
