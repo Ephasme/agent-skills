@@ -234,7 +234,7 @@ Portability — the contract above:
 Hygiene:
 
 11. No absolute home paths (`/home/you/…`, `/Users/you/…`), no `__pycache__`, nothing over 1 MiB.
-12. Only the seven categories below.
+12. Only the six categories below.
 
 A skill must be **self-contained**: anything it runs lives in its own `scripts/`. Where two skills
 need the same helper, both ship a copy rather than sharing one — they install independently and
@@ -247,9 +247,8 @@ for exactly that reason.
 | --- | --- |
 | `engineering` | code-quality-scan, greenfield, linear-project-sync, plan-hardening, prune-branches, spec-to-pr |
 | `finance` | payment-qr |
-| `research` | cite-or-refuse, fact-check-document |
+| `research` | cite-or-refuse, fact-check-document, harden-case |
 | `setup` | free-disk-space |
-| `trackers` | harden-case |
 | `meta` | executing-autonomously, handoff, no-verbose |
 | `health` | tcc |
 
@@ -266,6 +265,13 @@ Git history is the archive — nothing is vendored into an `archive/` directory,
 CLI discovers any `SKILL.md` two levels down from the repo root and would reinstall them. Restore
 one with `git checkout 9c9c809 -- skills/<category>/<skill>`. Their departure emptied the
 `ops` and `security` categories, which went with them.
+
+**The `trackers` category and its CLI.** `track-case` was the only thing that ever shelled out to
+`~/.agents/plugins/trackers/scripts/trackers`, so retiring it left the plugin with no caller — no
+cron entry, no timer, and no `~/.claude-trackers` state dir referenced it either. The plugin is
+gone from the machine and from the dotfiles. `harden-case` outlived the category because it never
+used the CLI: it reads a case directory and whatever conventions that repository declares, so it
+moved to `research` beside the other verification skills.
 
 **A second reviewer per task.** `spec-to-pr` used to run a spec reviewer and a quality reviewer in
 parallel on every task, then delegate a whole-branch pass to `two-axis-review`. Both collapsed into
@@ -290,6 +296,3 @@ fork them off upstream updates.
 per-product format, and this one is Claude Code's. It is kept beside the corpus it drives. The
 `skills` CLI installs skills only — symlink it into `~/.claude-<profile>/agents/` by hand.
 
-**Machine infrastructure.** `harden-case` drives the `trackers` CLI, which cron invokes too, so it
-belongs to the machine rather than to the skill. The skill looks for it on PATH, then at
-`~/.agents/plugins/trackers/scripts/trackers`, and stops if neither resolves.

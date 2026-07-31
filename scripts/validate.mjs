@@ -34,7 +34,6 @@ const CATEGORIES = [
   'meta',
   'research',
   'setup',
-  'trackers',
 ];
 
 // Spec: `name` and `description` are required; `license`, `compatibility`,
@@ -69,8 +68,7 @@ const MAX_FILE_BYTES = 1024 * 1024;
 // the spec's `compatibility` field is for.
 const COUPLING = [
   [/\$\{?CLAUDE_(PLUGIN_ROOT|SKILL_DIR|PROJECT_DIR|CONFIG_DIR|SESSION_ID|EFFORT)\}?/, 'harness-only variable — use $SKILL_DIR notation, the repo root, or an XDG path'],
-  // `~/.claude-trackers` is the trackers CLI's own directory, unrelated to any harness.
-  [/(^|[^.\w])~\/\.claude(?!-trackers)/, 'hard-coded Claude Code config directory'],
+  [/(^|[^.\w])~\/\.claude/, 'hard-coded Claude Code config directory'],
   [/\bclaude[ -]?code\b|\bclaude\.ai\b/i, 'names one harness — describe the capability instead'],
   // Claude model aliases only: these are the ones used as harness model selectors.
   // Case-sensitive on purpose — an all-caps OPUS is an institutional repository,

@@ -1,6 +1,6 @@
 ---
 name: harden-case
-description: Makes a case in this repository trustworthy before a deadline, payment, meeting, filing, third-party message, handoff, or archive. Use when asked to harden, audit, stress-test, poke holes in, comprehensively fact-check, tighten, or “durcir / vérifier / fiabiliser” a case — including when the ask is prompted by a tracked journal that has accumulated without human review, or by repeated updates leaving uncertainty about what still holds. Invoke only on an explicit request — never load it on your own initiative, since it rewrites the case from primary sources and costs a long run.
+description: Makes a case in this repository trustworthy before a deadline, payment, meeting, filing, third-party message, handoff, or archive. Use when asked to harden, audit, stress-test, poke holes in, comprehensively fact-check, tighten, or “durcir / vérifier / fiabiliser” a case — including when the ask is prompted by an accumulated journal or log that has gone without human review, or by repeated updates leaving uncertainty about what still holds. Invoke only on an explicit request — never load it on your own initiative, since it rewrites the case from primary sources and costs a long run.
 disable-model-invocation: true
 ---
 
@@ -90,7 +90,7 @@ identity and working-copy state have not changed unexpectedly.
 - Never write a fact not reopened at its primary source. A role report is not a source.
 - Never send sensitive case data to web search, outbound messages, or unrelated services.
 - Treat zones defined as hand-owned or untouchable by `cases/RUNBOOK.md` as read-only. Raise
-  findings there to the user, including front matter, journal cursors/past entries, and Notes.
+  findings there to the user, including front matter, journal or log entries, and Notes.
 - Never greenfield or compress `journal.md`, curated history, `documents/`, or `archive/`.
 - Move circulated wrong facts to the repository-defined wrong-facts record; never silently delete.
 - Before deletion, confirm the path is tracked, inside case scope, not a protected/generated
@@ -140,7 +140,7 @@ Build one dense brief:
 - effective modes and capability degradations;
 - file ownership, generators, and hand-owned/protected zones;
 - language rules by file and audience;
-- authorized source inventory, health evidence, and journal cursors;
+- authorized source inventory, health evidence, and any progress markers the case defines;
 - linked reference documents and root payment records;
 - conventions, traps, open questions, and user emphasis.
 
