@@ -75,6 +75,7 @@ jobs:
           m = json.load(open('mcp/servers.json'))
           name = next(iter(m['servers']))
           m['servers'][name]['enabled'] = False
+          m['servers'][name]['note'] = 'parked by CI to exercise the removal path'
           json.dump({'name': name, **m}, open('/tmp/off.json', 'w'))
           "
           off=$(python3 -c "import json; print(json.load(open('/tmp/off.json'))['name'])")

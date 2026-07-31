@@ -74,6 +74,10 @@ export function validateManifest(manifest, fail) {
     // Absent means enabled. A disabled server keeps its full definition — it is
     // parked, not deleted — so the rest of the shape is still validated.
     if ('enabled' in def && typeof def.enabled !== 'boolean') at('`enabled` must be a boolean');
+    if ('note' in def && typeof def.note !== 'string') at('`note` must be a string');
+    // A parked server with no stated reason is the one that never gets switched
+    // back on, because nobody left behind knows what would have to be true first.
+    if (def.enabled === false && !def.note) at('a disabled server needs a `note` saying why');
 
     if (def.transport === 'http') {
       if (!def.url) at('http transport needs `url`');
@@ -458,7 +462,7 @@ async function main() {
   // wrong trade for a server that is only down, or only temporarily unwanted.
   const all = Object.entries(manifest.servers);
   const servers = all.filter(([, def]) => def.enabled !== false);
-  const disabled = new Set(all.filter(([, def]) => def.enabled === false).map(([name]) => name));
+  const disabled = new Map(all.filter(([, def]) => def.enabled === false).map(([name, def]) => [name, def.note]));
   const known = new Set(all.map(([name]) => name));
 
   let adapters = ADAPTERS;
@@ -473,7 +477,9 @@ async function main() {
   }
 
   if (opts.list) {
-    console.log(`${servers.length} enabled, ${disabled.size} disabled${disabled.size ? `: ${[...disabled].join(', ')}` : ''}\n`);
+    console.log(`${servers.length} enabled, ${disabled.size} disabled`);
+    for (const [name, note] of disabled) console.log(`  · ${name} — ${note}`);
+    console.log();
     for (const adapter of ADAPTERS) {
       const targets = adapter.targets();
       const where = targets.length ? targets.map((t) => t.file).join(', ') : 'not installed';
@@ -483,7 +489,7 @@ async function main() {
   }
 
   if (disabled.size && !opts.prune) {
-    console.log(`  · disabled in the manifest, will be removed where installed: ${[...disabled].join(', ')}\n`);
+    console.log(`  · disabled in the manifest, removed where installed: ${[...disabled.keys()].join(', ')}\n`);
   }
 
   if (opts.materialize) {

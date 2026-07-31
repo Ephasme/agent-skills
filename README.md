@@ -115,6 +115,7 @@ already has it the next time the renderer runs.
 ```json
 "bank": {
   "enabled": false,
+  "note": "2026-07-31: bank.loup-peluso.com has no A record — the host is gone, not just down. Re-enable once it resolves.",
   "transport": "http",
   "url": "https://bank.loup-peluso.com/mcp",
   …
@@ -125,6 +126,15 @@ Deleting the entry uninstalls it too, and the difference is the definition: most
 a server off are temporary (the origin is down, the upstream package is broken, it is noisy in one
 season of work), and re-adding it later means reconstructing the URL and the header names from
 nothing. Parked is the recoverable version of the same act.
+
+`note` is required on a disabled server, and the validator enforces it. A parked entry with no
+stated reason is the one that never gets switched back on, because nobody is left knowing what
+would have to be true first — so the note says what that is, with the date it stopped being true.
+`--list` prints them.
+
+Four are parked today: `bank` (host no longer resolves), `playwright` and `brightdata` (origin
+returns Cloudflare 502 — Access accepts the credentials, the service behind it does not answer),
+and `n8n` (`npx -y n8n-mcp` exits with `Cannot find module 'zod'`, broken upstream).
 
 Removal runs off `~/.agents/.mcp-lock.json`, not off the manifest — by the time the renderer sees
 a disabled server, the only record that it was ever installed is the lock. Both the disabling and

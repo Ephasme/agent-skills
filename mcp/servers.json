@@ -12,7 +12,9 @@
     "`\"enabled\": false` parks a server: it is rendered nowhere, and removed from",
     "every agent that already has it on the next run. The definition stays, which is",
     "the point — deleting the entry also uninstalls it, but throws away the",
-    "definition, and most reasons to switch a server off are temporary.",
+    "definition, and most reasons to switch a server off are temporary. A parked",
+    "server must carry a dated `note` saying what would have to be true to switch it",
+    "back on; without one it is the entry nobody ever revisits.",
     "",
     "`purpose` is documentation only — it preserves the grouping the retired",
     "purpose-plugins used, and nothing keys off it."
@@ -31,6 +33,8 @@
     "playwright": {
       "purpose": "research",
       "description": "Self-hosted Playwright browser driver",
+      "enabled": false,
+      "note": "2026-07-31: origin down. Cloudflare returns 502 origin_bad_gateway, so Access accepts the credentials and the service behind it is not answering. Re-enable once it responds.",
       "transport": "http",
       "url": "https://playwright.loup-peluso.com/mcp",
       "headers": {
@@ -41,6 +45,8 @@
     "brightdata": {
       "purpose": "research",
       "description": "Bright Data scraping proxy",
+      "enabled": false,
+      "note": "2026-07-31: origin down, same 502 origin_bad_gateway as playwright. Re-enable once it responds.",
       "transport": "http",
       "url": "https://brightdata.loup-peluso.com/mcp",
       "headers": {
@@ -105,6 +111,8 @@
     "bank": {
       "purpose": "finance",
       "description": "Self-hosted bank aggregator",
+      "enabled": false,
+      "note": "2026-07-31: bank.loup-peluso.com has no A record — the host is gone, not just down. Re-enable once it resolves.",
       "transport": "http",
       "url": "https://bank.loup-peluso.com/mcp",
       "headers": {
@@ -168,6 +176,8 @@
     "n8n": {
       "purpose": "automation",
       "description": "n8n workflow automation",
+      "enabled": false,
+      "note": "2026-07-31: upstream package is broken — `npx -y n8n-mcp` exits with Cannot find module 'zod'. Nothing to fix here; re-enable when a working version ships.",
       "transport": "stdio",
       "command": "npx",
       "args": ["-y", "n8n-mcp"],
