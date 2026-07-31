@@ -7,8 +7,21 @@ Claude Code could load them. They are now a plain skill package: one folder per 
 self-contained, installed with the [`skills`](https://github.com/vercel-labs/skills) CLI into
 Claude Code, Codex, Cursor, opencode, Copilot, or any of the ~75 agents it supports.
 
-Private repo. Several skills carry personal or employer-adjacent detail — bank import recipes,
-a medical research corpus, a production-database runbook. Keep it that way.
+Self-hosted and private, on the Forgejo at `git.loup-peluso.com` — several skills carry personal
+or employer-adjacent detail (bank import recipes, a medical research corpus, a production-database
+runbook), and none of it needs to sit on someone else's server. Managed with
+[`tea`](https://gitea.com/gitea/tea), not `gh`.
+
+```
+ssh://git@git-ssh.loup-peluso.com:2222/loup/agent-skills.git
+```
+
+The `skills` CLI has no shorthand for a self-hosted host, so that full URL is the source string
+everywhere below. It falls through to the CLI's generic git path and is cloned with plain
+`git clone` — no forge API, no token. Access is the `git-ssh.loup-peluso.com` block already in
+`~/.ssh/config`, which names the perso key and the `:2222` port; without it a clone from a temp
+directory fails *Permission denied (publickey)* even though pushing from a checkout works, because
+`~/.gitconfig`'s `includeIf gitdir:~/code/perso/` never fires outside the checkout.
 
 ## Install
 
@@ -19,10 +32,12 @@ universal store-agent so upstream symlinks natively into `~/.agents/skills` inst
 in each profile instead of symlinks into one store.
 
 ```sh
-skills add Ephasme/agent-skills -s '*' -y              # both profiles
-skills --target=perso add Ephasme/agent-skills -s '*' -y
-skills list                                            # what is installed, and where
-skills update                                          # pull newer versions
+SRC=ssh://git@git-ssh.loup-peluso.com:2222/loup/agent-skills.git
+
+skills add "$SRC" -s '*' -y              # both profiles
+skills --target=perso add "$SRC" -s '*' -y
+skills list                              # what is installed, and where
+skills update                            # pull newer versions
 ```
 
 Result: content in `~/.agents/skills/<name>`, with `~/.claude-perso/skills/<name>` and
@@ -31,28 +46,11 @@ Result: content in `~/.agents/skills/<name>`, with `~/.claude-perso/skills/<name
 Anywhere else — another machine, another agent — use the upstream CLI directly:
 
 ```sh
-npx skills add Ephasme/agent-skills -g -a codex -a cursor -a opencode -s '*' -y
-npx skills add Ephasme/agent-skills -s two-axis-review   # one skill, project scope
+npx skills add "$SRC" -g -a codex -a cursor -a opencode -s '*' -y
+npx skills add "$SRC" -s two-axis-review   # one skill, project scope
 ```
 
 `scripts/bootstrap.sh` runs the whole set for a fresh machine.
-
-### Private-repo access
-
-The CLI clones over SSH when `gh auth status` reports the ssh protocol, into a temp directory
-where `~/.gitconfig`'s `includeIf gitdir:~/code/perso/` never fires. That include is the only
-place the perso key is named for GitHub, so without an `~/.ssh/config` entry the clone fails with
-*Permission denied (publickey)* even though pushing from a checkout works:
-
-```
-Host github.com
-  User git
-  IdentityFile "~/.ssh/id_ed25519_perso"
-  IdentitiesOnly yes
-```
-
-From a plain terminal also set `GH_CONFIG_DIR=$HOME/.config/gh-perso`; inside a Claude session
-`claude-profile` already exports it.
 
 ## Authoring
 
@@ -104,6 +102,9 @@ need the same helper, both ship a copy (`spec-to-pr` and `two-axis-review` each 
 repo only; installed skills are flat.
 
 ## What is deliberately not here
+
+**A GitHub mirror.** This lived briefly at `Ephasme/agent-skills` before moving here. There is no
+mirror and no sync — Forgejo is the only remote.
 
 **MCP servers.** The purpose-plugins that used to carry these skills also carried `.mcp.json`
 files (`engineering`, `research`, `finance`, `communication`, `workspace`, `navigation`,

@@ -14,16 +14,16 @@
 # Usage: scripts/bootstrap.sh
 set -euo pipefail
 
-REPO=Ephasme/agent-skills
+# Self-hosted Forgejo. The CLI has no shorthand for it, so the full URL is the
+# source string; it takes the generic git path and is cloned with plain `git
+# clone`, using the git-ssh.loup-peluso.com block in ~/.ssh/config for the key
+# and the :2222 port. No forge API and no token involved.
+REPO=ssh://git@git-ssh.loup-peluso.com:2222/loup/agent-skills.git
 
 command -v skills >/dev/null || {
   echo "skills wrapper not found at ~/.local/bin/skills — run 'yadm clone' first." >&2
   exit 1
 }
-
-# The upstream CLI probes `gh auth status` to decide SSH vs HTTPS for the private
-# clone, and a plain terminal has no profile env. Point it at the perso account.
-export GH_CONFIG_DIR="${GH_CONFIG_DIR:-$HOME/.config/gh-perso}"
 
 echo "==> $REPO"
 skills add "$REPO" -s '*' -y
