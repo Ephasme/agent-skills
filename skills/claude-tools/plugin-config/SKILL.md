@@ -5,8 +5,8 @@ description: >-
   Cloudflare Access credentials, and other plugin secrets) straight from the shell,
   without the interactive /plugin configure prompt. NOT FOR THE PERSONAL
   PURPOSE-PLUGINS (engineering, research, finance, …) — those are yadm-tracked at
-  ~/.agents/plugins/, are MCP-only (their skills live in the separate agent-skills
-  repo), loaded as <purpose>@skills-dir, and read plain ${KEY} env vars
+  ~/.agents/plugins/, carry MCP servers only (their skills moved to the separate
+  agent-skills repo), load as <purpose>@skills-dir, and read plain ${KEY} env vars
   from ~/.config/secrets.zsh; they declare no userConfig at all, so nothing here
   applies to them. Use this skill for third-party plugins from other marketplaces
   still on the userConfig/keychain model, bulk-configuring many such plugins or a
@@ -22,7 +22,7 @@ description: >-
 
 # Plugin config (non-interactive)
 
-**Not for the personal purpose-plugins.** `engineering`, `research`, `finance`, `security`, … live in the yadm dotfiles at `~/.agents/plugins/<purpose>/`, symlinked into `~/.claude-{work,perso}/skills/` and auto-loaded as `<purpose>@skills-dir`. They are **MCP-only** — the skills they used to bundle now live in the `Ephasme/agent-skills` repo and are installed with the `skills` CLI. Their `.mcp.json` files reference credentials as plain `${KEY}` env vars, exported by `~/.config/secrets.zsh` — a file yadm keeps in its gpg-symmetric archive and `yadm decrypt` restores at bootstrap. **`userConfig` is unused across all of them and `pluginConfigs` is empty in both profiles**, so there is no keychain entry, no `/plugin config` step and nothing for this skill to set: a missing value there is a missing `export` in `secrets.zsh`, not a plugin-config problem. Everything below is for **third-party plugins from other marketplaces** that still declare `userConfig`.
+**Not for the personal purpose-plugins.** `engineering`, `research`, `finance`, `security`, … are the yadm-tracked set at `~/.agents/plugins/<purpose>/`, symlinked into `~/.claude-{work,perso}/skills/` and auto-loaded as `<purpose>@skills-dir`. (Skills no longer live there — they moved to the `Ephasme/agent-skills` repo — and the store itself was removed from the dotfiles on 2026-07-31, restorable with `yadm checkout debe473 -- .agents/plugins`.) Their `.mcp.json` files reference credentials as plain `${KEY}` env vars, exported by `~/.config/secrets.zsh` — a file yadm keeps in its gpg-symmetric archive and `yadm decrypt` restores at bootstrap. **`userConfig` is unused across all of them and `pluginConfigs` is empty in both profiles**, so there is no keychain entry, no `/plugin config` step and nothing for this skill to set: a missing value there is a missing `export` in `secrets.zsh`, not a plugin-config problem. Everything below is for **third-party plugins from other marketplaces** that still declare `userConfig`.
 
 Claude Code plugins can declare `userConfig` fields (API keys, tokens, service credentials). The interactive way to fill them is the `/plugin` configure dialog — which is fine until it isn't (it can be fiddly, and it gives you no visibility into _where_ a value ends up). This skill is the shell-driven alternative: set values deterministically, and diagnose them when something isn't resolving.
 

@@ -12,28 +12,27 @@ a medical research corpus, a production-database runbook. Keep it that way.
 
 ## Install
 
+On Loup's machines `skills` is the wrapper at `~/.local/bin/skills`, not the upstream CLI. It runs
+upstream once per Claude profile with `CLAUDE_CONFIG_DIR` set, and pairs `claude-code` with a
+universal store-agent so upstream symlinks natively into `~/.agents/skills` instead of copying.
+**Do not pass `-a` yourself** — that suppresses the store-agent injection and you get real copies
+in each profile instead of symlinks into one store.
+
 ```sh
-# everything, into this shell's Claude profile, global
-skills add Ephasme/agent-skills -g -a claude-code -s '*' -y
-
-# other agents — same repo, no repackaging
-skills add Ephasme/agent-skills -g -a codex -a cursor -a opencode -s '*' -y
-
-# one skill, project scope → ./.claude/skills/ + ./.agents/skills/
-skills add Ephasme/agent-skills -s two-axis-review
-
-skills list      # what is installed, and where
-skills update    # pull newer versions
+skills add Ephasme/agent-skills -s '*' -y              # both profiles
+skills --target=perso add Ephasme/agent-skills -s '*' -y
+skills list                                            # what is installed, and where
+skills update                                          # pull newer versions
 ```
 
-`-g` installs to the **canonical store** `~/.agents/skills/<name>` and symlinks each agent's own
-skills dir at it. For Claude Code that dir is `$CLAUDE_CONFIG_DIR/skills`, so the two-profile
-split works without extra flags — whichever profile's env is loaded is the one that gets the
-symlink. To do both from one shell:
+Result: content in `~/.agents/skills/<name>`, with `~/.claude-perso/skills/<name>` and
+`~/.claude-work/skills/<name>` as relative symlinks at it.
+
+Anywhere else — another machine, another agent — use the upstream CLI directly:
 
 ```sh
-CLAUDE_CONFIG_DIR=$HOME/.claude-perso skills add Ephasme/agent-skills -g -a claude-code -s '*' -y
-CLAUDE_CONFIG_DIR=$HOME/.claude-work  skills add Ephasme/agent-skills -g -a claude-code -s '*' -y
+npx skills add Ephasme/agent-skills -g -a codex -a cursor -a opencode -s '*' -y
+npx skills add Ephasme/agent-skills -s two-axis-review   # one skill, project scope
 ```
 
 `scripts/bootstrap.sh` runs the whole set for a fresh machine.
@@ -61,7 +60,7 @@ From a plain terminal also set `GH_CONFIG_DIR=$HOME/.config/gh-perso`; inside a 
 git -C ~/code/perso/agent-skills pull
 $EDITOR skills/<category>/<skill>/SKILL.md
 node scripts/validate.mjs
-skills add ~/code/perso/agent-skills -g -a claude-code -s '*' -y   # reinstall
+skills add ~/code/perso/agent-skills -s '*' -y   # reinstall from the working tree
 ```
 
 A global install **copies** into `~/.agents/skills/<name>`; edits in this working tree are not
@@ -106,10 +105,13 @@ repo only; installed skills are flat.
 
 ## What is deliberately not here
 
-**MCP servers.** The eight purpose-plugins (`engineering`, `research`, `finance`, `communication`,
-`workspace`, `navigation`, `automation`, `security`, `trackers`) stay in the yadm dotfiles at
-`~/.agents/plugins/<purpose>/`, now MCP-only. No agent outside Claude Code consumes `.mcp.json`,
-and their credentials are `${KEY}` env vars from `~/.config/secrets.zsh`.
+**MCP servers.** The purpose-plugins that used to carry these skills also carried `.mcp.json`
+files (`engineering`, `research`, `finance`, `communication`, `workspace`, `navigation`,
+`automation`, `security`, `trackers`). The whole `~/.agents/plugins/` store was removed from the
+dotfiles on 2026-07-31 in yadm commit `1803e8c`; it is restorable with
+`yadm checkout debe473 -- .agents/plugins`. Whether that MCP layer comes back is a separate
+decision — it does not belong here either way, since no agent outside Claude Code consumes
+`.mcp.json` and their credentials are `${KEY}` env vars from `~/.config/secrets.zsh`.
 
 **Third-party skills.** `tamagui`, `find-skills`, `web-design-guidelines` and `gnhf` are installed
 from their own upstreams and tracked in `~/.agents/.skill-lock.json`. Vendoring them here would
@@ -118,6 +120,7 @@ fork them off upstream updates.
 **`agents/tcc-expert.md`.** A Claude Code subagent, kept here beside the corpus it drives. The
 `skills` CLI installs skills only — symlink it into `~/.claude-<profile>/agents/` by hand.
 
-**Machine infrastructure.** `track-case` drives the `trackers` CLI, which stays in the dotfiles
-plugin because cron invokes it too; the skill resolves it at
-`~/.agents/plugins/trackers/scripts/trackers`.
+**Machine infrastructure.** `track-case` drives the `trackers` CLI, which cron invokes too, so it
+belongs to the machine rather than to the skill. The skill looks for it on PATH, then at
+`~/.agents/plugins/trackers/scripts/trackers`, and stops if neither resolves — which is the case
+right now, since that store was removed in `1803e8c`.
