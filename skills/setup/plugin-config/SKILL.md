@@ -1,30 +1,28 @@
 ---
 name: plugin-config
 description: >-
-  Set, change, and diagnose Claude Code plugin userConfig values (API keys, tokens,
-  Cloudflare Access credentials, and other plugin secrets) straight from the shell,
-  without the interactive /plugin configure prompt. NOT FOR THE PERSONAL
-  PURPOSE-PLUGINS (engineering, research, finance, …) — those are yadm-tracked at
-  ~/.agents/plugins/, carry MCP servers only (their skills moved to the separate
-  agent-skills repo), load as <purpose>@skills-dir, and read plain ${KEY} env vars
-  from ~/.config/secrets.zsh; they declare no userConfig at all, so nothing here
-  applies to them. Use this skill for third-party plugins from other marketplaces
-  still on the userConfig/keychain model, bulk-configuring many such plugins or a
-  whole profile at once, the interactive plugin-config flow being buggy / stuck /
-  "weird", or diagnosing why ${user_config.KEY} resolves empty / an MCP server fails
-  to authenticate after being configured. Also covers multi-profile
-  (CLAUDE_CONFIG_DIR) setups, and setups that generate settings.json from a template
-  (jsonnet, Nix, etc.) where sensitive values must NOT live in settings.json. Covers
-  the storage split (macOS keychain vs Linux/headless .credentials.json vs
-  settings.json) and bundles scripts to diagnose storage, set values across profiles,
-  bulk-configure from env/JSON/SOPS sources, and discover the keychain entry.
+  Sets, changes, and diagnoses plugin userConfig values (API keys, tokens, service
+  credentials) from the shell instead of through an interactive configure dialog. Use
+  for plugins on the userConfig/keychain model — bulk-configuring many plugins or a
+  whole profile at once, an interactive config flow that is buggy or stuck, or
+  diagnosing why ${user_config.KEY} resolves empty and an MCP server fails to
+  authenticate after being configured. Covers multi-profile setups, and setups that
+  render settings.json from a template (jsonnet, Nix) where sensitive values must not
+  live in settings.json. Explains the storage split — system keychain versus
+  .credentials.json versus settings.json — and bundles scripts to diagnose storage, set
+  values across profiles, bulk-configure from env, JSON or SOPS sources, and discover
+  the keychain entry.
+compatibility: >-
+  Targets Claude Code plugins. Needs the `claude` CLI on PATH, Python 3.8+, and macOS
+  `security` for keychain probing. Runnable from any agent — it drives that CLI, it does
+  not run inside it.
 ---
 
 # Plugin config (non-interactive)
 
-**Not for the personal purpose-plugins.** `engineering`, `research`, `finance`, `security`, … are the yadm-tracked set at `~/.agents/plugins/<purpose>/`, symlinked into `~/.claude-{work,perso}/skills/` and auto-loaded as `<purpose>@skills-dir`. (Skills no longer live there — they moved to the `agent-skills` repo on the personal Forgejo, `git.loup-peluso.com/loup/agent-skills` — and the store itself was removed from the dotfiles on 2026-07-31, restorable with `yadm checkout debe473 -- .agents/plugins`.) Their `.mcp.json` files reference credentials as plain `${KEY}` env vars, exported by `~/.config/secrets.zsh` — a file yadm keeps in its gpg-symmetric archive and `yadm decrypt` restores at bootstrap. **`userConfig` is unused across all of them and `pluginConfigs` is empty in both profiles**, so there is no keychain entry, no `/plugin config` step and nothing for this skill to set: a missing value there is a missing `export` in `secrets.zsh`, not a plugin-config problem. Everything below is for **third-party plugins from other marketplaces** that still declare `userConfig`.
+Plugins can declare `userConfig` fields (API keys, tokens, service credentials). The interactive way to fill them is the `/plugin` configure dialog — which is fine until it isn't (it can be fiddly, and it gives you no visibility into _where_ a value ends up). This skill is the shell-driven alternative: set values deterministically, and diagnose them when something isn't resolving.
 
-Claude Code plugins can declare `userConfig` fields (API keys, tokens, service credentials). The interactive way to fill them is the `/plugin` configure dialog — which is fine until it isn't (it can be fiddly, and it gives you no visibility into _where_ a value ends up). This skill is the shell-driven alternative: set values deterministically, and diagnose them when something isn't resolving.
+**Scope.** Only plugins that actually declare `userConfig`. A plugin whose `.mcp.json` reads plain `${KEY}` environment variables has no plugin config at all — a value missing there is a missing `export` in whatever file supplies the environment, and nothing here applies.
 
 ## The one thing to understand first: where values are stored
 
@@ -54,8 +52,9 @@ The bundled scripts wrap this with the marketplace-refresh step, multi-profile s
 Run with `python3`; paths are under `$SKILL_DIR/scripts/`.
 
 > **`$SKILL_DIR` is notation, not a variable that is already set.** It stands for this skill's own
-> directory — the absolute path printed in the skill preamble. Export it once
-> (`SKILL_DIR=<that path>`) before running any of the commands below.
+> directory — the absolute path printed when the skill is loaded, or the directory holding
+> this `SKILL.md`. Export it once (`SKILL_DIR=<that path>`) before running any of the
+> commands below.
 
 ### 1. Diagnose first — `diagnose.py`
 
@@ -87,8 +86,6 @@ What it does, in order: refreshes the marketplace cache (so manifest flags are c
 Pass values with `--config-from-env KEY` for anything secret. The value is still handed to the underlying `claude` process as an argument (briefly visible to `ps` — a property of the CLI, not avoidable here), but it won't sit in your shell history. This skill is **secret-store-agnostic**: it never fetches secrets itself. Decrypt/retrieve them however the user already does, into an env var.
 
 ### 3. Configure many plugins at once — `bulk_config.py`
-
-The personal purpose-plugins need none of this — their credentials are `${KEY}` env vars from `~/.config/secrets.zsh` (see the top of this file). `bulk_config.py` is for a fleet of third-party plugins that still declare `userConfig`.
 
 When you're setting up a whole machine or profile — every plugin's credentials in one go — don't loop `set_config.py` by hand. `bulk_config.py` builds one **value pool** from any mix of sources, discovers every installed plugin and its `userConfig` schema, and **auto-routes** each value to the plugin(s) that declare that key. It reports pool keys that matched no plugin (secrets with no home — expected for server-side config, and for anything that lives as a plain env var instead) and declared fields left unset.
 

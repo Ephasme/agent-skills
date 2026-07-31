@@ -1,6 +1,6 @@
 ---
 name: fact-check-document
-description: Extract every factual claim from user-provided source material (documents, transcripts, emails, articles, notes) and verify each against a tiered evidence hierarchy, producing a structured report with VALID / INVALID / INCONCLUSIVE verdicts and cited sources. Use whenever the user asks to fact-check, audit, verify, validate, or cross-check claims in a document — even if phrased casually. Skip for single-fact lookups.
+description: Extracts every factual claim from user-provided source material (documents, transcripts, emails, articles, notes) and verifies each against a tiered evidence hierarchy, producing a structured report with VALID / INVALID / INCONCLUSIVE verdicts and cited sources. Use whenever the user asks to fact-check, audit, verify, validate, or cross-check claims in a document — even if phrased casually. Skip for single-fact lookups.
 ---
 
 # Fact-Check Document

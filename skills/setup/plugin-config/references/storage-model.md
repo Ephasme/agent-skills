@@ -2,13 +2,23 @@
 
 Reference for the `plugin-config` skill. Read this when you need the precise rules, the file locations, or a failure-mode walkthrough.
 
-**The personal purpose-plugins are out of scope for all of this** — the yadm-tracked `~/.agents/plugins/<purpose>/` set (loaded as `<purpose>@skills-dir`) reads plain `${KEY}` env vars from `~/.config/secrets.zsh` and declares no `userConfig`, so neither `settings.json` nor the keychain is ever involved. This doc covers the model for third-party plugins that do declare `userConfig`.
+**Plugins that read plain `${KEY}` environment variables are out of scope** — they declare no `userConfig`, so neither `settings.json` nor the keychain is ever involved, and a missing value is a missing `export`. This doc covers the model for plugins that do declare `userConfig`.
 
 - [Storage rules](#storage-rules)
 - [Where things live on disk](#where-things-live-on-disk)
 - [The keychain](#the-keychain)
 - [CLI reference](#cli-reference)
 - [Troubleshooting](#troubleshooting)
+
+## Contents
+
+- [Storage rules](#storage-rules)
+- [Where things live on disk](#where-things-live-on-disk)
+- [The keychain](#the-keychain)
+- [CLI reference](#cli-reference)
+- [Troubleshooting](#troubleshooting)
+
+---
 
 ## Storage rules
 

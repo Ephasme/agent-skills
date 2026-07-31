@@ -1,22 +1,19 @@
 ---
 name: linear-project-sync
 description: >-
-  Reconcile a repo's Linear project with reality and leave it greenfield — read every
-  ticket, cross-check each one's status, priority, and estimate against what the code,
-  git history, and merged PRs actually show, rewrite stale descriptions down to the
-  current desired state, then close done/obsolete tickets, reopen regressed ones, and
-  create tickets for uncovered gaps — so the board reads as if it were freshly planned
-  today and is ready to pick up cold next session. Grounds every status/close/reopen
-  call in evidence and ends with a report of everything it changed. Resolves the project
-  from a "Linear project" section in the repo's CLAUDE.md; if none exists, it asks for
-  the project name/id + team, resolves them, and writes that section. Use whenever the
-  user wants to sync, groom, tidy, clean up, triage, refresh, or update the Linear board
-  or tickets for the current project, "greenfield the linear project", get the backlog in
-  shape, reconcile tickets with what's actually been done, or prep the project for the
-  next work session — even when they just say "update linear", "sort out the tickets",
-  "get the board ready", or "make linear match where we actually are". Applies changes
-  autonomously by default; pass `--dry-run` for a plan-only preview that reads the board and
-  reports what it would change without any Linear writes.
+  Reconciles a repo's Linear project with reality and leaves it greenfield — cross-checks
+  every ticket's status, priority, and estimate against what the code, git history, and
+  merged PRs actually show, rewrites stale descriptions down to the current desired state,
+  closes done and obsolete tickets, reopens regressed ones, and creates tickets for
+  uncovered gaps, so the board reads as if it were planned from scratch today. Grounds
+  every status change in evidence and reports everything it changed. Resolves the project
+  from a "Linear project" section in the repo's agent instructions file, asking for the
+  project and team and writing that section when missing. Use whenever the user wants to
+  sync, groom, triage, or refresh the Linear board for the current project, get the
+  backlog in shape, or prep the project for the next session — including "update linear",
+  "sort out the tickets", "get the board ready", "greenfield the linear project". Applies
+  changes autonomously; pass --dry-run for a preview with no writes.
+compatibility: Requires a Linear integration (MCP server or API access) and a git checkout of the repo.
 ---
 
 # linear-project-sync
@@ -59,8 +56,8 @@ that need the evidence bar above.
 everything below — resolve the project, build ground truth, read the board, evaluate every ticket,
 decide every close/reopen/create — but you **call no mutating tool** (`save_issue`, `save_project`,
 `save_comment`, `save_status_update`, `create_issue_label`). Reading is unchanged; only the writes
-are withheld. Phase 0 is the sole exception: writing the `## Linear project` section to CLAUDE.md
-is local, not a Linear mutation, so still do it — the next real run needs it.
+are withheld. Phase 0 is the sole exception: writing the `## Linear project` section to the repo's
+agent instructions file is local, not a Linear mutation, so still do it — the next real run needs it.
 
 The Phase 6 report becomes the whole deliverable: it reads as "what I *would* change" instead of
 "what I changed" (`would close`, `would set`, …). Use it as the trust-building first pass on any
@@ -70,8 +67,9 @@ the skill applies autonomously as described everywhere else.
 ## Phase 0 — Resolve the project
 
 The skill needs one Linear project to operate on: the one belonging to *this repo*. Look for a
-`## Linear project` section in the repo's `CLAUDE.md` (`${CLAUDE_PROJECT_DIR}/CLAUDE.md`, or the
-CLAUDE.md at the repo root):
+`## Linear project` section in the repo's **agent instructions file** — at the repo root, the first
+of `AGENTS.md`, `CLAUDE.md`, `GEMINI.md` that exists (check all of them; different agents have
+written to different files in the same repo):
 
 ```markdown
 ## Linear project
@@ -86,9 +84,10 @@ CLAUDE.md at the repo root):
 **If it's missing**, ask the user two things and nothing else: the **project** (name or id/URL)
 and the **team** it lives in. Then resolve them against Linear (`list_teams` to match the team,
 `list_projects` filtered to that team to match the project), confirm you found the right one by
-name, and **write the section into CLAUDE.md** using the format above — storing the resolved
-UUIDs and the team key so the next run skips this entirely. Place it near other project-context
-sections; don't disturb the rest of the file.
+name, and **write the section into that instructions file** using the format above — storing the
+resolved UUIDs and the team key so the next run skips this entirely. If the repo has none, create
+`AGENTS.md`: it is the name every agent reads, and the one most likely to be found next time.
+Place the section near other project-context sections; don't disturb the rest of the file.
 
 The **team key** (e.g. `ENG`) matters beyond identification: ticket identifiers (`ENG-142`) are
 built from it, and those identifiers are how you'll link tickets to git history in Phase 1.

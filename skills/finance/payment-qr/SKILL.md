@@ -32,7 +32,7 @@ IBAN, montant, libellé. L'utilisateur n'a plus qu'à valider.
 2. Lancer le script (Python 3, aucune dépendance binaire). Il réutilise un
    moteur QR déjà présent (`segno`, sinon `qrcode`+Pillow) ; sinon il installe
    `segno` via pip en s'adaptant au sandbox (PEP 668, site-packages verrouillé →
-   venv isolé). Marche tel quel sous Claude.ai, en CI, ou sur un Mac Homebrew :
+   venv isolé). Marche tel quel dans un sandbox durci, en CI, ou sur un Mac Homebrew :
    ```bash
    python scripts/epc_qr.py --name "Carole Huet" \
      --iban "FR76 3000 4000 0312 3456 7890 143" \

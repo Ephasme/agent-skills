@@ -1,23 +1,19 @@
 ---
 name: 1password-passkey-audit
 description: >-
-  Audit Loup's 1Password vault(s) for every item that has a saved passkey and
-  build/refresh the French Markdown rotation tracker (`PASSKEYS.md` format:
-  checkbox table of service/compte/lien/notes). Fetches the 1Password
-  service-account API token from the connected Bitwarden vault (an item named
-  like "1Password - <name>"), then uses the `op` CLI to enumerate every
-  Login/Password item's URL and username, redacting every secret value along
-  the way. CRITICAL, VERIFIED LIMITATION: the 1Password CLI / service-account
-  API cannot see passkeys at all, under any flag or filter — so this skill
-  never tries to auto-detect them, and neither should you; it always asks Loup
-  for the ground-truth list of passkey-holding item titles (copied or
-  screenshotted from a 1Password app search for "passkey"). Trigger this skill
-  whenever Loup asks to audit/list/track which 1Password items have a passkey,
-  rebuild or update `PASSKEYS.md`, cross-reference a list of passkey titles
-  with their account/URL, or plan a batch passkey rotation — even if he just
-  pastes titles from the app and says "make me a list" or "update the
-  tracker," and even if he doesn't mention 1Password by name but references
-  "passkeys" or "clés d'accès" for his accounts.
+  Audits Loup's 1Password vaults for every item holding a saved passkey and builds or
+  refreshes the French Markdown rotation tracker (PASSKEYS.md — a checkbox table of
+  service, compte, lien, notes). Fetches the 1Password service-account token from the
+  connected Bitwarden vault, then uses the op CLI to enumerate each Login item's URL and
+  username, redacting every secret value along the way. Critical verified limitation: the
+  1Password CLI and service-account API cannot see passkeys at all, under any flag or
+  filter, so this skill never tries to auto-detect them and always asks Loup for the
+  ground-truth list of passkey-holding item titles, copied from a 1Password app search
+  for "passkey". Use whenever Loup asks to audit, list, or track which 1Password items
+  have a passkey, rebuild PASSKEYS.md, cross-reference passkey titles with their account
+  and URL, or plan a batch rotation — including when he just pastes titles and says "make
+  me a list", or says "passkeys" or "clés d'accès" without naming 1Password.
+compatibility: Requires the 1Password `op` CLI, the Bitwarden `bw` CLI with an unlocked session, and network access.
 ---
 
 # 1Password Passkey Audit

@@ -1,6 +1,6 @@
 ---
 name: cite-or-refuse
-description: Search official documentation, source code, and other trusted sources before drawing any conclusion; cite findings with version and date; refuse to conclude when no acceptable source exists. Use this skill whenever the user signals they want a documented, verified, trusted, reliable, sourced, or evidence-backed answer — phrases like "I want a trusted answer", "back this up with sources", "cite your sources", "verified please", "don't speculate", "document this", "I need this to be reliable", or any similar request for a sourceable response. Trigger even when the topic seems familiar — the user is explicitly asking for verification, not recall.
+description: Searches official documentation, source code, and other trusted sources before drawing any conclusion; cites findings with version and date; refuses to conclude when no acceptable source exists. Use this skill whenever the user signals they want a documented, verified, trusted, reliable, sourced, or evidence-backed answer — phrases like "I want a trusted answer", "back this up with sources", "cite your sources", "verified please", "don't speculate", "document this", "I need this to be reliable", or any similar request for a sourceable response. Trigger even when the topic seems familiar — the user is explicitly asking for verification, not recall.
 ---
 
 # Cite or Refuse

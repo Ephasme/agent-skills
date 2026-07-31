@@ -1,6 +1,6 @@
 ---
 name: prune-branches
-description: Safely clean up git branches — from removing only branches whose work is already merged into the default (including squash-merges that `git branch --merged` cannot see) up to a full wipe leaving just main/master/trunk. Use whenever the user wants to delete, nuke, wipe, prune, tidy, or reset branches, drop merged/stale branches, or shrink a cluttered branch list. Destructive — classify branches first, confirm scope, rescue unsaved work, then delete. Requires explicit user authorization.
+description: Safely cleans up git branches — from removing only branches whose work is already merged into the default (including squash-merges that `git branch --merged` cannot see) up to a full wipe leaving just main/master/trunk. Use whenever the user wants to delete, nuke, wipe, prune, tidy, or reset branches, drop merged/stale branches, or shrink a cluttered branch list. Destructive — classify branches first, confirm scope, rescue unsaved work, then delete. Requires explicit user authorization.
 ---
 
 # prune-branches
@@ -37,8 +37,12 @@ echo "=== open PRs ===" && gh pr list 2>/dev/null || echo "(no gh / not a GitHub
 
 ### 2. Classify every branch
 
+> **`$SKILL_DIR` is notation, not a variable that is already set.** It stands for this skill's own
+> directory — the absolute path printed when the skill is loaded, or the directory holding this
+> `SKILL.md`. Export it once (`SKILL_DIR=<that path>`) before running the command.
+
 ```bash
-bash <skill>/scripts/classify-branches.sh        # auto-detects default
+bash "$SKILL_DIR/scripts/classify-branches.sh"        # auto-detects default
 # or: classify-branches.sh master
 ```
 
@@ -52,7 +56,7 @@ Read the table. `CONTAINED` rows are the safe-to-delete set. `UNIQUE` rows hold 
 
 ### 4. Confirm scope — offer tiers, don't assume the maximum
 
-"Clean up branches" rarely means "detonate everything." Present the scope as a graduated choice (use the AskUserQuestion tool when the picture is rich), and recommend the safe end:
+"Clean up branches" rarely means "detonate everything." Present the scope as a graduated choice — a structured multiple-choice prompt if this agent has one, otherwise a numbered list in plain text — and recommend the safe end:
 
 - **Merged-only (recommended default):** delete only `CONTAINED` branches (local, and their remotes if the user wants remote tidy-up too). Keep every `UNIQUE` branch, every open PR, and every dirty worktree. Loses nothing.
 - **Local-only:** as above but never touch remotes/PRs — purely a local tidy.

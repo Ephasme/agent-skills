@@ -1,13 +1,27 @@
 ---
 name: code-quality-scan
-description: Scan a codebase for structural quality issues (architecture incoherence, design-principle violations, dead code, excessive complexity, unclear naming, hidden state) and produce an evidence-backed, severity-ranked report with concrete, non-breaking refactor suggestions. Runs each review aspect as a parallel reviewer subagent (find phase, default Sonnet 4.6) and verifies + ranks every finding with a cheaper checker subagent (check phase, default Haiku 4.5); both models are overridable via --find-model and --check-model. Use this skill whenever the user asks for a code review, code audit, code quality assessment, tech-debt analysis, refactoring preparation, code-smell detection, maintainability review, or architecture review — including casual phrasings like "look over my repo", "where's the worst code in this codebase", "is this code any good", "what should I clean up first", "review this for code smells", "I want to understand this codebase before I start contributing", or "check this module before I ship it". Trigger across any language or framework — the skill is language-agnostic.
+description: >-
+  Scans a codebase for structural quality issues (architecture incoherence,
+  design-principle violations, dead code, excessive complexity, unclear naming, hidden
+  state) and produces an evidence-backed, severity-ranked report with concrete,
+  non-breaking refactor suggestions. Runs each review aspect as its own reviewer (the
+  find phase, on a capable model) and verifies and ranks every finding with a separate
+  checker (the check phase, on a cheaper one); both are overridable via --find-model and
+  --check-model. Use whenever the user asks for a code review, code audit, code quality
+  assessment, tech-debt analysis, refactoring preparation, code-smell detection,
+  maintainability review, or architecture review — including casual phrasings like "look
+  over my repo", "where's the worst code in this codebase", "is this code any good",
+  "what should I clean up first", "review this for code smells", or "check this module
+  before I ship it". Applies to any language or framework.
 ---
 
 # Code Quality Scan
 
-Act as the **orchestrator** of a senior code-review team. You don't read every file yourself — you scope the work, fan it out to specialist reviewer subagents (one per quality aspect), then route their findings through a cheaper checker that verifies and ranks each one. You assemble the survivors into a single evidence-backed report.
+Act as the **orchestrator** of a senior code-review team. You don't read every file yourself — you scope the work, fan it out to specialist reviewers (one per quality aspect), then route their findings through a cheaper checker that verifies and ranks each one. You assemble the survivors into a single evidence-backed report.
 
 Splitting the review this way keeps each reviewer focused on one lens (so it goes deep instead of skimming six concerns at once), runs the lenses in parallel, and spends the expensive model only on *finding* — the mechanical job of *verifying* a concrete claim and scoring its priority is well within a small, fast model's reach, so it runs there.
+
+**Parallelism is an optimisation, not a requirement.** If this agent can dispatch sub-agents, give each reviewer and each checker its own; that is what makes the isolation real and the run fast. If it cannot, work the same list yourself — one category at a time, writing each category's findings to a file before starting the next, then a separate verification pass over the collected findings. Never drop a category, and never merge the find and check passes into one read: the check exists to be an independent look at the cited code.
 
 ## When to use
 
@@ -18,18 +32,20 @@ Splitting the review this way keeps each reviewer focused on one lens (so it goe
 
 ## Options
 
-Read these from the invocation (e.g. `--find-model sonnet --check-model haiku --depth thorough src/`). If absent, use the default and state the resolved value at the top of the report.
+Read these from the invocation (e.g. `--find-model <mid-tier> --check-model <cheap> --depth thorough src/`). If absent, use the default and state the resolved value at the top of the report.
 
 | Option | Default | Meaning |
 | --- | --- | --- |
-| `--find-model` | `sonnet` (Sonnet 4.6) | Model for the per-aspect reviewer subagents (the find phase). |
-| `--check-model` | `haiku` (Haiku 4.5) | Model for the verification + ranking subagents (the check phase). |
+| `--find-model` | mid-tier: a strong general model, not the largest one available | Model for the per-aspect reviewers (the find phase). |
+| `--check-model` | cheapest: the smallest, fastest model available | Model for the verification and ranking pass (the check phase). |
 | `--depth` | `thorough` | `quick` = top findings only, one checker batch; `thorough` = full catalog, per-finding verification. |
-| `--focus` | all categories | Comma-separated subset of the detection categories below — only those reviewers are dispatched. |
+| `--focus` | all categories | Comma-separated subset of the detection categories below — only those reviewers run. |
 | target paths | repo root | Positional args: directories/files to scan. |
 | `--exclude` | vendor, generated, build outputs, lockfiles | Paths to skip. |
 
-Model values pass straight through to each subagent's `model` parameter. Accept either an alias (`sonnet`, `haiku`, `opus`) or a full model id (e.g. `claude-sonnet-4-6`, `claude-haiku-4-5`). The orchestrator itself runs on the session model regardless of these flags — they only set the subagent models.
+Model values pass through verbatim to whatever model selector this agent exposes — an alias or a full model id, whichever it accepts. If it exposes none, ignore both flags and say so in the report's config line; the phases still run, just on one model. The orchestrator itself always runs on the session model.
+
+The tiers matter more than the names: **finding** structural problems needs reasoning, **checking** a concrete claim against cited code does not. Sending both to the same large model wastes most of the run's cost on the cheaper half of the work.
 
 ## Architecture
 
@@ -176,7 +192,6 @@ A detected pattern is acceptable when any of these holds — the checker should 
 - **Verification is independent.** The checker must re-read the cited code rather than trust the reviewer's claim; that second look is the whole point of the check phase and the reason it can run on a smaller model.
 - **Respect existing conventions.** Match the project's naming, layering, and idioms in refactor suggestions — imposed style changes create friction.
 - **Non-breaking refactors only.** Each refactor direction must preserve current behavior. Flag sweeping rewrites as a separate, explicit recommendation rather than embedding them as a "refactor direction".
-- **Graceful fallback.** If subagents are unavailable in the current environment, run the find and check phases sequentially in-context using the same category list, contracts, and rubrics — the report structure is unchanged.
 
 ## References
 

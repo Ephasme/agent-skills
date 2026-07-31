@@ -6,8 +6,8 @@ Two things wreck a vision model's read of a phone receipt photo:
 1. Orientation. Phone photos are frequently rotated 90° (a long thermal strip held
    sideways), which mangles digit reading. This produces an upright JPG.
 2. Size. A raw phone shot is 12+ megapixels and several MB. That whole image is base64'd
-   into the extraction subagent's context — expensive — and Claude's vision pipeline
-   downsamples anything past ~1568px on the long edge anyway, so the extra pixels buy no
+   into the extraction agent's context — expensive — and vision pipelines generally
+   downsample anything past ~1568px on the long edge anyway, so the extra pixels buy no
    legibility, only tokens. So this also downscales (longest edge → --max-dim) and
    re-encodes as JPEG at --quality. Defaults are tuned for thermal receipts; the caller
    can override per receipt (see below).
@@ -25,9 +25,9 @@ Usage:
     --rotate N       apply an explicit clockwise rotation (cw=90, ccw=270).
     --all            write all four rotations (…_r0/_r90/_r180/_r270.jpg) and list them,
                      so the extractor can pick the legible orientation itself.
-    --max-dim N      cap the longest edge at N pixels (default 1568, Claude's vision
-                     long-edge limit — going higher only adds bytes, not detail the model
-                     can see). Drop it lower (e.g. 1200) for a short, large-print ticket to
+    --max-dim N      cap the longest edge at N pixels (default 1568, the long-edge limit
+                     vision pipelines commonly downsample to — going higher only adds
+                     bytes, not detail the model can see). Drop it lower (e.g. 1200) for a short, large-print ticket to
                      save more; 0 disables downscaling. If a dense, small-print receipt
                      fails its cross-check on misread digits, re-prep nearer 1568 (and bump
                      --quality) before blaming the OCR.
@@ -48,7 +48,8 @@ import sys
 import tempfile
 
 ROT = {"0": 0, "90": 90, "180": 180, "270": 270, "cw": 90, "ccw": 270, "auto": "auto"}
-MAX_DIM_DEFAULT = 1568  # Claude downsamples the long edge to this; larger is wasted bytes
+# Vision pipelines commonly downsample the long edge to this; larger is wasted bytes.
+MAX_DIM_DEFAULT = 1568
 QUALITY_DEFAULT = 80
 
 

@@ -4,6 +4,18 @@ The target output is a `docs/` tree of linked markdown files with a master
 index. Pick the structure that matches the **detected architecture** (Phase 0).
 Don't impose event-sourcing/DDD sections on a codebase that isn't built that way.
 
+## Contents
+
+- [Where the corpus goes](#where-the-corpus-goes)
+- [Structure A — Event-sourced / DDD system](#structure-a-event-sourced-ddd-system)
+- [Structure B — Generic (layered / CRUD / service) system](#structure-b-generic-layered-crud-service-system)
+- [Page template — area page (context / module)](#page-template-area-page-context-module)
+- [Glossary entry format (`GLOSSARY.md`)](#glossary-entry-format-glossarymd)
+- [Master index format (`INDEX.md`)](#master-index-format-indexmd)
+- [Gaps format (`GAPS.md`)](#gaps-format-gapsmd)
+
+---
+
 ## Where the corpus goes
 
 Default to a `docs/` directory at the repo root (or a path the user specifies).

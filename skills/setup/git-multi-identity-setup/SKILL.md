@@ -1,6 +1,6 @@
 ---
 name: git-multi-identity-setup
-description: Set up per-directory git identity profiles (email, SSH signing key, SSH auth key, commit signing) using gitconfig includeIf. Use this whenever the user wants to configure different git identities for different projects, set up SSH commit signing, use separate SSH keys for work vs personal GitHub accounts, migrate from a single global git identity to per-directory profiles, or replicate this kind of setup on a new machine. Trigger even if the user just says "set up my git identities" or "configure work and personal git separately".
+description: Sets up per-directory git identity profiles (email, SSH signing key, SSH auth key, commit signing) using gitconfig includeIf. Use this whenever the user wants to configure different git identities for different projects, set up SSH commit signing, use separate SSH keys for work vs personal GitHub accounts, migrate from a single global git identity to per-directory profiles, or replicate this kind of setup on a new machine. Trigger even if the user just says "set up my git identities" or "configure work and personal git separately".
 ---
 
 # Git Multi-Identity Setup

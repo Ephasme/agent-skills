@@ -10,7 +10,7 @@ one sibling skill, so this phase is one call.
 
 ## The call
 
-Run `/engineering-perso:plan-hardening --fix <plan-file>` — with **`--fix`**, naming the plan
+Run the `plan-hardening` skill with `--fix <plan-file>` — with **`--fix`**, naming the plan
 file explicitly, and **without `--fast`**.
 
 - **`--fix`** — without it the skill reports and stops, which is the wrong shape here: this
@@ -56,4 +56,4 @@ Minor/nice-to-have findings don't block; carry them to the Phase-9 handoff.
 plateau reached and the remainder surfaced).
 
 **Exit receipt example:**
-`✅ Phase 3 (HARDEN) — engineering-perso:plan-hardening --fix — 3 rounds: 5 major → 2 major → 0, closing sweep clean; plan amended (migration back-fill, cache invalidation)`
+`✅ Phase 3 (HARDEN) — plan-hardening --fix — 3 rounds: 5 major → 2 major → 0, closing sweep clean; plan amended (migration back-fill, cache invalidation)`

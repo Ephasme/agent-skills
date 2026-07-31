@@ -1,6 +1,18 @@
 ---
 name: tcc
-description: Sourced, adversarially verified research corpus on TCC (thérapie cognitivo-comportementale / cognitive behavioural therapy), compiled 2026-07-28 with ~210 cited primary sources. Use for ANY question about CBT or TCC — what it is, whether it works for a given disorder and how well, effect sizes and why the headline numbers are inflated, techniques and session doses, exposure and ERP, behavioural activation, third-wave therapies (ACT, DBT, MBCT, schema therapy, MCT), EMDR versus trauma-focused CBT, the guideline landscape (NICE, HAS, APA, WHO mhGAP, VA/DoD), internet CBT and mental-health apps and AI therapy chatbots, and the French practical reality (who may legally practise, "Mon soutien psy" rules and tariffs, ALD, access). Also use when asked whether a CBT claim is still current, or to extend or re-verify this corpus. Trigger on "TCC", "thérapie cognitivo-comportementale", "CBT", "cognitive behavioural therapy", "psychothérapie", "Mon soutien psy", or a named CBT technique or third-wave therapy — including casual phrasings like "does CBT actually work", "how many sessions", "is CBT better than antidepressants", "combien de séances", "est-ce remboursé".
+description: >-
+  Sourced, adversarially verified research corpus on TCC (thérapie
+  cognitivo-comportementale / cognitive behavioural therapy), compiled 2026-07-28 from
+  ~210 cited primary sources. Use for any question about CBT or TCC — what it is,
+  whether it works for a given disorder and how well, effect sizes and why headline
+  numbers are inflated, techniques and session doses, exposure and ERP, behavioural
+  activation, third-wave therapies (ACT, DBT, MBCT, schema therapy, MCT), EMDR versus
+  trauma-focused CBT, the guideline landscape (NICE, HAS, APA, WHO mhGAP, VA/DoD),
+  internet CBT, mental-health apps and AI therapy chatbots, and the French practical
+  reality (who may legally practise, "Mon soutien psy", ALD, access). Also when asked
+  whether a CBT claim is still current, or to extend or re-verify the corpus. Triggers:
+  "TCC", "CBT", "psychothérapie", "Mon soutien psy", a named CBT technique or third-wave
+  therapy, and phrasings like "does CBT actually work", "combien de séances".
 ---
 
 # TCC research corpus
@@ -9,15 +21,15 @@ A standing evidence base on TCC (*thérapie cognitivo-comportementale* = cogniti
 
 ## Files
 
-All paths relative to `$SKILL_DIR/references/`.
-
-**`$SKILL_DIR` is notation, not a variable that is already set** — it stands for this skill's own directory, the absolute path printed in this skill's preamble. Build every Read and Bash path from that, or export it once (`SKILL_DIR=<that path>`) before running any command below.
+**`$SKILL_DIR` is notation, not a variable that is already set** — it stands for this skill's own directory, the absolute path printed when the skill is loaded, or the directory holding this `SKILL.md`. Build every read and shell path from that, or export it once (`SKILL_DIR=<that path>`) before running any command below.
 
 | File | What it is | When to open it |
 |---|---|---|
-| `handbook.md` | The operating manual — source registry, decay schedule, trap list, contested register, work queue, method | **Before any substantive research.** Always for a trap, source-admissibility or currency question |
-| `dossier.md` | The findings. 12 sections, ~210 sources, every claim cited inline. 1,340 lines with very long lines | For the answer itself. Read the section the domain map names, with `offset`/`limit` — never the whole file |
-| `source-ledger.md` | Every source used, with its type, date and **why it was acceptable** — 526 rows grouped by research angle | To judge whether a new source class is admissible, or to check whether a claim was read at source or only via an abstract |
+| [`references/handbook.md`](references/handbook.md) | The operating manual — source registry, decay schedule, trap list, contested register, work queue, method | **Before any substantive research.** Always for a trap, source-admissibility or currency question |
+| [`references/dossier.md`](references/dossier.md) | The findings. 12 sections, ~210 sources, every claim cited inline. 1,340 lines with very long lines | For the answer itself. Read the section the domain map names, in ranges — never the whole file |
+| [`references/source-ledger.md`](references/source-ledger.md) | Every source used, with its type, date and **why it was acceptable** — 526 rows grouped by research angle | To judge whether a new source class is admissible, or to check whether a claim was read at source or only via an abstract |
+
+Below, a bare `handbook.md` / `dossier.md` / `source-ledger.md` means that file under `$SKILL_DIR/references/`.
 
 The corpus was condensed from a thirteen-file raw research layer that has since been **deleted**, though its 526 ledger rows are preserved verbatim in `source-ledger.md`; `dossier.md` §12 records what each deleted file covered and how to recover it from git. Because the dossier was written by an editor reading those files rather than the primary sources, a load-bearing claim deserves one fetch of its cited source — check `source-ledger.md` first, since it often records whether that source was read in full.
 

@@ -14,6 +14,15 @@ the "Return" sections into schemas; otherwise pass them as plain instructions.
 For small scopes you won't spawn anything — do the work inline. Reach for these
 when the change spans several areas and parallel updaters pay off.
 
+## Contents
+
+- [Scope / impact scout (Phase 1, optional for large diffs)](#scope-impact-scout-phase-1-optional-for-large-diffs)
+- [Doc updater (Phase 2 — the core)](#doc-updater-phase-2-the-core)
+- [Reconciler (Phase 3)](#reconciler-phase-3)
+- [Verifier (Phase 4 — final sweep)](#verifier-phase-4-final-sweep)
+
+---
+
 ---
 
 ## Scope / impact scout (Phase 1, optional for large diffs)

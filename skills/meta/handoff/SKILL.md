@@ -1,29 +1,46 @@
 ---
 name: handoff
-description: Compact the current conversation into a handoff document for another agent to pick up.
-argument-hint: "[--output=pack|file|chat] [--send=<target>] [--move] What will the next session be used for?"
+description: >-
+  Compacts the current conversation into a handoff document a fresh agent can pick the
+  work up from, optionally bundling everything it depends on into a self-contained
+  archive and shipping that to another machine. Use when the user asks for a handoff,
+  a session summary to carry forward, a context dump for the next session, or wants
+  the current work moved to another machine or agent. Invoke only on an explicit
+  request — never load it on your own initiative, since it summarises rather than
+  advances the work in progress.
+compatibility: Packing and sending need a Unix-like local and remote host with tar, ssh, and rsync or scp.
 disable-model-invocation: true
 ---
 
 # Handoff
 
 > **`$SKILL_DIR` in the commands below is notation, not a variable that is already set.** It stands
-> for this skill's own directory — the absolute path printed in the skill preamble. Export it once
-> (`SKILL_DIR=<that path>`) before running any of them.
+> for this skill's own directory — the absolute path printed when the skill is loaded, or the
+> directory holding this `SKILL.md`. Export it once (`SKILL_DIR=<that path>`) before running any of
+> them.
+
+**Explicit invocation only.** Some agents honour the `disable-model-invocation` frontmatter above;
+where that key is ignored, this paragraph is the rule — do not load this skill because a handoff
+sounds relevant, only because the user asked for one.
 
 Write a handoff document summarising the current conversation so a fresh agent can continue the work.
 
-Include a "suggested skills" section in the document, which suggests skills that the agent should invoke.
+Include a "suggested skills" section in the document, naming the skills the next agent should invoke.
 
 Do not duplicate content already captured in other artifacts (PRDs, plans, ADRs, issues, commits, diffs). Reference them by path or URL instead — that keeps the handoff short and avoids drift from the source of truth.
 
 Redact any sensitive information, such as API keys, passwords, or personally identifiable information.
 
-If the user passed additional arguments beyond the `--output`/`--send`/`--move` flags, treat them as a description of what the next session will focus on and tailor the doc accordingly.
+## Arguments
+
+| Argument | Meaning |
+|---|---|
+| `--output=chat\|file\|pack` | Where the handoff goes. Default `chat`. |
+| `--send=<target>` | After building a pack, copy it to `<target>` (an ssh destination). Requires `--output=pack`. |
+| `--move` | Unpack the sent archive into the matching project on the target. Requires `--send`. |
+| *anything else* | Prose describing what the next session will focus on. Tailor the document to it. |
 
 ## Output modes
-
-Pass `--output=<mode>` to choose where the handoff goes. Default: `chat`.
 
 - `chat` (default) — output the document directly in the chat response. It's meant to be read or copied right away, not hunted for on disk.
 - `file` — save the document to a single markdown file in the temporary directory of the user's OS (not the current workspace), named meaningfully with today's date, e.g. `handoff-<topic>-YYYY-MM-DD.md`. Dependencies stay referenced by path/URL, same as `chat`.
@@ -34,7 +51,7 @@ Pass `--output=<mode>` to choose where the handoff goes. Default: `chat`.
 1. Create a staging directory in the OS temp dir, e.g. `handoff-<topic>-YYYY-MM-DD/`.
 2. Identify what the handoff depends on, and for each one decide whether it can be bundled or must stay a live reference:
    - The current conversation transcript, if one is accessible on disk — bundle it.
-   - Plan documents (e.g. from `superpowers:writing-plans`) relevant to the handed-off work — bundle them.
+   - Plan documents relevant to the handed-off work — bundle them.
    - Temporary/scratch files created during the session that the next agent would need (e.g. anything under the session's scratchpad directory) — bundle them.
    - Other local files the handoff depends on (PRDs, ADRs, notes) — bundle only what's referenced, not the whole repo.
    - Remote dependencies (a GitHub issue/PR, a Linear ticket, a Notion doc) — fetch their current content and bundle it as a snapshot file (markdown or JSON) when feasible; that's what makes the pack usable without network/credential access on the other end. If a snapshot isn't feasible, it stays a URL reference.

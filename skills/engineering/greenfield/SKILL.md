@@ -1,20 +1,18 @@
 ---
 name: greenfield
 description: >-
-  Convert one or more documents into a clean "greenfield" version that describes
-  only the current state — as if the system/project were freshly designed with no
-  past — by stripping all legacy content: history and evolution narratives,
-  decision records / ADRs, deprecation and migration notes, embedded changelogs
-  and release notes, rejected or abandoned alternatives, back-compat sections, and
-  dated/temporal commentary. By default nothing is deleted: every removed passage is
-  preserved verbatim, with its original location, in a sibling `{name}.changelog.md`;
-  passing `--no-changelog` makes the trim destructive, discarding removed content
-  instead of saving it. Use whenever the user says "greenfield this", "make this
-  doc/spec read fresh", "strip the history / legacy / ADRs / decision records",
-  "remove the migration and deprecation notes", "clean this up for handoff", or "I
-  want only the current state, no baggage". Handles a single document directly; when
-  given many documents (a list, a glob, or a directory) it fans out **one sub-agent
-  per document** and processes them in parallel.
+  Converts one or more documents into a "greenfield" version describing only the
+  current state — as if the system were freshly designed with no past — by stripping
+  every kind of legacy content: history and evolution narratives, decision records and
+  ADRs, deprecation and migration notes, embedded changelogs and release notes,
+  rejected alternatives, back-compat sections, and dated commentary. Nothing is deleted
+  by default: each removed passage is preserved verbatim, with its original location,
+  in a sibling {name}.changelog.md; --no-changelog makes the trim destructive instead.
+  Use whenever the user says "greenfield this", "make this doc read fresh", "strip the
+  history / legacy / ADRs / decision records", "remove the migration and deprecation
+  notes", "clean this up for handoff", or "I want only the current state, no baggage".
+  Handles one document directly and many documents — a list, a glob, or a directory —
+  one at a time, in parallel where possible.
 ---
 
 # Greenfield
@@ -225,7 +223,10 @@ Rules for the changelog:
 ## Orchestration: single vs many
 
 - **One document** → run the **Per-document procedure** directly and report.
-- **Many documents** → spawn **one sub-agent per document, in parallel**. Each
+- **Many documents** → spawn **one sub-agent per document, in parallel**; where
+  sub-agents aren't available, process the documents one at a time in this context,
+  finishing and writing out each before opening the next. The isolation is what
+  matters, not the concurrency. Each
   sub-agent owns exactly one file and must not read or write any other input file
   (isolation keeps runs independent and prevents cross-contamination). **Pass the run's
   mode to every sub-agent** — a sub-agent cannot infer it, and one that assumes the

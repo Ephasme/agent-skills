@@ -114,6 +114,12 @@ Then ask the user to confirm or adjust. Wait for sign-off before Phase 2.
 
 ## Phase 2 — Parallel authoring (the fleet)
 
+**Parallelism is an optimisation, not a requirement.** If this agent can dispatch
+sub-agents, give each area its own — that is what keeps the contexts clean and
+the run fast. If it cannot, work the same list yourself, one area at a time,
+writing each result to its file before starting the next. Never drop an area for
+lack of parallelism, and never widen one agent's scope to cover two.
+
 Spawn one subagent per area, in parallel. Each agent gets a brief built from the
 template in `references/agent-briefs.md` (the "Area author" brief), parameterized
 with: its area, the exact code paths it owns, the existing docs to verify, the

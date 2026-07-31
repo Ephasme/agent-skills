@@ -24,7 +24,23 @@ precede it: nothing reaches the PR that didn't come through this door. (Phases 5
 too — verification fixes and review fixes are code — but they amend what this phase built; they
 don't smuggle in what it never saw.)
 
-## The procedure (owned — dispatched via the Agent tool)
+## Contents
+
+- [The procedure (owned — every step dispatched to a sub-agent)](#the-procedure-owned-every-step-dispatched-to-a-sub-agent)
+- [Freeze check, first](#freeze-check-first)
+- [Create the feature branch](#create-the-feature-branch)
+- [Pre-flight gate — say the cost before you spend it](#pre-flight-gate-say-the-cost-before-you-spend-it)
+- [The per-task loop](#the-per-task-loop)
+- [Handling implementer status](#handling-implementer-status)
+- [Model selection](#model-selection)
+- [Constructing reviewer prompts — the discipline](#constructing-reviewer-prompts-the-discipline)
+- [File handoffs](#file-handoffs)
+- [Durable progress](#durable-progress)
+- [Handling a stuck task](#handling-a-stuck-task)
+
+---
+
+## The procedure (owned — every step dispatched to a sub-agent)
 
 1. **Read the plan once.** Note the scene-setting context and the **Global Constraints** section
    (you'll hand those to every reviewer). Create a todo per task.
@@ -97,7 +113,7 @@ the resolved absolute paths rather than the notation.
 4. **Handle the implementer's status** (see below) until it reports DONE.
 5. **Build the review package.** `$SKILL_DIR/scripts/review-package BASE HEAD` — writes the commit list, stat
    summary, and full diff to one file and prints the path. It never enters your context.
-6. **Dispatch both task reviewers, in parallel.** One message, two `Agent` calls — one using
+6. **Dispatch both task reviewers, in parallel.** One turn, two sub-agents — one using
    [`prompts/task-spec-reviewer.md`](prompts/task-spec-reviewer.md), one using
    [`prompts/task-quality-reviewer.md`](prompts/task-quality-reviewer.md). Hand each the same three
    paths — the brief, the implementer's report, and the review package — plus the Global Constraints

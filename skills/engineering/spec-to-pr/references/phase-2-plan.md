@@ -6,6 +6,19 @@ and the one Phase 4 hands task by task to its per-task build loop — so its job
 enough to be wrong**. A plan vague enough that no reviewer can disagree with it is a plan nobody
 can implement task by task, either.
 
+## Contents
+
+- [Write the plan yourself — in plan mode, no code](#write-the-plan-yourself-in-plan-mode-no-code)
+- [Plan document header](#plan-document-header)
+- [File structure, then tasks](#file-structure-then-tasks)
+- [Task structure](#task-structure)
+- [No placeholders](#no-placeholders)
+- [What the plan must carry (checklist)](#what-the-plan-must-carry-checklist)
+- [Self-review before you exit](#self-review-before-you-exit)
+- [Write it down — as a file](#write-it-down-as-a-file)
+
+---
+
 ## Write the plan yourself — in plan mode, no code
 
 This phase owns its own planning procedure; it does not hand off to a plan-writing skill. Enter

@@ -1,9 +1,9 @@
 ---
 name: plan-hardening
 description: >-
-  Harden an engineering plan against reality — verify every claim it makes against the
-  codebase and the docs, surface the collateral damage it doesn't handle, and close with a
-  structural sweep for the ambiguity, missing contracts, and unstated invariants that claim
+  Hardens an engineering plan against reality — verifies every claim it makes against the
+  codebase and the docs, surfaces the collateral damage it doesn't handle, and closes with
+  a structural sweep for the ambiguity, missing contracts, and unstated invariants that claim
   verification cannot catch. Reports by default and changes nothing; pass --fix to also
   apply fixes and re-review until a round finds nothing. Use when the user hands over a
   plan, design doc, RFC, ADR, refactor proposal, or migration document and asks anything
@@ -31,7 +31,7 @@ All four combinations are legal. **REPORT is read-only on the plan file itself**
 
 Say which mode ran, in the first line of the output.
 
-**Invocation:** `/engineering-perso:plan-hardening [--fix] [--fast] [<plan-file>]`. A path argument names the plan directly and skips Step 0's discovery — which is how another skill should call this one, since a caller always knows its own plan file and shouldn't make this skill guess from conversational context.
+**Invocation:** `plan-hardening [--fix] [--fast] [<plan-file>]`, however this agent invokes skills. A path argument names the plan directly and skips Step 0's discovery — which is how another skill should call this one, since a caller always knows its own plan file and shouldn't make this skill guess from conversational context.
 
 ## Guardrails
 
@@ -80,7 +80,7 @@ Rank every finding as **critical**, **major**, or **minor**:
 
 **REPORT mode asks nothing.** There is no fix to gate on an answer, so every open choice becomes an entry in the report's *Open questions* section — the finding, the options, and the implication of each — for the caller to resolve. The rest of this step (ranking) applies in both modes.
 
-For any critical or major finding where there's a real choice to make (tradeoffs, design preferences, scope decisions), ask the user before moving to Step 3. Use a structured question tool when one is available (`AskUserQuestion` in Claude Code). Gather every open question first and ask them in one round rather than dripping them one at a time. For each, state the finding, the options, and the implication of each option concretely.
+For any critical or major finding where there's a real choice to make (tradeoffs, design preferences, scope decisions), ask the user before moving to Step 3. Use a structured multiple-choice prompt if this agent has one; otherwise ask in plain text with the options numbered. Gather every open question first and ask them in one round rather than dripping them one at a time. For each, state the finding, the options, and the implication of each option concretely.
 
 Findings with a clear right answer don't need a question — they go straight to Step 3. Minor findings are noted for the final summary but not fixed.
 

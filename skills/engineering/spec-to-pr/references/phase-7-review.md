@@ -15,7 +15,7 @@ assembled.
 
 ## The call
 
-Run `/engineering-perso:two-axis-review --since <merge-base> --spec <plan-file>`, with the
+Run the `two-axis-review` skill with `--since <merge-base> --spec <plan-file>`, with the
 arguments filled in so it skips its own discovery. Hand it:
 
 - **The fixed point** — the feature branch's merge-base with the default branch, so the review
@@ -61,4 +61,4 @@ finding you reject on inspection is a fine outcome; a finding you quietly ignore
 **Exit:** two reports, findings enumerated and triaged.
 
 **Exit receipt example:**
-`✅ Phase 7 (REVIEW) — engineering-perso:two-axis-review on abc1234...HEAD — Standards: 3 findings (1 major); Spec: 2 findings (1 critical: rate limit applied per key, AC says per tenant)`
+`✅ Phase 7 (REVIEW) — two-axis-review on abc1234...HEAD — Standards: 3 findings (1 major); Spec: 2 findings (1 critical: rate limit applied per key, AC says per tenant)`

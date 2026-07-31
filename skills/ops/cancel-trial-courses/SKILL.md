@@ -1,7 +1,7 @@
 ---
 name: cancel-trial-courses
 description: >-
-  Execute Edouard's recurring month-end "cancel the trials" request against the
+  Executes Edouard's recurring month-end "cancel the trials" request against the
   Sherpas production database. Trigger whenever someone asks to cancel / "passer
   en canceled" the trials for a list of chatroom IDs (CR IDs) — list pasted
   inline in a Slack message, linked in a Google Sheet, or attached as a CSV.

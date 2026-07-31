@@ -32,3 +32,20 @@ jobs:
             echo "::error::expected $expected skills, CLI reported otherwise"
             exit 1
           fi
+
+      # Proves the portability claim rather than asserting it: the whole catalog
+      # must install for agents that are not Claude Code.
+      - name: Portability install
+        run: |
+          set -euo pipefail
+          expected=$(find skills -name SKILL.md | wc -l)
+          work=$(mktemp -d)
+          git -C "$work" init -q .
+          out=$(cd "$work" && npx -y skills add "$GITHUB_WORKSPACE" \
+                  -a codex -a cursor -a opencode -a gemini-cli -s '*' -y 2>&1 \
+                | sed 's/\x1b\[[0-9;]*[a-zA-Z]//g')
+          echo "$out"
+          if ! grep -q "Installed $expected skills" <<<"$out"; then
+            echo "::error::not every skill installed for the non-Claude targets"
+            exit 1
+          fi

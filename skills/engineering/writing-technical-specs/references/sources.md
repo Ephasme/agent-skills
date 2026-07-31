@@ -4,14 +4,13 @@ The authoritative grounding behind the templates and guidance in this skill. Eac
 template's section choices and rules trace to one or more of these. Recorded so a
 user can audit the provenance and so the skill's cite-or-refuse discipline has a
 foundation to point at. (Compiled from a Phase-1-style research pass over standards
-bodies, recognized practitioners, and Anthropic's own skill-authoring docs.)
+bodies and recognized practitioners.)
 
 ## Contents
 - [Standards bodies](#standards-bodies)
 - [Architecture decision records](#architecture-decision-records)
 - [Named templates & models](#named-templates--models)
 - [Industry design-doc / RFC practice](#industry-design-doc--rfc-practice)
-- [Anthropic skill authoring](#anthropic-skill-authoring)
 - [Caveats — what is not fully verified](#caveats--what-is-not-fully-verified)
 
 ## Standards bodies
@@ -97,20 +96,6 @@ bodies, recognized practitioners, and Anthropic's own skill-authoring docs.)
 - **Amazon "Working Backwards" (Bryar & Carr)** — narrative six-pager over bullets;
   PR/FAQ written before building. Summary: https://commoncog.com/working-backwards/
 
-## Anthropic skill authoring
-
-- **Agent Skills — overview** — required frontmatter (`name`, `description`);
-  three-level progressive disclosure. https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview
-- **Skill authoring best practices** — `description` is the trigger signal (third
-  person, what + when); SKILL.md < 500 lines; references one level deep with a TOC
-  if > 100 lines; be concise; concrete examples; consistent terminology; avoid
-  time-sensitive info. https://platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices
-- **Claude Code — skills** — extended frontmatter (all optional; `description`
-  recommended); plugin skill layout `<plugin>/skills/<name>/SKILL.md`.
-  https://code.claude.com/docs/en/skills
-- **Engineering blog — Equipping agents with Agent Skills** (referenced):
-  https://www.anthropic.com/engineering/equipping-agents-for-the-real-world-with-agent-skills
-
 ## Caveats — what is not fully verified
 
 - The **engineering-RFC section pattern** has no single normative standard; it's a
@@ -125,7 +110,3 @@ bodies, recognized practitioners, and Anthropic's own skill-authoring docs.)
 - **IEEE 1016-2009** explicit requirement-to-design-element traceability wording is
   unverified; the 1998 edition's mandate ("each requirement must be traceable to
   one or more design entities") is verbatim-sourced.
-- Anthropic **base-standard** `description` validation limit is 1024 chars; Claude
-  Code displays a combined `description`+`when_to_use` listing capped at 1536. A
-  `license`/`metadata` frontmatter field and an `assets/` directory convention were
-  not found in the docs read (unverified).

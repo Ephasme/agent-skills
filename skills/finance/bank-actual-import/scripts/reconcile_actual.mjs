@@ -3,9 +3,9 @@
 // csv_to_transactions.py. Requires @actual-app/api (see SKILL.md for
 // install). Destructive by design (deletes existing transactions before
 // re-importing the full history) — refuses to touch anything without
-// --confirm, and Claude Code's own auto-mode classifier will independently
-// gate the actual delete/insert call. That's a feature, not a bug: don't try
-// to route around it.
+// --confirm. An agent's command-approval layer will likely gate the actual
+// delete/insert call on top of that. Both are features, not bugs: don't try
+// to route around either.
 //
 // Usage:
 //   node reconcile_actual.mjs --list-accounts

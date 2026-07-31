@@ -1,6 +1,6 @@
 ---
 name: executing-autonomously
-description: Use when Loup hands off work to finish unattended and tells you to run in complete autonomy — "don't stop", "don't ask", "do it until it's done", "use your judgment", "don't wait for me", "just keep going", "do all of this on your own", to work through the remaining plans/phases yourself, or otherwise signals they won't be available to answer until the work is complete.
+description: Runs a queue of plans or phases to completion without check-ins, re-hardening each plan before executing it and stopping only on a hard physical block. Use when Loup hands off work to finish unattended and tells you to run in complete autonomy — "don't stop", "don't ask", "do it until it's done", "use your judgment", "don't wait for me", "just keep going", "do all of this on your own", to work through the remaining plans/phases yourself, or otherwise signals they won't be available to answer until the work is complete.
 ---
 
 # Executing autonomously
@@ -13,8 +13,8 @@ Loup has handed off a multi-step build — often a queue of plans or phases — 
 
 1. Finish the task in progress.
 2. Take the next plan/phase in the queue.
-3. **Re-harden it before executing** — fold in everything you learned implementing the previous phase(s); assumptions it made may now be known-true or known-false, so fix the plan first. (Use `engineering-perso:plan-hardening --fix` — the flag is what makes it amend the plan rather than just report.)
-4. Implement it inline, fully — then verify it (`superpowers:verification-before-completion`).
+3. **Re-harden it before executing** — fold in everything you learned implementing the previous phase(s); assumptions it made may now be known-true or known-false, so fix the plan first. (Use the `plan-hardening` skill with `--fix` if it is installed — the flag is what makes it amend the plan rather than just report. Otherwise re-read the plan against the code yourself and correct it in place.)
+4. Implement it inline, fully — then verify it: run the tests, run the thing, and confirm the acceptance criteria hold. "Implemented" is not "verified".
 5. Repeat until the queue is empty.
 
 ## Autonomy rules

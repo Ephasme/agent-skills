@@ -3,16 +3,26 @@
 Reference for `bulk_config.py`. Read this to configure many plugins at once and
 to feed values from files or an encrypted secrets store instead of typing them.
 
-The personal purpose-plugins (`~/.agents/plugins/<purpose>/`, tracked by yadm) never need
-this: their credentials are plain `${KEY}` env vars exported by `~/.config/secrets.zsh`,
-which `yadm decrypt` restores at bootstrap. `bulk_config.py --from-sops` is for third-party
-plugins that still declare `userConfig` and whose values sit in a SOPS-encrypted repo.
+`bulk_config.py --from-sops` is for plugins that declare `userConfig` and whose values
+sit in a SOPS-encrypted repo. Plugins reading plain `${KEY}` env vars need none of this.
+
+## Contents
 
 - [The value-pool model](#the-value-pool-model)
 - [Sources](#sources)
 - [Decrypting a SOPS secrets dir](#decrypting-a-sops-secrets-dir)
 - [Routing, filtering, profiles](#routing-filtering-profiles)
 - [Reading the report](#reading-the-report)
+
+## Contents
+
+- [The value-pool model](#the-value-pool-model)
+- [Sources](#sources)
+- [Decrypting a SOPS secrets dir](#decrypting-a-sops-secrets-dir)
+- [Routing, filtering, profiles](#routing-filtering-profiles)
+- [Reading the report](#reading-the-report)
+
+---
 
 ## The value-pool model
 

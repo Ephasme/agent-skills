@@ -27,7 +27,7 @@ Corpus compiled **2026-07-28**. Read [§5 Decay schedule](#5-decay-schedule--wha
 
 ### 1.1 What exists
 
-The corpus is the `tcc` skill, in the `health` category of the `agent-skills` repo. Its home is `$SKILL_DIR/` — this skill's own directory, whose absolute path the skill preamble prints — and every path below is relative to `$SKILL_DIR/references/`.
+The corpus is the `tcc` skill, in the `health` category of the `agent-skills` repo. Its home is `$SKILL_DIR/` — this skill's own directory, the absolute path printed when the skill is loaded — and every path below is relative to `$SKILL_DIR/references/`.
 
 | File | Role | Size |
 |---|---|---|
@@ -303,7 +303,7 @@ Items 2, 7, 9–10, 14, 17–18, 21, 23–24, 27–30, 32, 35–39, 41–43, 45�
 
 ### 10.1 What produced it
 
-A 25-agent workflow, run 2026-07-28: nine parallel angle researchers → one adversarial verifier per angle (editing files in place) → a deprecation auditor plus a completeness critic → four gap-fill researchers → one editor. Script preserved at `~/.claude-perso/projects/-Users-loup-code-perso-me/<session>/workflows/scripts/tcc-deep-research-*.js`.
+A 25-agent workflow, run 2026-07-28: nine parallel angle researchers → one adversarial verifier per angle (editing files in place) → a deprecation auditor plus a completeness critic → four gap-fill researchers → one editor. Reproduce that shape rather than the original orchestration script, which was session-local and is gone.
 
 **All nine angles came back `CORRECTED`, none clean.** That is the base rate to expect: a first-pass researcher under cite-or-refuse rules still fabricates quotes and cites superseded guidance. **The verification pass is not optional.**
 
@@ -331,4 +331,4 @@ Preserve the structure — the next agent depends on it:
 
 ### 10.4 Language convention
 
-Repo convention is English (see the repo `CLAUDE.md`). French clinical and institutional terms stay verbatim with a gloss on first use: **TCC**, **HAS**, **RBP**, **ALD**, **EDC**, **"Mon soutien psy"**, **AFTCC**. Folder and file names stay English.
+Repo convention is English (see the repo's agent instructions — `AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, whichever it carries). French clinical and institutional terms stay verbatim with a gloss on first use: **TCC**, **HAS**, **RBP**, **ALD**, **EDC**, **"Mon soutien psy"**, **AFTCC**. Folder and file names stay English.

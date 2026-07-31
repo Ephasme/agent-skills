@@ -104,6 +104,13 @@ For a corpus too large to hold in one context with care, **partition it and spaw
 `references/reader-brief.md`. You (the lead) do **not** read everything yourself —
 you merge what the readers return.
 
+**Parallelism is an optimisation, not a requirement.** If this agent can dispatch
+sub-agents, give each slice its own — that is what keeps the contexts clean and
+the run fast. If it cannot, work the same list yourself, one slice at a time,
+writing each result to its file before starting the next. Never drop a slice for
+lack of parallelism, and never widen one agent's scope to cover two.
+
+
 - **Each reader reads code, not just docs.** This is the point of the whole
   phase. A slice is a *subsystem* — its corpus material **and the actual code that
   implements it**. Every reader verifies the corpus claims in its slice against

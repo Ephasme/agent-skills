@@ -1,11 +1,11 @@
 ---
 name: two-axis-review
 description: >-
-  Review the changes since a fixed point (commit, branch, tag, or merge-base) along two
+  Reviews the changes since a fixed point (commit, branch, tag, or merge-base) along two
   independent axes — Standards (does the code follow this repo's documented standards, plus
   a code-smell baseline?) and Spec (does it match what the originating spec, issue, or PRD
-  asked for?). The two axes run as parallel subagents so neither pollutes the other's
-  context, and the reports are presented side by side without cross-axis reranking. Use
+  asked for?). The two axes run in separate contexts so neither pollutes the other, and the
+  reports are presented side by side without cross-axis reranking. Use
   when the user wants to review a branch, a PR, work-in-progress changes, or says "review
   since main", "review this branch", or "check this against the spec". Read-only — it
   reports findings and changes nothing.
@@ -29,17 +29,17 @@ reported **separately**:
 Merging the reports lets one axis mask the other, and reranking across them buries a real Spec
 failure under a pile of style notes. So this skill never merges and never re-ranks across axes.
 
-Running them as separate subagents matters for the same reason: one agent holding both jobs in one
-context will let a clean verdict on one axis soften a finding on the other.
+Keeping them in **separate contexts** matters for the same reason: one agent holding both jobs in
+one context will let a clean verdict on one axis soften a finding on the other.
 
 ## Inputs
 
 ```
-/engineering-perso:two-axis-review --since <ref> [--spec <path>] [--model <model>]
+two-axis-review --since <ref> [--spec <path>] [--model <model>]
 ```
 
 `--since` is the fixed point. A bare positional argument is accepted as `--since` (so
-`/two-axis-review main` works). Everything else is discovered per the table below. Anything the
+`two-axis-review main` works). Everything else is discovered per the table below. Anything the
 caller can't express as a flag — a roll-up of previously deferred findings, for instance — is
 passed as prose alongside the invocation, and read as additional context.
 
@@ -47,8 +47,8 @@ passed as prose alongside the invocation, and read as additional context.
 |---|---|
 | **Fixed point** | The argument, if given (SHA / branch / tag / `HEAD~5`). Otherwise the merge-base with the repo's default branch — **derive it and say so**, don't ask for what you can compute. |
 | **Spec** | An explicit `--spec` path → else a `spec-to-pr` plan file → else issue references parsed from `git log` (`#123`, `Closes #45`) fetched with `gh` → else ask. If there is genuinely no spec, **skip the Spec axis** and say so in the report. |
-| **Standards** | The repo's `CLAUDE.md` / `AGENTS.md`, `CONTRIBUTING.md`, `CODING_STANDARDS.md`, plus lint/format configs — the configs read to learn **what tooling already enforces, so the axis can skip it**. Always plus the smell baseline. |
-| **`--model`** | Model for both axis agents. Default: the most capable available — only two agents run, and this is the last gate before a human's time is spent. |
+| **Standards** | The repo's agent instructions (`AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, `.cursor/rules` — whichever exist), `CONTRIBUTING.md`, `CODING_STANDARDS.md`, plus lint/format configs — the configs read to learn **what tooling already enforces, so the axis can skip it**. Always plus the smell baseline. |
+| **`--model`** | Model for both axis agents, in whatever form this agent's model selector accepts. Default: the most capable available — only two agents run, and this is the last gate before a human's time is spent. |
 
 ## Step 1 — Pin the fixed point
 
@@ -78,8 +78,8 @@ empty diff must not be discovered inside two subagents that have already been pa
 ## Step 2 — Package the diff as a file
 
 > **`$SKILL_DIR` is notation, not a variable that is already set.** It stands for this skill's own
-> directory — the absolute path printed in the skill preamble. Export it once
-> (`SKILL_DIR=<that path>`) before running the command.
+> directory — the absolute path printed when the skill is loaded, or the directory holding
+> this `SKILL.md`. Export it once (`SKILL_DIR=<that path>`) before running the command.
 
 ```bash
 $SKILL_DIR/scripts/review-package <fixed-point> HEAD
@@ -95,19 +95,25 @@ Per the Inputs table. **List what you found** before dispatching, so the reader 
 change was judged against. "No standards file found, baseline only" is a useful thing to say out
 loud; silently reviewing against nothing is not.
 
-## Step 4 — Dispatch both axes in parallel
+## Step 4 — Run both axes, isolated from each other
 
-**One message, two `Agent` calls**, using
-[`references/prompts/standards-axis.md`](references/prompts/standards-axis.md) and
-[`references/prompts/spec-axis.md`](references/prompts/spec-axis.md).
+Use [`references/prompts/standards-axis.md`](references/prompts/standards-axis.md) and
+[`references/prompts/spec-axis.md`](references/prompts/spec-axis.md) as the two prompts.
 
-Set **`model` and `effort` explicitly on both** — an omitted model silently inherits the session's,
-usually the most expensive.
+**If this agent can dispatch sub-agents, dispatch both at once** — one per axis, in a single
+turn, so they run in parallel and neither sees the other's findings. Set the model and the
+reasoning effort explicitly on both; left unset they inherit the session's, usually the most
+expensive.
+
+**If it cannot,** run the axes yourself, one after the other, and **write each report to a file
+before starting the next**. Then clear what you can from context and read only the diff package
+again. Sequential is slower and leakier, but a review that skips an axis is worse than a review
+that runs them in series — never drop the Spec axis for lack of parallelism.
 
 Paste [`references/smell-baseline.md`](references/smell-baseline.md) into the Standards prompt
-**in full**: the subagent has no other access to it.
+**in full**: a dispatched agent has no other access to it.
 
-If there is no spec, dispatch only the Standards axis and say the Spec axis was skipped.
+If there is no spec, run only the Standards axis and say the Spec axis was skipped.
 
 ## Step 5 — Aggregate
 

@@ -1,6 +1,6 @@
 ---
 name: harden-case
-description: Make a case in this repository trustworthy before a deadline, payment, meeting, filing, third-party message, handoff, or archive. Use when asked to harden, audit, stress-test, poke holes in, comprehensively fact-check, tighten, or “durcir / vérifier / fiabiliser” a case; when a tracked journal has accumulated without human review; or when repeated updates have left uncertainty about what still holds.
+description: Makes a case in this repository trustworthy before a deadline, payment, meeting, filing, third-party message, handoff, or archive. Use when asked to harden, audit, stress-test, poke holes in, comprehensively fact-check, tighten, or “durcir / vérifier / fiabiliser” a case; when a tracked journal has accumulated without human review; or when repeated updates have left uncertainty about what still holds.
 ---
 
 # Harden a case

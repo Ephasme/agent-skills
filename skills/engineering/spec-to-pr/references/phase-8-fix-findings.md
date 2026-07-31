@@ -13,7 +13,7 @@ The loop is what stops that.
    haste is a classic way to break a build you already proved green.
 3. **Push the fixes.** Pushing more commits to your *own already-open* PR branch is fine without a
    fresh prompt — the outward-facing decision was made at Phase 6's PR gate.
-4. **Re-review.** Run `engineering-perso:two-axis-review` again on the updated range.
+4. **Re-review.** Run `two-axis-review` again on the updated range.
 5. **Repeat until a clean pass** — no critical/major findings (loop-until-clean, SKILL Operating
    rules).
 

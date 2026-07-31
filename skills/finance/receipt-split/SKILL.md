@@ -1,6 +1,6 @@
 ---
 name: receipt-split
-description: Extract expense data from one or more French receipt photos and post each to Splitwise, split 50/50 between Loup (you) and Cassandra. Use whenever receipt or ticket photos are shared — a single photo, several, or a folder — and the user wants them on Splitwise (phrasings like add this receipt to Splitwise, split these tickets with Cassandra, ajoute ces reçus sur Splitwise, note this purchase to share), or asks to expense or split a bill — even if they don't say Splitwise out loud. Who paid is read from the CB card last-4 or the loyalty/fidélité account printed on the receipt (you keep a local identity registry); it asks when neither resolves, and always shows a summary you approve before creating anything.
+description: Extracts expense data from one or more French receipt photos and posts each to Splitwise, split 50/50 between Loup (you) and Cassandra. Use whenever receipt or ticket photos are shared — a single photo, several, or a folder — and the user wants them on Splitwise (phrasings like add this receipt to Splitwise, split these tickets with Cassandra, ajoute ces reçus sur Splitwise, note this purchase to share), or asks to expense or split a bill — even if they don't say Splitwise out loud. Who paid is read from the CB card last-4 or the loyalty/fidélité account printed on the receipt (you keep a local identity registry); it asks when neither resolves, and always shows a summary you approve before creating anything.
 ---
 
 # receipt-split — French receipts → Splitwise, split 50/50
@@ -9,14 +9,19 @@ Turn one or many receipt photos into Splitwise expenses, each split 50/50 betwee
 **Loup** (the current Splitwise user) and **Cassandra**. Receipts are **always French**
 (*ticket de caisse* + *facturette carte bancaire*).
 
-**Division of labour — two models, on purpose:**
-- **Sonnet 4.6 subagents** do the OCR: one per photo, in parallel — fast, cheap, strong at
-  messy thermal print. They export *everything* (line items, discounts, fees, totals,
-  payment method, card last-4, loyalty block).
-- **This orchestrating session (Opus 4.8)** does the *verification and the writes*:
-  recompute the sum from the items and reconcile it against the printed total; if it
-  doesn't add up, send the receipt back to Sonnet with specific comments and re-read.
-  Cheap OCR, careful arithmetic — the numbers get checked, not trusted.
+**Division of labour — two tiers, on purpose:**
+- **A mid-tier vision model does the OCR**, one reader per photo, in parallel — fast,
+  cheap, strong at messy thermal print. Each exports *everything* (line items, discounts,
+  fees, totals, payment method, card last-4, loyalty block).
+- **This orchestrating session does the verification and the writes**: recompute the sum
+  from the items and reconcile it against the printed total; if it doesn't add up, send
+  the receipt back to the reader with specific comments and re-read. Cheap OCR, careful
+  arithmetic — the numbers get checked, not trusted.
+
+If this agent can't dispatch sub-agents or pick a model, read the photos yourself, one at
+a time, and still do the arithmetic reconciliation as a **separate pass** over what you
+extracted. The two-tier split is a cost optimisation; the recompute-and-reconcile step is
+the correctness guarantee, and it is never optional.
 
 ## When to use
 
@@ -28,15 +33,16 @@ Not for: generating a payment QR (use `payment-qr`) or reading bank transactions
 
 ## Prerequisites
 
-- **Splitwise tools** reachable (`mcp__plugin_finance_splitwise__*`). If a call returns
-  `SPLITWISE_API_KEY is not set` / auth errors, the server isn't configured — say so and
-  stop; the writes can't happen.
+- **A Splitwise integration** reachable — an MCP server or equivalent exposing
+  `get_current_user`, `get_friends`, `create_expense`. If a call returns
+  `SPLITWISE_API_KEY is not set` or an auth error, it isn't configured — say so and stop;
+  the writes can't happen. Tool names are prefixed differently in each install; match by
+  the bare method name.
 - **Identity registry** — a local JSON mapping payment cards *and* loyalty accounts to a
   person, plus the two names. It holds personal data, so it lives **outside this public
   repo** and is never committed. Resolution order:
   1. `$RECEIPT_CARDS_REGISTRY`, else
-  2. `$CLAUDE_CONFIG_DIR/receipt-cards.json` (e.g. `~/.claude-perso/receipt-cards.json`), else
-  3. `~/.config/receipt-split/cards.json`.
+  2. `${XDG_CONFIG_HOME:-$HOME/.config}/receipt-split/cards.json`.
 
   Format:
   ```json
@@ -67,9 +73,9 @@ python scripts/prep.py <input> --out /tmp/<name>_upright.jpg
 ```
 
 **Why compress.** A raw phone shot is 12+ MP and several MB; that whole image gets base64'd
-into the OCR subagent's context — expensive — and Claude's vision pipeline downsamples
-anything past ~1568px on the long edge anyway, so the extra pixels cost tokens without
-buying legibility. The script caps the long edge (`--max-dim`, default 1568) and re-encodes
+into the reader's context — expensive — and vision pipelines generally downsample anything
+past ~1568px on the long edge anyway, so the extra pixels cost tokens without buying
+legibility. The script caps the long edge (`--max-dim`, default 1568) and re-encodes
 as JPEG (`--quality`, default 80). The defaults suit a typical thermal receipt; **pick per
 receipt** rather than treating them as fixed:
 - short, large-print ticket → go smaller (`--max-dim 1000 --quality 70`) to save more.
@@ -87,25 +93,25 @@ step 2's extractor reports the image is rotated/upside-down or its numbers fail 
 cross-check (step 3), re-orient and re-extract:
 ```bash
 python scripts/prep.py <input> --rotate 90    # or 270 / 180 (degrees clockwise)
-python scripts/prep.py <input> --all          # emit r0/r90/r180/r270; let Sonnet pick the legible one
+python scripts/prep.py <input> --all          # emit r0/r90/r180/r270; let the reader pick the legible one
 ```
 
 **Missing tooling.** The script needs Pillow (`pip install Pillow`) or macOS `sips`; for
 HEIC without `sips` it also needs `pillow-heif` (`pip install pillow-heif`). If it exits
 asking for one of these, relay the exact install command to the user and stop — do **not**
-fall back to handing the raw multi-MB image to the subagent, since that's the context
+fall back to handing the raw multi-MB image to the reader, since that's the context
 blow-up this step exists to prevent.
 
 PDFs are read directly. If you can't find any image, ask for the path rather than guessing.
 
-### 2. Extract each receipt with a Sonnet 4.6 subagent
+### 2. Extract each receipt
 
-Dispatch **one subagent per photo in a single message** (parallel) via the Agent tool with
-**`model: "sonnet"`**. For French-receipt specifics — which line is the amount paid
+Dispatch **one reader per photo, all in one turn** so they run in parallel, on a mid-tier
+vision model. For French-receipt specifics — which line is the amount paid
 (`NET A PAYER`/`RESTE A PAYER`/`TOTAL TTC`, never `HT`), comma decimals, the facturette,
 loyalty-vs-payment-card disambiguation — the detailed reference is
-[`references/french-receipts.md`](references/french-receipts.md); point the subagent there
-if a receipt is unusual. Give each subagent this prompt (substitute the path):
+[`references/french-receipts.md`](references/french-receipts.md); point the reader there
+if a receipt is unusual. Give each reader this prompt (substitute the path):
 
 > Read the French receipt image at `<ABSOLUTE_PATH>` and export its data. Return **only**
 > one JSON object, no prose:
@@ -143,8 +149,8 @@ For each extracted receipt, **you** recompute and check before going further:
   `tva_ttc` when those are present — each is an independent print of the same number.
 
 If everything agrees, the total is confident — proceed. **If anything is off**, send the
-receipt **back to the same Sonnet subagent** (continue it with SendMessage, or dispatch a
-fresh one) with a concrete comment, e.g.:
+receipt **back to the same reader** if this agent can resume one, otherwise dispatch a
+fresh reader with the same image, with a concrete comment either way, e.g.:
 
 > Your line items sum to 23.91 but the printed total is 23.94, and the facturette MONTANT
 > reads 23.94 — so an item amount is misread by ~0.03. Re-read the items digit by digit
@@ -227,7 +233,7 @@ distinctly — a partial batch should be obvious. Don't silently retry; you migh
 
 **Input:** "ajoute ce ticket sur splitwise, c'est Cassandra qui a payé" + `IMG_0228.HEIC`
 
-1. `prep.py` → upright, compressed JPG. A Sonnet subagent exports items, discounts, totals, and the
+1. `prep.py` → upright, compressed JPG. A reader exports items, discounts, totals, and the
    loyalty block: `total 23.94`, `total_crosscheck 23.94`, `tva_ttc 23.94`,
    `card_last4 null`, `loyalty {client_name:"De Carvalho", merchant_program:"Monoprix M'"}`.
 2. Reconcile: `Σ items − discounts + fees` ≈ 23.94 = total = crosscheck = TTC → confident.

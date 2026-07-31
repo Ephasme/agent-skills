@@ -1,7 +1,7 @@
 ---
 name: free-disk-space
 description: >-
-  Reclaim as much disk space as possible on a machine, aggressively but safely.
+  Reclaims as much disk space as possible on a machine, aggressively but safely.
   Use this whenever the user is low on disk space or wants to clean up their
   machine — phrasings like "free up space", "my disk is full", "running out of
   space", "clean my mac", "reclaim disk", "make room on this drive", or in French
@@ -50,8 +50,9 @@ report concrete wins and catch surprises.
    can do this without asking — it's the textbook reversible category and it's
    usually the biggest single win. Announce what you're clearing and the result.
 3. **Confirm the 🟠 tier.** Present the recoverable-with-impact items you found
-   (with sizes) and let the user pick. Use the AskUserQuestion tool with
-   multiSelect so they choose à la carte. Typical items: `node_modules` sweep,
+   (with sizes) and let the user pick. Use a multi-select prompt if this agent
+   has one, otherwise a numbered list they answer à la carte. Typical items:
+   `node_modules` sweep,
    Android SDK/AVD, extra iOS simulators/runtimes, Docker. Then execute the
    chosen ones (`scripts/reclaim-node-modules.sh`, `scripts/docker-reclaim.sh`).
 4. **Handle 🔴 personal data deliberately.** For Downloads / large personal
@@ -142,7 +143,7 @@ by category, delete the obvious, ask about the rest, and **protect documents**.
 2. Delete the unambiguous junk autonomously: **installers** (`.dmg`, `.pkg`),
    tool outputs (`iloveimg-*`, generated icon sets, `*.har`, browser captures),
    and dev/session artifacts. Apps are installed; installers re-download.
-3. Ask (AskUserQuestion, multiSelect) about the ambiguous-but-bulky categories:
+3. Ask — multi-select, à la carte — about the ambiguous-but-bulky categories:
    personal media, data exports (Google Takeout, DB dumps), sideload `.ipa`,
    old project zips.
 4. **Always preserve** documents (`*.pdf`), unless the user explicitly says

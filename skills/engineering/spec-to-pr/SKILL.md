@@ -2,10 +2,10 @@
 name: spec-to-pr
 disable-model-invocation: true
 description: >-
-  Drive one specification or ticket all the way to a reviewed pull request: understand it,
-  brainstorm the approach when it's open, plan it, harden the plan against the codebase,
-  implement it task by task through a subagent build loop, verify, open the PR, and fix
-  findings until it is clean. Use when the user hands over a unit of work to take to
+  Drives one specification or ticket all the way to a reviewed pull request: understands
+  it, brainstorms the approach when it's open, plans it, hardens the plan against the
+  codebase, implements it task by task through a subagent build loop, verifies, opens the
+  PR, and fixes findings until it is clean. Use when the user hands over a unit of work to take to
   completion — a raw spec (pasted or a file path), a Notion page/ID, a GitHub Issue or
   Project item, or a Linear issue — and asks to take it to a PR, ship it, implement it end
   to end, or drive it from spec to merge. It commits, pushes, and opens PRs, pausing to
@@ -22,13 +22,21 @@ test never silently rides through to a merged PR.
 
 This skill **owns** the phases at the heart of the pipeline — planning (Phase 2), the per-task
 build loop (Phase 4), and verification (Phase 5) are procedures it carries inline. The two it
-delegates go to its own siblings in this plugin: **`engineering-perso:plan-hardening`** hardens
-the plan (Phase 3) and **`engineering-perso:two-axis-review`** reviews the finished branch
-(Phase 7). Both are hard requirements, not preferences — see the operating rules. Nothing here
-depends on a third-party skill, and nothing here runs a dynamic multi-agent workflow runtime —
-the fan-out that remains is plain parallel agent dispatch, where the work is genuinely parallel.
-It runs only when you invoke it explicitly — it pushes branches and opens PRs, which must never
-happen on a guess.
+delegates go to two skills from this same catalog: **`plan-hardening`** hardens the plan
+(Phase 3) and **`two-axis-review`** reviews the finished branch (Phase 7). Both are hard
+requirements, not preferences — see the operating rules. Nothing here depends on a third-party
+skill or a workflow runtime; the fan-out that remains is plain parallel agent dispatch, where
+the work is genuinely parallel.
+
+**Explicit invocation only.** It pushes branches and opens PRs, which must never happen on a
+guess. Some agents honour the `disable-model-invocation` frontmatter above; where that key is
+ignored, this paragraph is the rule.
+
+**It needs an agent that can dispatch sub-agents.** Phase 4's build loop and Phase 7's review
+depend on fresh, isolated contexts per task — a single context implementing and then reviewing
+its own work is exactly the check this pipeline exists to provide. If sub-agents are
+unavailable, say so and stop rather than running a version of the pipeline whose receipts
+would overstate what happened.
 
 ## RULE ZERO — no code before Phase 4 (absolute, overrides everything below)
 
@@ -51,8 +59,8 @@ guarantees.
 - **Paste the canonical rule block from [`references/rule-zero-no-code.md`](references/rule-zero-no-code.md)
   verbatim into every subagent you dispatch in Phases 0–3**, whatever its job. Assume no agent
   knows this rule unless you tell it.
-- **Prefer read-only agents** (`Explore`) for exploration — a tool the agent doesn't have is a
-  rule it cannot break.
+- **Prefer read-only agents** for exploration, if this agent can restrict a sub-agent's tools —
+  a tool the agent doesn't have is a rule it cannot break.
 - **If an agent broke the freeze**, revert the edit, say so, and re-enter the change as a plan
   amendment. It never reaches Phase 4's base commit.
 - **Check the tree before Phase 4 launches** — `git status --porcelain` shows nothing but the
@@ -87,10 +95,11 @@ what to do when you think you need an exception.
 This pipeline only works if every phase actually runs, in order, with its gate honoured. To
 make that auditable instead of best-effort, **do these two things — they are not optional:**
 
-1. **Open the ledger first.** Before Phase 0, call **TodoWrite** with all the phases
-   (0–9, including the conditional Phase 1.5) as separate items, in order. This is the first action the skill takes — before
-   reading the ticket, before any tool call. The ledger stays in front of you for the whole
-   run so a phase can't quietly fall off.
+1. **Open the ledger first.** Before Phase 0, write out all the phases (0–9, including the
+   conditional Phase 1.5) as separate tracked items, in order — in this agent's task or todo
+   list if it has one, otherwise in a `PHASES.md` scratch file you keep updated. This is the
+   first action the skill takes, before reading the ticket and before any other tool call. The
+   ledger stays in front of you for the whole run so a phase can't quietly fall off.
 
 2. **Advance one phase at a time, and only on a receipt.** Exactly one phase is
    `in_progress` at any moment. You may mark a phase `completed` **only after** you have
@@ -114,7 +123,7 @@ above, outranks every one of them.**
 - **Print an exit receipt before advancing.** Every phase ends with one line of the form
   `✅ Phase N (<NAME>) — <which path ran> — <evidence>`, e.g.
   `✅ Phase 5 (VERIFY) — ran pnpm test+lint+build — 142 passed, 0 failed (output above)`, or
-  `✅ Phase 3 (HARDEN) — engineering-perso:plan-hardening --fix — 2 rounds, closing sweep clean`, or
+  `✅ Phase 3 (HARDEN) — plan-hardening --fix — 2 rounds, closing sweep clean`, or
   `✅ Phase 4 (IMPLEMENT) — owned per-task loop, 7 tasks, both reviewers clean on each`.
   The receipt names the skill that ran and points at the concrete evidence that the phase's
   stated **Exit** condition is met. No receipt → the phase isn't done → you may not move on.
@@ -128,12 +137,11 @@ above, outranks every one of them.**
   plateau), not a fixed number of rounds, is the stop signal — and it's what keeps "clean"
   meaning clean. Minor/nice-to-have findings don't block; carry them to the handoff.
 
-- **A missing sibling skill stops the run — it is not a cue to improvise.** The only skills this
-  pipeline invokes are its siblings in this plugin: `engineering-perso:plan-hardening` (Phase 3)
-  and `engineering-perso:two-axis-review` (Phase 7). If one is not in this session's skill list,
-  that is a broken install (a plugin left out of the dotfiles, or a profile symlink never
-  created — `agents-doctor` diagnoses it), **not** a degraded environment to work around.
-  **Stop, name the missing skill, and say the run can't be trusted without it.** An inline
+- **A missing companion skill stops the run — it is not a cue to improvise.** The only skills
+  this pipeline invokes are `plan-hardening` (Phase 3) and `two-axis-review` (Phase 7), both
+  from this catalog. If one is not in this session's skill list, that is a broken install —
+  install it from the same source as this skill — **not** a degraded environment to work
+  around. **Stop, name the missing skill, and say the run can't be trusted without it.** An inline
   substitute would produce a receipt that claims a phase ran when the rigorous version didn't,
   which is the one failure this pipeline exists to prevent. Every receipt names the skill that
   ran.
@@ -143,15 +151,16 @@ above, outranks every one of them.**
   the floor and `~4T` in practice for `T` tasks, fix rounds included. Phase 7 adds exactly two.
   Invoking this skill opts you into multi-agent work in general, but a big fan-out costs real
   tokens: if a run would spawn **more than ~20 agents**, say the number and **confirm with the
-  human before launching**. (The runtime also caps concurrency and total agents, but that's a
-  backstop, not a substitute for the heads-up.)
+  human before launching**. (An agent that caps concurrency or total agents is a backstop, not
+  a substitute for the heads-up.)
 
-- **Always set a subagent's model *and* effort — where you're the one dispatching.** An
-  omitted `model` inherits the orchestrator's (Opus 4.8); an omitted `effort` inherits the
-  session's (`xhigh`). This binds Phase 4's per-task loop — an implementer and two reviewers per
-  task, all dispatched by you — so pick each one's model per Phase 4's Model Selection section
-  (mechanical tasks cheap, judgment tasks standard), and Phase 7's two axes. Set it explicitly
-  every time; the default is the most expensive model.
+- **Always set a subagent's model *and* reasoning effort — where you're the one dispatching.**
+  Left unset, both inherit the orchestrator's, which is the most expensive combination
+  available. This binds Phase 4's per-task loop — an implementer and two reviewers per task,
+  all dispatched by you — so pick each one's tier per Phase 4's Model Selection section
+  (mechanical tasks cheap, judgment tasks standard), and Phase 7's two axes. If this agent
+  exposes no model or effort selector, skip the flags and say so once in the Phase 4 receipt;
+  everything else is unchanged.
 
 - **Confirm before anything irreversible or outward-facing.** Pushing a branch, opening a
   PR, and posting review comments leave your fingerprints on shared infrastructure. Pause
@@ -245,7 +254,7 @@ engineers build incompatible things. **"Fix" here means amend the plan file — 
 (Rule Zero); a real defect found in this phase is exactly the success case, and it gets written
 down, not patched.
 
-Run **`engineering-perso:plan-hardening` with `--fix`** on the plan file, and **without
+Run **`plan-hardening` with `--fix`** on the plan file, and **without
 `--fast`** — `--fix` makes it apply fixes and loop until a round finds nothing instead of stopping
 at a report, and omitting `--fast` keeps its closing structural sweep, which this pipeline no
 longer duplicates in a phase of its own. A missing sibling stops the run (Operating rules).
@@ -316,7 +325,7 @@ parallel and are reported separately: **Standards** (does it follow this repo's 
 standards, plus the code-smell baseline?) and **Spec** (does it faithfully implement what was
 asked — nothing missing, nothing extra, nothing built wrong?).
 
-Run **`engineering-perso:two-axis-review`**, handing it the fixed point (the feature branch's
+Run **`two-axis-review`**, handing it the fixed point (the feature branch's
 merge-base) and the spec (the hardened plan, backed by the ticket's acceptance criteria) so it
 skips its own discovery. Hand it the Minor findings deferred from Phase 4's task reviews as well,
 for re-triage now that they can be seen together.
@@ -347,6 +356,22 @@ a plateau). Then hand it back.
 → [`references/phase-9-handoff.md`](references/phase-9-handoff.md)
 
 ---
+
+## Bundled files
+
+Every file this skill ships, listed here so each is one link from this page rather than
+buried behind another reference. Phase files are linked from their phase above; the three
+prompt templates are filled in and dispatched during Phase 4.
+
+| File | Read it when |
+|---|---|
+| [`references/rule-zero-no-code.md`](references/rule-zero-no-code.md) | Any Phase 0–3 dispatch — paste it into the sub-agent verbatim |
+| [`references/prompts/implementer.md`](references/prompts/implementer.md) | Dispatching a Phase 4 implementer for one plan task |
+| [`references/prompts/task-spec-reviewer.md`](references/prompts/task-spec-reviewer.md) | Dispatching the Phase 4 spec reviewer for a finished task |
+| [`references/prompts/task-quality-reviewer.md`](references/prompts/task-quality-reviewer.md) | Dispatching the Phase 4 quality reviewer for a finished task |
+| `scripts/build-workspace` | Phase 4 — set up an isolated workspace for a task |
+| `scripts/task-brief` | Phase 4 — cut one task's brief out of the plan file |
+| `scripts/review-package` | Phase 4 and 7 — write the diff to a file so reviewers read the same bytes |
 
 ## If a phase can't proceed
 

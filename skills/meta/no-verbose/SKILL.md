@@ -1,6 +1,6 @@
 ---
 name: no-verbose
-description: Reinject Loup's response-style rules — maximum concision, numbered lists, no narration or process storytelling. Use when invoked as /no-verbose, when the user says responses are getting verbose, bloated, chatty, or "too much bla-bla", when they ask to tighten up or reset how you write, or at the start of a long session where output discipline matters. Also use after a context summarization, when the always-on CLAUDE.md copy of these rules may have decayed.
+description: Reinjects Loup's response-style rules — maximum concision, numbered lists, no narration or process storytelling. Use when the user invokes it by name, when they say responses are getting verbose, bloated, chatty, or "too much bla-bla", when they ask to tighten up or reset how you write, or at the start of a long session where output discipline matters. Also use after a context summarization, when the always-on copy of these rules in the agent instructions file may have decayed.
 ---
 
 # Response style
@@ -69,5 +69,6 @@ Announce nothing. Do not confirm you have read this skill, do not summarize
 the rules back, do not say you will be concise from now on. Just be.
 
 Source of truth is this file. The same rules are duplicated in the
-`## Response style` section of `~/.claude-{work,perso}/CLAUDE.md` so they
-load every session — edit both when they change.
+`## Response style` section of the agent's always-on instructions file
+(`AGENTS.md`, `CLAUDE.md`, `GEMINI.md` — whichever this agent loads every
+session) so they apply without invoking anything. Edit both when they change.

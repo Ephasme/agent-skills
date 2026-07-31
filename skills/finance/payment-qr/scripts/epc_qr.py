@@ -9,7 +9,7 @@ valider dans son app.
 Pur Python, aucune dépendance binaire. Cherche un moteur QR déjà présent
 (`segno`, puis `qrcode`+Pillow) ; sinon installe `segno` via pip en s'adaptant
 au sandbox (PEP 668, site-packages verrouillé → venv isolé). Marche tel quel
-dans le sandbox Claude.ai, en CI, ou sur un Mac Homebrew.
+dans un sandbox durci, en CI, ou sur un Mac Homebrew.
 
 Exemples :
   python scripts/epc_qr.py --name "Carole Huet" --iban "FR76 3000 4000 0312 3456 7890 143" \
@@ -76,7 +76,7 @@ def render_qr(payload, out_path):
       2. pip install segno dans l'interpréteur courant, en enchaînant les jeux
          d'options qui survivent à PEP 668 et à un site-packages utilisateur ;
       3. dernier recours : un venv isolé jetable (env courant non inscriptible
-         mais réseau dispo — cas du sandbox Claude.ai durci).
+         mais réseau dispo — cas d'un sandbox durci).
     """
     # 1) moteur déjà présent — zéro réseau
     for saver, name in ((_save_segno, "segno"), (_save_qrcode, "qrcode")):

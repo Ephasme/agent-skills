@@ -11,6 +11,17 @@ deterministic orchestration tool is available (e.g. a Workflow runner with
 schema-validated outputs), use it and turn the "Return" sections below into
 schemas. Otherwise pass them as plain instructions.
 
+## Contents
+
+- [Scout (Phase 0, optional for large repos)](#scout-phase-0-optional-for-large-repos)
+- [Area author (Phase 2 — the core of the fleet)](#area-author-phase-2-the-core-of-the-fleet)
+- [Completeness critic (end of Phase 2)](#completeness-critic-end-of-phase-2)
+- [Reconciler (Phase 3)](#reconciler-phase-3)
+- [Editor & assembler (Phase 4)](#editor-assembler-phase-4)
+- [Verifier (Phase 4 — final sweep)](#verifier-phase-4-final-sweep)
+
+---
+
 ---
 
 ## Scout (Phase 0, optional for large repos)

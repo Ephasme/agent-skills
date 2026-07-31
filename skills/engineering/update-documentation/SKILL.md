@@ -2,22 +2,17 @@
 name: update-documentation
 description: >-
   Keeps an existing documentation corpus in sync with code by re-running the
-  document-codebase verification workflow over a SMALL, bounded scope — a set of
-  changes rather than the whole repo. Resolve the scope (uncommitted working-tree
-  changes by default, or an explicit commit, commit range, PR, or staged set),
-  map the changed code to the doc pages, glossary entries, diagrams, and index
-  links it affects, then update those — and only those — re-verifying every claim
-  and citation against the new code. Use this whenever code has changed and the
-  docs need to catch up: "update the docs for this PR", "I just refactored the
-  billing service, fix the documentation", "keep the docs in sync with my
-  changes", "document what changed in this commit / since main", "the docs are
-  stale after this merge", "regenerate the affected wiki pages", "update the
-  glossary and architecture docs for these changes". Reach for it even when the
-  user doesn't say "corpus" or "fleet" — any "update / refresh / sync the
-  documentation for <a change>" belongs here. This is the INCREMENTAL companion
-  to document-codebase: document-codebase builds the corpus from scratch over the
-  whole codebase; update-documentation patches an existing corpus from a diff. If
-  no corpus exists yet, this skill stops and points at document-codebase.
+  document-codebase verification workflow over a small, bounded scope — a set of changes
+  rather than the whole repo. Resolves the scope (uncommitted working-tree changes by
+  default, or an explicit commit, commit range, PR, or staged set), maps the changed
+  code to the doc pages, glossary entries, diagrams, and index links it affects, then
+  updates those and only those, re-verifying every claim and citation against the new
+  code. Use whenever code has changed and the docs need to catch up: "update the docs
+  for this PR", "I just refactored the billing service, fix the documentation", "keep
+  the docs in sync with my changes", "document what changed since main", "the docs are
+  stale after this merge", "regenerate the affected wiki pages". This is the incremental
+  companion to document-codebase, which builds a corpus from scratch; if no corpus exists
+  yet, this skill stops and points there.
 ---
 
 # Update Documentation
@@ -123,7 +118,9 @@ Scale the effort to the impact, don't over-engineer a small diff:
 - **A broad change spanning several areas** → spawn one updater subagent per
   affected area, in parallel, using the "Doc updater" brief in
   `references/agent-briefs.md`. Keep each agent inside its pages to preserve the
-  partition, exactly as in `document-codebase`.
+  partition, exactly as in `document-codebase`. Where sub-agents aren't available,
+  work the affected areas one at a time in this context, finishing each area's pages
+  before starting the next — the partition still holds, it just runs in series.
 
 Every updater, inline or spawned, does the same thing for its pages:
 

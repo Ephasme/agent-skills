@@ -1,6 +1,6 @@
 ---
 name: track-case
-description: Enable tracking on a case (new or existing) in a data repo — interview + scaffold/edit the `tracking:` block and `journal.md`, then bootstrap the first digest.
+description: Enables tracking on a case (new or existing) in a data repo — interviews the user, scaffolds or edits the `tracking:` block and `journal.md`, then bootstraps the first digest. Use when asked to start tracking a case, add a journal to one, or set up digests for it.
 ---
 
 # Track a case
