@@ -38,10 +38,10 @@
 //   node scripts/install-mcp.mjs --prune         remove everything this script wrote
 //   node scripts/install-mcp.mjs --materialize   inline real secrets (see above)
 
-import { readFile, writeFile, mkdir, rename, chmod, copyFile } from 'node:fs/promises';
-import { existsSync } from 'node:fs';
+import { readFile, writeFile, mkdir, rename, chmod, copyFile, stat, unlink, realpath } from 'node:fs/promises';
+import { existsSync, realpathSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { join, dirname } from 'node:path';
+import { join, dirname, relative, isAbsolute, resolve as resolvePath } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -65,10 +65,25 @@ const isRef = (v) => v !== null && typeof v === 'object' && typeof v.env === 'st
 
 export function validateManifest(manifest, fail) {
   const seen = new Set();
+  if (manifest === null || typeof manifest !== 'object' || Array.isArray(manifest)) {
+    fail('manifest must be a JSON object');
+    return;
+  }
   if (manifest.version !== 1) fail(`unsupported manifest version ${manifest.version}`);
+  if (manifest.servers !== undefined && (manifest.servers === null || typeof manifest.servers !== 'object' || Array.isArray(manifest.servers))) {
+    fail('`servers` must be an object');
+    return;
+  }
   for (const [name, def] of Object.entries(manifest.servers ?? {})) {
     const at = (msg) => fail(`server \`${name}\`: ${msg}`);
     if (!/^[a-z0-9][a-z0-9-]*$/.test(name)) at('name must be lowercase kebab-case');
+    // Every check below indexes into `def`. A null or scalar entry — a trailing-comma
+    // cleanup, a half-finished paste — would otherwise throw a raw TypeError out of
+    // both this script and validate.mjs, naming neither the file nor the server.
+    if (def === null || typeof def !== 'object' || Array.isArray(def)) {
+      at('must be an object');
+      continue;
+    }
     if (seen.has(name.toLowerCase())) at('duplicate name');
     seen.add(name.toLowerCase());
     // Absent means enabled. A disabled server keeps its full definition — it is
@@ -151,27 +166,78 @@ const tomlInline = (obj) =>
 // File writers
 // ---------------------------------------------------------------------------
 
+// VS Code and Gemini CLI both ship their config with a `// …` header and document
+// comments as supported, so `JSON.parse` rejects a perfectly stock file. Strip
+// comments for the read; the write cannot preserve them, which the caller reports.
+function parseJsonc(text) {
+  let out = '';
+  let inString = false;
+  let escaped = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (inString) {
+      out += c;
+      if (escaped) escaped = false;
+      else if (c === '\\') escaped = true;
+      else if (c === '"') inString = false;
+      continue;
+    }
+    if (c === '"') { inString = true; out += c; continue; }
+    if (c === '/' && text[i + 1] === '/') {
+      while (i < text.length && text[i] !== '\n') i++;
+      out += '\n';
+      continue;
+    }
+    if (c === '/' && text[i + 1] === '*') {
+      const end = text.indexOf('*/', i + 2);
+      i = end === -1 ? text.length : end + 1;
+      out += ' ';
+      continue;
+    }
+    out += c;
+  }
+  // Trailing commas are legal in both dialects and fatal to JSON.parse.
+  return JSON.parse(out.replace(/,(\s*[}\]])/g, '$1'));
+}
+
 // Read-modify-write of a single top-level key, preserving everything else in the
 // file. Claude Code's `.claude.json` is 60 KB of live session state that happens to
 // also hold `mcpServers`, so touching anything else would be destructive.
 async function writeJsonKey(file, key, entries, dropped, opts) {
   let doc = {};
+  let hadComments = false;
   if (existsSync(file)) {
+    const raw = await readFile(file, 'utf8');
     try {
-      doc = JSON.parse(await readFile(file, 'utf8'));
-    } catch (e) {
-      return { error: `${file} is not valid JSON (${e.message}) — refusing to overwrite it` };
+      doc = JSON.parse(raw);
+    } catch {
+      try {
+        doc = parseJsonc(raw);
+        hadComments = true;
+      } catch (e) {
+        return { error: `${file} is not valid JSON or JSONC (${e.message}) — refusing to overwrite it` };
+      }
     }
   }
   const before = JSON.stringify(doc[key] ?? {});
   const bucket = { ...(doc[key] ?? {}) };
   for (const name of dropped) delete bucket[name];
+  // Overwriting an entry this script did not write loses a hand-written server
+  // silently, and the lock would then claim it so `--prune` deletes it outright.
+  // Adopting it is the lesser evil only if it is said out loud.
+  const adopted = Object.keys(entries).filter((n) => n in bucket && !dropped.includes(n) && !opts.owned.has(n));
   Object.assign(bucket, entries);
   doc[key] = bucket;
   const after = JSON.stringify(doc[key]);
-  if (before === after) return { changed: false };
-  if (!opts.dryRun) await atomicWrite(file, JSON.stringify(doc, null, 2) + '\n', opts);
-  return { changed: true };
+  const notes = [];
+  if (adopted.length) notes.push(`overwrote hand-written entr(ies): ${adopted.join(', ')}`);
+  if (hadComments && before !== after) notes.push('comments in this file were not preserved');
+  if (before === after) return { changed: false, notes };
+  if (!opts.dryRun) {
+    const err = await atomicWrite(file, JSON.stringify(doc, null, 2) + '\n', opts);
+    if (err) return { error: err };
+  }
+  return { changed: true, notes };
 }
 
 // Replace (or append) the delimited region this script owns, leaving hand-written
@@ -179,23 +245,67 @@ async function writeJsonKey(file, key, entries, dropped, opts) {
 async function writeTomlBlock(file, body, opts) {
   const existing = existsSync(file) ? await readFile(file, 'utf8') : '';
   const block = body.trim() ? `${BEGIN}\n${body.trim()}\n${END}\n` : '';
-  const marked = new RegExp(`\\n?${escapeRe(BEGIN)}[\\s\\S]*?${escapeRe(END)}\\n?`, 'g');
-  const base = existing.replace(marked, '\n').replace(/\n{3,}/g, '\n\n');
-  const next = block ? `${base.trimEnd()}\n\n${block}`.replace(/^\n+/, '') : base.trimEnd() + '\n';
+  const marked = new RegExp(`\\n*${escapeRe(BEGIN)}[\\s\\S]*?${escapeRe(END)}[^\\n]*\\n?`, 'g');
+  // Only the seam left by the removed block is collapsed. A global
+  // `\n{3,}` -> `\n\n` would reach inside hand-written multi-line basic strings and
+  // silently change their value, which is exactly what this promises not to do.
+  const base = existing.replace(marked, '\n\n');
+  const next = block
+    ? (base.trim() ? `${base.replace(/\n+$/, '')}\n\n${block}` : block)
+    : (base.trim() ? `${base.replace(/\n+$/, '')}\n` : '');
   if (next === existing) return { changed: false };
-  if (!opts.dryRun) await atomicWrite(file, next, opts);
+  if (!opts.dryRun) {
+    const err = await atomicWrite(file, next, opts);
+    if (err) return { error: err };
+  }
   return { changed: true };
 }
 
 const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
+// Returns an error string, or undefined on success.
 async function atomicWrite(file, content, opts) {
   await mkdir(dirname(file), { recursive: true });
-  if (existsSync(file)) await copyFile(file, `${file}.bak`);
+
+  // The target may be live session state that its agent is writing to right now
+  // (Claude Code's `.claude.json`). There is no lock to take, so compare-and-swap:
+  // if the file changed between the caller's read and this write, the merge was
+  // computed against a stale document and renaming over it would discard whatever
+  // the agent wrote in between.
+  let before;
+  if (existsSync(file)) {
+    const s = await stat(file);
+    before = `${s.mtimeMs}:${s.size}`;
+    if (opts.readStamp && opts.readStamp.get(file) !== before) {
+      return `${file} changed on disk while this ran (an agent has it open) — nothing written, re-run when it is idle`;
+    }
+  }
+
+  // Preserve the target's permissions. Claude Code creates `.claude.json` 0600 and
+  // it holds oauth state and the whole per-project history; taking the mode from the
+  // umask instead would quietly publish it to every other local account.
+  let mode = 0o600;
+  if (existsSync(file)) mode = (await stat(file)).mode & 0o777;
+  if (opts.materialize) mode &= 0o600;
+
+  // The backup inherits the target's secrecy — after a `--materialize` run it holds
+  // the same plaintext credentials the target does.
+  if (existsSync(file)) {
+    await copyFile(file, `${file}.bak`);
+    await chmod(`${file}.bak`, mode);
+  }
   const tmp = `${file}.agent-skills.tmp`;
   await writeFile(tmp, content);
-  // Written before the rename so the secret is never briefly world-readable.
-  if (opts.materialize) await chmod(tmp, 0o600);
+  // Set before the rename so the file is never briefly readable at the umask.
+  await chmod(tmp, mode);
+
+  if (existsSync(file)) {
+    const s = await stat(file);
+    if (`${s.mtimeMs}:${s.size}` !== before) {
+      await unlink(tmp);
+      return `${file} changed on disk while this ran (an agent has it open) — nothing written, re-run when it is idle`;
+    }
+  }
   await rename(tmp, file);
 }
 
@@ -224,13 +334,31 @@ const ADAPTERS = [
     // One target per profile, and every profile gets the same set. CLAUDE_CONFIG_DIR
     // is a *candidate*, never an override: running this from inside a claude-perso
     // session must still configure the work profile, or the two would drift.
+    //
+    // The default profile is NOT `~/.claude/.claude.json`. With CLAUDE_CONFIG_DIR
+    // unset Claude Code reads `~/.claude.json` — verified against 2.1.220 — and
+    // `~/.claude` exists here for unrelated reasons (rtk artefacts), so treating it
+    // as a config dir writes 13 servers to a file nothing ever loads.
     targets() {
-      const dirs = new Set(['.claude-work', '.claude-perso', '.claude'].map((d) => join(HOME, d)).filter(existsSync));
-      if (process.env.CLAUDE_CONFIG_DIR) dirs.add(process.env.CLAUDE_CONFIG_DIR);
-      return [...dirs].map((dir) => ({
-        id: `claude-code:${dir.replace(/.*\.claude-?/, '') || 'default'}`,
-        file: join(dir, '.claude.json'),
-      }));
+      const found = [];
+      for (const name of ['.claude-work', '.claude-perso']) {
+        const dir = join(HOME, name);
+        if (existsSync(dir)) found.push({ id: `claude-code:${name.slice('.claude-'.length)}`, file: join(dir, '.claude.json') });
+      }
+      if (process.env.CLAUDE_CONFIG_DIR) {
+        const dir = process.env.CLAUDE_CONFIG_DIR;
+        const file = join(dir, '.claude.json');
+        if (!found.some((t) => t.file === file)) {
+          found.push({ id: `claude-code:${dir.replace(/.*\.claude-?/, '') || 'env'}`, file });
+        }
+      }
+      // Only claim the profile-less config when it is actually in use; creating it
+      // would hand a bare `claude` a config it never had.
+      const bare = join(HOME, '.claude.json');
+      if (existsSync(bare) && !found.some((t) => t.file === bare)) {
+        found.push({ id: 'claude-code:default', file: bare });
+      }
+      return found;
     },
     server(def, r) {
       if (def.transport === 'stdio') {
@@ -268,7 +396,23 @@ const ADAPTERS = [
       }
       return lines.join('\n');
     },
-    write: (t, entries, _dropped, opts) => writeTomlBlock(t.file, Object.values(entries).join('\n\n'), opts),
+    // TOML forbids declaring the same table twice, and Codex refuses to load its
+    // *entire* configuration on a duplicate — model, approval policy, profiles, not
+    // just MCP. A hand-written `[mcp_servers.github]` outside the managed block would
+    // collide with the rendered one, so those are dropped with a reason instead.
+    async write(t, entries, _dropped, opts) {
+      const existing = existsSync(t.file) ? await readFile(t.file, 'utf8') : '';
+      const outside = existing.replace(
+        new RegExp(`${escapeRe(BEGIN)}[\\s\\S]*?${escapeRe(END)}`, 'g'), '');
+      const clash = Object.keys(entries).filter((name) =>
+        new RegExp(`^\\s*\\[mcp_servers\\.(${escapeRe(name)}|"${escapeRe(name)}")\\]`, 'm').test(outside));
+      for (const name of clash) delete entries[name];
+      const result = await writeTomlBlock(t.file, Object.values(entries).join('\n\n'), opts);
+      if (clash.length) {
+        result.notes = [`hand-written [mcp_servers.${clash.join('], [mcp_servers.')}] already in ${t.file} — left alone, not rendered (a duplicate table stops Codex loading any config)`];
+      }
+      return result;
+    },
   },
 
   {
@@ -404,19 +548,46 @@ function renderServer(adapter, name, def, opts) {
 // removed from the agents. Mirrors ~/.agents/.skill-lock.json, which yadm tracks for
 // the same reason: the installed artefacts are disposable, the record of them is not.
 
+// Paths are stored relative to $HOME. The lock is yadm-tracked, and an absolute
+// /home/debian/... in it makes every other machine's first health check report three
+// targets "gone" when nothing is wrong.
+const packPath = (p) => (isAbsolute(p) && !relative(HOME, p).startsWith('..') ? relative(HOME, p) : p);
+const unpackPath = (p) => (isAbsolute(p) ? p : resolvePath(HOME, p));
+
 async function readLock() {
   if (!existsSync(LOCK)) return { version: 1, targets: {} };
+  let raw;
   try {
-    return JSON.parse(await readFile(LOCK, 'utf8'));
-  } catch {
-    return { version: 1, targets: {} };
+    raw = JSON.parse(await readFile(LOCK, 'utf8'));
+  } catch (e) {
+    // Returning an empty lock here would be silently catastrophic rather than
+    // merely broken: `dropped` is computed from it, so every removal — a parked
+    // server, a deleted one, `--prune` — becomes a no-op that still reports success.
+    console.error(`✗ ${LOCK} does not parse (${e.message}).`);
+    console.error('  It records what is installed where; without it nothing can be removed.');
+    console.error('  Fix or delete it — deleting means the renderer forgets what it wrote and');
+    console.error('  every already-installed server has to be removed by hand.');
+    process.exit(1);
   }
+  const targets = {};
+  for (const [id, entry] of Object.entries(raw.targets ?? {})) {
+    targets[id] = { ...entry, file: unpackPath(entry.file ?? '') };
+  }
+  return { version: 1, targets };
 }
 
 async function writeLock(lock, opts) {
   if (opts.dryRun) return;
   await mkdir(dirname(LOCK), { recursive: true });
-  await writeFile(LOCK, JSON.stringify(lock, null, 2) + '\n');
+  const packed = { version: 1, targets: {} };
+  for (const [id, entry] of Object.entries(lock.targets)) {
+    packed.targets[id] = { ...entry, file: packPath(entry.file) };
+  }
+  // Temp-and-rename: a partial write here is the corruption that readLock now has
+  // to refuse, and an interrupted `writeFile` is exactly how it would happen.
+  const tmp = `${LOCK}.tmp`;
+  await writeFile(tmp, JSON.stringify(packed, null, 2) + '\n');
+  await rename(tmp, LOCK);
 }
 
 // ---------------------------------------------------------------------------
@@ -424,7 +595,15 @@ async function writeLock(lock, opts) {
 // ---------------------------------------------------------------------------
 
 function parseArgs(argv) {
-  const opts = { agents: [], dryRun: false, materialize: false, prune: false, list: false };
+  const opts = {
+    agents: [], dryRun: false, materialize: false, prune: false, list: false,
+    // Populated per target: the mtime/size seen when the target was read, so the
+    // write can refuse if its owning agent touched the file in between.
+    readStamp: new Map(),
+    // Server names this script wrote to the current target last time; anything else
+    // already in the file is the user's, not ours to replace without saying so.
+    owned: new Set(),
+  };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--dry-run' || a === '-n') opts.dryRun = true;
@@ -522,11 +701,14 @@ async function main() {
     // cannot do secret headers fails the same way fifteen times, and fifteen
     // identical lines bury the two that are actually different.
     const skipped = new Map();
+    const unexpressible = [];
     for (const [name, def] of servers) {
       if (opts.prune) continue;
       const { entry, skip } = renderServer(adapter, name, def, opts);
-      if (skip) skipped.set(skip.text, [...(skipped.get(skip.text) ?? []), name]);
-      else entries[name] = entry;
+      if (skip) {
+        skipped.set(skip.text, [...(skipped.get(skip.text) ?? []), name]);
+        unexpressible.push(name);
+      } else entries[name] = entry;
     }
     for (const [text, names] of skipped) {
       console.log(`  ! ${adapter.id}: skipped ${names.length} — ${text}\n    ${names.join(', ')}`);
@@ -535,6 +717,13 @@ async function main() {
     for (const target of targets) {
       const previous = lock.targets[target.id]?.servers ?? [];
       const dropped = previous.filter((n) => !(n in entries));
+      // Stamp the target before the adapter reads it, so atomicWrite can tell
+      // whether the agent that owns the file wrote to it in the meantime.
+      if (existsSync(target.file)) {
+        const s = await stat(target.file);
+        opts.readStamp.set(target.file, `${s.mtimeMs}:${s.size}`);
+      }
+      opts.owned = new Set(previous);
       const result = await adapter.write(target, entries, dropped, opts);
 
       if (result.error) {
@@ -542,6 +731,7 @@ async function main() {
         process.exitCode = 1;
         continue;
       }
+      for (const note of result.notes ?? []) console.log(`  ! ${target.id}: ${note}`);
 
       const count = Object.keys(entries).length;
       const mark = result.changed || opts.dryRun ? '✓' : '·';
@@ -565,8 +755,16 @@ async function main() {
         for (const [reason, names] of groups) console.log(`    dropped ${names.join(', ')} — ${reason}`);
       }
 
-      if (count) lock.targets[target.id] = { file: target.file, servers: Object.keys(entries) };
-      else delete lock.targets[target.id];
+      // `unexpressible` is recorded so agents-doctor can tell the two reasons a
+      // server is not installed apart: one is fixed by re-running the renderer, the
+      // other never can be, because this agent structurally cannot carry it.
+      if (count || unexpressible.length) {
+        lock.targets[target.id] = {
+          file: target.file,
+          servers: Object.keys(entries),
+          ...(unexpressible.length && { unexpressible }),
+        };
+      } else delete lock.targets[target.id];
       if (result.changed) wrote++;
     }
   }
@@ -576,4 +774,9 @@ async function main() {
 }
 
 // Importable for scripts/validate.mjs; only runs the CLI when invoked directly.
-if (process.argv[1] === fileURLToPath(import.meta.url)) await main();
+// Compared through realpath: a checkout reached by a symlinked path (a symlinked
+// ~/code, /tmp on macOS) makes the raw string comparison false, and main() would
+// then silently never run — bootstrap printing "Done." having written nothing.
+const invokedDirectly = process.argv[1]
+  && realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url));
+if (invokedDirectly) await main();

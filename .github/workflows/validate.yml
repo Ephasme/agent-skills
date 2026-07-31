@@ -45,24 +45,48 @@ jobs:
                    "$fake"/.config/{opencode,Code/User}
           env -u CLAUDE_CONFIG_DIR HOME="$fake" node scripts/install-mcp.mjs
           python3 - "$fake" <<'PY'
-          import json, sys, tomllib, pathlib
+          import json, re, sys, tomllib, pathlib
           home = pathlib.Path(sys.argv[1])
           tomllib.loads((home / '.codex/config.toml').read_text())
-          for rel, key, ok in [
-              ('.claude-perso/.claude.json', 'mcpServers', '${'),
-              ('.config/opencode/opencode.json', 'mcp', '{env:'),
-              ('.config/Code/User/mcp.json', 'servers', '${env:'),
-              ('.cursor/mcp.json', 'mcpServers', '${env:'),
-              ('.gemini/settings.json', 'mcpServers', '$'),
+
+          # One exact pattern per agent, not a substring test. `ok in value` was
+          # vacuous for gemini-cli ('$' is implied by every dialect) and could not
+          # tell claude-code's ${NAME} from Cursor's ${env:NAME} — so the one
+          # regression this step exists to catch, an adapter given the wrong
+          # dialect, passed. Anything matching ANY dialect must match THIS one.
+          DIALECTS = {
+              'claude-code': re.compile(r'\$\{(?!env:)[A-Za-z_][A-Za-z0-9_]*\}'),
+              'opencode':    re.compile(r'\{env:[A-Za-z_][A-Za-z0-9_]*\}'),
+              'vscode':      re.compile(r'\$\{env:[A-Za-z_][A-Za-z0-9_]*\}'),
+              'cursor':      re.compile(r'\$\{env:[A-Za-z_][A-Za-z0-9_]*\}'),
+              'gemini-cli':  re.compile(r'\$[A-Za-z_][A-Za-z0-9_]*$'),
+          }
+          # A value holding a credential must reference it, never carry it: if none
+          # of the known forms appears at all, the renderer materialised a secret.
+          ANY = re.compile(r'\$\{[^}]*\}|\{env:[^}]*\}|\$[A-Za-z_][A-Za-z0-9_]*')
+          SECRETISH = re.compile(r'key|token|secret|password|session|client[-_]?id|auth', re.I)
+
+          for rel, key, agent in [
+              ('.claude-perso/.claude.json', 'mcpServers', 'claude-code'),
+              ('.config/opencode/opencode.json', 'mcp', 'opencode'),
+              ('.config/Code/User/mcp.json', 'servers', 'vscode'),
+              ('.cursor/mcp.json', 'mcpServers', 'cursor'),
+              ('.gemini/settings.json', 'mcpServers', 'gemini-cli'),
           ]:
+              want = DIALECTS[agent]
               servers = json.loads((home / rel).read_text())[key]
               assert servers, f'{rel}: no servers written'
-              # Every placeholder present must be one this agent expands.
+              seen = 0
               for name, s in servers.items():
-                  for slot in ('headers', 'env'):
-                      for v in (s.get(slot) or {}).values():
-                          if any(m in str(v) for m in ('${', '{env:')):
-                              assert ok in str(v), f'{rel}/{name}/{slot}: alien placeholder {v!r}'
+                  for slot in ('headers', 'env', 'environment'):
+                      for k, v in (s.get(slot) or {}).items():
+                          v = str(v)
+                          if ANY.search(v):
+                              assert want.search(v), f'{rel}/{name}/{slot}.{k}: not {agent} dialect: {v!r}'
+                              seen += 1
+                          elif SECRETISH.search(k):
+                              raise AssertionError(f'{rel}/{name}/{slot}.{k}: literal credential, no reference')
+              assert seen, f'{rel}: no {agent} placeholder found at all — dialect untested'
           print('MCP render OK')
           PY
 
