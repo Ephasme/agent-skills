@@ -18,8 +18,11 @@ import { readdir, readFile, stat } from 'node:fs/promises';
 import { join, relative, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { validateManifest } from './install-mcp.mjs';
+
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const SKILLS = join(ROOT, 'skills');
+const MCP = join(ROOT, 'mcp', 'servers.json');
 const QUIET = process.argv.includes('--quiet');
 
 // Categories organise this repo only; installed skills are flat. The set is
@@ -284,6 +287,34 @@ async function checkSkill(category, slug) {
   }
 }
 
+// The MCP manifest is committed, so the one failure that matters is a credential
+// pasted in as a literal instead of written as {"env": "NAME"}. Everything else is
+// shape validation, shared with the renderer so the two cannot disagree.
+async function checkMcpManifest() {
+  let manifest;
+  try {
+    manifest = JSON.parse(await readFile(MCP, 'utf8'));
+  } catch (e) {
+    if (e.code === 'ENOENT') return 0; // the manifest is optional
+    fail(MCP, `is not valid JSON (${e.message})`);
+    return 0;
+  }
+
+  validateManifest(manifest, (msg) => fail(MCP, msg));
+
+  const SECRETY = /token|key|secret|password|session|auth|bearer|pat\b|credential/i;
+  for (const [name, def] of Object.entries(manifest.servers ?? {})) {
+    for (const [slot, bag] of [['header', def.headers], ['env', def.env]]) {
+      for (const [k, v] of Object.entries(bag ?? {})) {
+        if (typeof v === 'string' && SECRETY.test(k)) {
+          fail(MCP, `server \`${name}\`: ${slot} \`${k}\` is a literal — use {"env": "NAME"}`);
+        }
+      }
+    }
+  }
+  return Object.keys(manifest.servers ?? {}).length;
+}
+
 async function main() {
   const categories = (await readdir(SKILLS, { withFileTypes: true }))
     .filter((e) => e.isDirectory())
@@ -300,13 +331,17 @@ async function main() {
     for (const slug of slugs) await checkSkill(category, slug);
   }
 
+  const mcpServers = await checkMcpManifest();
+
   for (const w of warnings) console.warn(`  ! ${w}`);
   if (errors.length) {
     console.error(`\n✗ ${errors.length} problem(s):\n`);
     for (const e of errors) console.error(`  ${e}`);
     process.exit(1);
   }
-  if (!QUIET) console.log(`✓ ${found.size} skills across ${categories.length} categories, no problems`);
+  if (!QUIET) {
+    console.log(`✓ ${found.size} skills across ${categories.length} categories, ${mcpServers} MCP servers, no problems`);
+  }
 }
 
 await main();

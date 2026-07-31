@@ -1,0 +1,190 @@
+{
+  "$comment": [
+    "Canonical MCP server set. Agent-neutral on purpose: no agent reads this file.",
+    "`node scripts/install-mcp.mjs` renders it into each agent's own config format.",
+    "",
+    "Secrets are never values here. A credential is written as {\"env\": \"NAME\"} — a",
+    "reference to an environment variable, resolved by the agent at connect time, not",
+    "by this file and not by the renderer. Every NAME has an `export` in",
+    "~/.config/secrets.zsh, which yadm keeps gpg-encrypted. That is what makes this",
+    "file safe to commit.",
+    "",
+    "`purpose` is documentation only — it preserves the grouping the retired",
+    "purpose-plugins used, and nothing keys off it."
+  ],
+  "version": 1,
+  "servers": {
+    "exa": {
+      "purpose": "research",
+      "description": "Exa web search",
+      "transport": "http",
+      "url": "https://mcp.exa.ai/mcp",
+      "headers": {
+        "x-api-key": { "env": "EXA_API_KEY" }
+      }
+    },
+    "playwright": {
+      "purpose": "research",
+      "description": "Self-hosted Playwright browser driver",
+      "transport": "http",
+      "url": "https://playwright.loup-peluso.com/mcp",
+      "headers": {
+        "CF-Access-Client-Id": { "env": "PLAYWRIGHT_CF_ACCESS_CLIENT_ID" },
+        "CF-Access-Client-Secret": { "env": "PLAYWRIGHT_CF_ACCESS_CLIENT_SECRET" }
+      }
+    },
+    "brightdata": {
+      "purpose": "research",
+      "description": "Bright Data scraping proxy",
+      "transport": "http",
+      "url": "https://brightdata.loup-peluso.com/mcp",
+      "headers": {
+        "CF-Access-Client-Id": { "env": "BRIGHTDATA_CF_ACCESS_CLIENT_ID" },
+        "CF-Access-Client-Secret": { "env": "BRIGHTDATA_CF_ACCESS_CLIENT_SECRET" }
+      }
+    },
+    "apify": {
+      "purpose": "research",
+      "description": "Apify actor runner",
+      "transport": "http",
+      "url": "https://mcp.apify.com/",
+      "auth": { "type": "bearer", "token": { "env": "APIFY_API_TOKEN" } }
+    },
+
+    "github": {
+      "purpose": "engineering",
+      "description": "GitHub via the Copilot MCP endpoint",
+      "transport": "http",
+      "url": "https://api.githubcopilot.com/mcp/",
+      "auth": { "type": "bearer", "token": { "env": "GITHUB_PAT" } }
+    },
+    "linear": {
+      "purpose": "engineering",
+      "description": "Linear issues and projects",
+      "transport": "http",
+      "url": "https://mcp.linear.app/mcp",
+      "auth": { "type": "bearer", "token": { "env": "LINEAR_API_KEY" } }
+    },
+
+    "slack": {
+      "purpose": "communication",
+      "description": "Self-hosted Slack bridge",
+      "transport": "http",
+      "url": "https://slack.loup-peluso.com/mcp",
+      "headers": {
+        "CF-Access-Client-Id": { "env": "SLACK_CF_ACCESS_CLIENT_ID" },
+        "CF-Access-Client-Secret": { "env": "SLACK_CF_ACCESS_CLIENT_SECRET" }
+      }
+    },
+    "wacli": {
+      "purpose": "communication",
+      "description": "Self-hosted WhatsApp bridge",
+      "transport": "http",
+      "url": "https://wacli.loup-peluso.com/mcp",
+      "headers": {
+        "CF-Access-Client-Id": { "env": "WACLI_CF_ACCESS_CLIENT_ID" },
+        "CF-Access-Client-Secret": { "env": "WACLI_CF_ACCESS_CLIENT_SECRET" }
+      }
+    },
+    "imessage": {
+      "purpose": "communication",
+      "description": "Self-hosted iMessage bridge",
+      "transport": "http",
+      "url": "https://imessage.loup-peluso.com/mcp",
+      "headers": {
+        "CF-Access-Client-Id": { "env": "IMESSAGE_CF_ACCESS_CLIENT_ID" },
+        "CF-Access-Client-Secret": { "env": "IMESSAGE_CF_ACCESS_CLIENT_SECRET" }
+      }
+    },
+
+    "bank": {
+      "purpose": "finance",
+      "description": "Self-hosted bank aggregator",
+      "transport": "http",
+      "url": "https://bank.loup-peluso.com/mcp",
+      "headers": {
+        "CF-Access-Client-Id": { "env": "BANK_CF_ACCESS_CLIENT_ID" },
+        "CF-Access-Client-Secret": { "env": "BANK_CF_ACCESS_CLIENT_SECRET" }
+      }
+    },
+    "splitwise": {
+      "purpose": "finance",
+      "description": "Self-hosted Splitwise bridge",
+      "transport": "http",
+      "url": "https://splitwise.loup-peluso.com/mcp",
+      "headers": {
+        "CF-Access-Client-Id": { "env": "SPLITWISE_CF_ACCESS_CLIENT_ID" },
+        "CF-Access-Client-Secret": { "env": "SPLITWISE_CF_ACCESS_CLIENT_SECRET" }
+      }
+    },
+
+    "workspace-perso": {
+      "purpose": "workspace",
+      "description": "Personal Google Workspace",
+      "transport": "http",
+      "url": "https://google-perso.loup-peluso.com/mcp",
+      "headers": {
+        "CF-Access-Client-Id": { "env": "GOOGLE_PERSO_CF_ACCESS_CLIENT_ID" },
+        "CF-Access-Client-Secret": { "env": "GOOGLE_PERSO_CF_ACCESS_CLIENT_SECRET" }
+      }
+    },
+    "workspace-work": {
+      "purpose": "workspace",
+      "description": "Work Google Workspace",
+      "transport": "http",
+      "url": "https://google-work.loup-peluso.com/mcp",
+      "headers": {
+        "CF-Access-Client-Id": { "env": "GOOGLE_WORK_CF_ACCESS_CLIENT_ID" },
+        "CF-Access-Client-Secret": { "env": "GOOGLE_WORK_CF_ACCESS_CLIENT_SECRET" }
+      }
+    },
+
+    "google-maps": {
+      "purpose": "navigation",
+      "description": "Self-hosted Google Maps bridge",
+      "transport": "http",
+      "url": "https://maps.loup-peluso.com/mcp",
+      "headers": {
+        "CF-Access-Client-Id": { "env": "MAPS_CF_ACCESS_CLIENT_ID" },
+        "CF-Access-Client-Secret": { "env": "MAPS_CF_ACCESS_CLIENT_SECRET" }
+      }
+    },
+    "tesla": {
+      "purpose": "navigation",
+      "description": "Self-hosted Tesla vehicle control",
+      "transport": "http",
+      "url": "https://tesla.loup-peluso.com/mcp",
+      "headers": {
+        "CF-Access-Client-Id": { "env": "TESLA_CF_ACCESS_CLIENT_ID" },
+        "CF-Access-Client-Secret": { "env": "TESLA_CF_ACCESS_CLIENT_SECRET" }
+      }
+    },
+
+    "n8n": {
+      "purpose": "automation",
+      "description": "n8n workflow automation",
+      "transport": "stdio",
+      "command": "npx",
+      "args": ["-y", "n8n-mcp"],
+      "env": {
+        "MCP_MODE": "stdio",
+        "LOG_LEVEL": "error",
+        "DISABLE_CONSOLE_OUTPUT": "true",
+        "N8N_API_URL": { "env": "N8N_API_URL" },
+        "N8N_API_KEY": { "env": "N8N_API_KEY" }
+      }
+    },
+    "bitwarden": {
+      "purpose": "security",
+      "description": "Bitwarden vault; BW_SESSION comes from the `bwunlock` shell function",
+      "transport": "stdio",
+      "command": "npx",
+      "args": ["-y", "@bitwarden/mcp-server"],
+      "env": {
+        "BW_SESSION": { "env": "BW_SESSION" },
+        "BW_CLIENT_ID": { "env": "BW_CLIENT_ID" },
+        "BW_CLIENT_SECRET": { "env": "BW_CLIENT_SECRET" }
+      }
+    }
+  }
+}

@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Reinstall the full skill set on a fresh machine: this repo into both Claude
-# profiles, plus the third-party skills that are tracked here only by name.
+# profiles, plus the third-party skills that are tracked here only by name, plus
+# the MCP servers rendered into every agent that is installed.
 #
 # Uses the `skills` wrapper at ~/.local/bin/skills (yadm-tracked), which runs the
 # upstream CLI once per profile with CLAUDE_CONFIG_DIR set and pairs claude-code
@@ -35,5 +36,12 @@ skills add vercel-labs/agent-skills -s web-design-guidelines -y
 skills add tamagui/tamagui          -s tamagui -y
 skills add kunchenguid/gnhf         -s gnhf -y
 
+# MCP servers. Deliberately after the skills and independent of them: this renders
+# mcp/servers.json into each agent's own config format. It needs no credentials —
+# what it writes are references to environment variables, not their values — so it
+# runs correctly before `yadm decrypt` has restored ~/.config/secrets.zsh.
+echo "==> MCP servers"
+node "$(dirname "$0")/install-mcp.mjs"
+
 echo
-echo "Done. Verify with: skills list"
+echo "Done. Verify with: skills list && node scripts/install-mcp.mjs --list"

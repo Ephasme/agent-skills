@@ -33,6 +33,39 @@ jobs:
             exit 1
           fi
 
+      # The MCP renderer's failure mode is silent: a config that parses but carries
+      # the literal string `${TOKEN}` as a credential. Render into a throwaway HOME
+      # with every agent "installed", then assert each file parses and that no
+      # placeholder survived into a target that cannot expand it.
+      - name: MCP render
+        run: |
+          set -euo pipefail
+          fake=$(mktemp -d)
+          mkdir -p "$fake"/{.claude-perso,.claude-work,.codex,.cursor,.gemini} \
+                   "$fake"/.config/{opencode,Code/User}
+          env -u CLAUDE_CONFIG_DIR HOME="$fake" node scripts/install-mcp.mjs
+          python3 - "$fake" <<'PY'
+          import json, sys, tomllib, pathlib
+          home = pathlib.Path(sys.argv[1])
+          tomllib.loads((home / '.codex/config.toml').read_text())
+          for rel, key, ok in [
+              ('.claude-perso/.claude.json', 'mcpServers', '${'),
+              ('.config/opencode/opencode.json', 'mcp', '{env:'),
+              ('.config/Code/User/mcp.json', 'servers', '${env:'),
+              ('.cursor/mcp.json', 'mcpServers', '${env:'),
+              ('.gemini/settings.json', 'mcpServers', '$'),
+          ]:
+              servers = json.loads((home / rel).read_text())[key]
+              assert servers, f'{rel}: no servers written'
+              # Every placeholder present must be one this agent expands.
+              for name, s in servers.items():
+                  for slot in ('headers', 'env'):
+                      for v in (s.get(slot) or {}).values():
+                          if any(m in str(v) for m in ('${', '{env:')):
+                              assert ok in str(v), f'{rel}/{name}/{slot}: alien placeholder {v!r}'
+          print('MCP render OK')
+          PY
+
       # Proves the portability claim rather than asserting it: the whole catalog
       # must install for agents that are not Claude Code.
       - name: Portability install

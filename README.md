@@ -1,6 +1,6 @@
 # agent-skills
 
-Every hand-written agent skill, in one place, installable into any agent.
+Every hand-written agent skill and MCP server, in one place, installable into any agent.
 
 One folder per skill, each self-contained, following the [Agent Skills](https://agentskills.io)
 open format — the same `SKILL.md` contract Claude Code, Codex, Cursor, Gemini CLI, opencode,
@@ -94,6 +94,65 @@ store install once and are seen by all of them.
 
 `scripts/bootstrap.sh` runs the whole set for a fresh machine.
 
+## MCP servers
+
+`mcp/servers.json` is the canonical set. No agent reads it —
+`node scripts/install-mcp.mjs` renders it into each installed agent's own config.
+
+```sh
+node scripts/install-mcp.mjs --list       # targets, and what each can express
+node scripts/install-mcp.mjs --dry-run    # what would change
+node scripts/install-mcp.mjs              # write every detected target
+node scripts/install-mcp.mjs -a codex     # one agent
+node scripts/install-mcp.mjs --prune      # remove everything it wrote
+```
+
+Skills get portability for free because they are inert files: one store, one symlink per agent.
+MCP configuration cannot work that way. It is structured state, and every agent keeps it in its
+own file, under its own key, in its own dialect — there is nothing to symlink, so the manifest has
+to be **written** rather than linked. That renderer is the whole mechanism.
+
+### Credentials decide what is portable
+
+A credential is never a value in the manifest. It is `{"env": "NAME"}` — a reference to an
+environment variable, resolved by the agent at connect time. Every `NAME` has an `export` in
+`~/.config/secrets.zsh`, which yadm keeps gpg-encrypted. That indirection is what makes the
+manifest safe to commit, and it is also the thing the agents disagree about:
+
+| Agent | Config file | stdio `env` | HTTP headers |
+| --- | --- | --- | --- |
+| Claude Code | `$CLAUDE_CONFIG_DIR/.claude.json` → `mcpServers` | `${NAME}` | `${NAME}` |
+| opencode | `~/.config/opencode/opencode.json` → `mcp` | `{env:NAME}` | `{env:NAME}` |
+| VS Code | `~/.config/Code/User/mcp.json` → `servers` | `${env:NAME}` | `${env:NAME}` |
+| Codex | `~/.codex/config.toml` → `[mcp_servers]` | literal only | `env_http_headers`, `bearer_token_env_var` |
+| Cursor | `~/.cursor/mcp.json` → `mcpServers` | `${env:NAME}` | unresolved for remote servers |
+| Gemini CLI | `~/.gemini/settings.json` → `mcpServers` | `$NAME` | literal only |
+
+Claude Code's two rows are verified on 2.1.220 against a live endpoint that logged the headers it
+received; the rest are the agents' own documentation and open issues. Fifteen of the seventeen
+servers are HTTP with the secret in a header, so those last two rows are not a detail — **Cursor
+and Gemini CLI can only take the two stdio servers.** They are skipped with a printed reason
+rather than written with a literal `${TOKEN}` that would go out as a credential. Codex is the
+mirror image: its `env_http_headers` covers all fifteen HTTP servers, and only the two stdio ones
+drop out. (Those may work anyway by process inheritance — Claude Code passes the full parent
+environment to stdio servers, and the variable names already match. Untested for Codex, so the
+renderer does not claim it.)
+
+`--materialize` writes the real values instead, for a target that cannot reference them. It is
+opt-in, chmods the file to `0600`, and warns: it turns a committed-safe reference into a secret at
+rest, and rotating a credential then means re-running the renderer.
+
+### What it will not clobber
+
+Claude Code's `.claude.json` is 60 KB of live session state that happens to also hold
+`mcpServers`; the JSON targets are merged key-scoped and written through a temp file, with a
+`.bak` of the previous contents. `config.toml` cannot be merged structurally without a TOML
+parser, and this repo stays dependency-free, so the Codex adapter owns a delimited block and
+leaves hand-written TOML above and below it alone. `~/.agents/.mcp-lock.json` records what was
+written where — alongside `.skill-lock.json`, and for the same reason: a server dropped from the
+manifest has to be removed from the agents too, and the installed artefacts are disposable while
+the record of them is not.
+
 ## Authoring
 
 ```sh
@@ -169,13 +228,11 @@ repo only; installed skills are flat.
 **A GitHub mirror.** This lived briefly at `Ephasme/agent-skills` before moving here. There is no
 mirror and no sync — Forgejo is the only remote.
 
-**MCP servers.** The purpose-plugins that used to carry these skills also carried `.mcp.json`
-files (`engineering`, `research`, `finance`, `communication`, `workspace`, `navigation`,
-`automation`, `security`, `trackers`). The whole `~/.agents/plugins/` store was removed from the
-dotfiles on 2026-07-31 in yadm commit `1803e8c`; it is restorable with
-`yadm checkout debe473 -- .agents/plugins`. Whether that MCP layer comes back is a separate
-decision — it does not belong here either way, since no agent outside Claude Code consumes
-`.mcp.json` and their credentials are `${KEY}` env vars from `~/.config/secrets.zsh`.
+**`.mcp.json` files.** The seventeen servers in `mcp/servers.json` came from the purpose-plugins
+that used to carry these skills, removed from the dotfiles on 2026-07-31 in yadm commit `1803e8c`
+(still restorable with `yadm checkout debe473 -- .agents/plugins`). They are not stored in that
+shape any more, because `.mcp.json` is a Claude Code plugin file and nothing else reads it. The
+manifest plus the renderer is the agent-neutral replacement.
 
 **Third-party skills.** `tamagui`, `find-skills`, `web-design-guidelines` and `gnhf` are installed
 from their own upstreams and tracked in `~/.agents/.skill-lock.json`. Vendoring them here would
