@@ -66,6 +66,32 @@ jobs:
           print('MCP render OK')
           PY
 
+          # Disabling a server must also uninstall it. That path runs off the lock
+          # file rather than off the manifest, so nothing about the first render
+          # exercises it — and its failure is invisible until a parked server is
+          # still answering somewhere weeks later.
+          python3 -c "
+          import json
+          m = json.load(open('mcp/servers.json'))
+          name = next(iter(m['servers']))
+          m['servers'][name]['enabled'] = False
+          json.dump({'name': name, **m}, open('/tmp/off.json', 'w'))
+          "
+          off=$(python3 -c "import json; print(json.load(open('/tmp/off.json'))['name'])")
+          env -u CLAUDE_CONFIG_DIR HOME="$fake" node scripts/install-mcp.mjs --manifest /tmp/off.json
+          python3 - "$fake" "$off" <<'PY'
+          import json, sys, pathlib
+          home, off = pathlib.Path(sys.argv[1]), sys.argv[2]
+          for rel, key in [('.claude-perso/.claude.json', 'mcpServers'),
+                           ('.config/opencode/opencode.json', 'mcp'),
+                           ('.config/Code/User/mcp.json', 'servers')]:
+              servers = json.loads((home / rel).read_text())[key]
+              assert off not in servers, f'{rel}: disabled server {off} was not removed'
+              assert servers, f'{rel}: everything was removed, not just {off}'
+          assert off not in json.loads((home / '.agents/.mcp-lock.json').read_text())['targets']['claude-code:perso']['servers']
+          print(f'MCP disable OK ({off} removed)')
+          PY
+
       # Proves the portability claim rather than asserting it: the whole catalog
       # must install for agents that are not Claude Code.
       - name: Portability install

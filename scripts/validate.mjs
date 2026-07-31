@@ -295,9 +295,9 @@ async function checkMcpManifest() {
   try {
     manifest = JSON.parse(await readFile(MCP, 'utf8'));
   } catch (e) {
-    if (e.code === 'ENOENT') return 0; // the manifest is optional
+    if (e.code === 'ENOENT') return { total: 0, off: 0 }; // the manifest is optional
     fail(MCP, `is not valid JSON (${e.message})`);
-    return 0;
+    return { total: 0, off: 0 };
   }
 
   validateManifest(manifest, (msg) => fail(MCP, msg));
@@ -312,7 +312,8 @@ async function checkMcpManifest() {
       }
     }
   }
-  return Object.keys(manifest.servers ?? {}).length;
+  const defs = Object.values(manifest.servers ?? {});
+  return { total: defs.length, off: defs.filter((d) => d.enabled === false).length };
 }
 
 async function main() {
@@ -331,7 +332,7 @@ async function main() {
     for (const slug of slugs) await checkSkill(category, slug);
   }
 
-  const mcpServers = await checkMcpManifest();
+  const mcp = await checkMcpManifest();
 
   for (const w of warnings) console.warn(`  ! ${w}`);
   if (errors.length) {
@@ -340,7 +341,8 @@ async function main() {
     process.exit(1);
   }
   if (!QUIET) {
-    console.log(`✓ ${found.size} skills across ${categories.length} categories, ${mcpServers} MCP servers, no problems`);
+    const off = mcp.off ? ` (${mcp.off} disabled)` : '';
+    console.log(`✓ ${found.size} skills across ${categories.length} categories, ${mcp.total} MCP servers${off}, no problems`);
   }
 }
 

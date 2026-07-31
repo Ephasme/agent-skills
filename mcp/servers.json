@@ -9,6 +9,11 @@
     "~/.config/secrets.zsh, which yadm keeps gpg-encrypted. That is what makes this",
     "file safe to commit.",
     "",
+    "`\"enabled\": false` parks a server: it is rendered nowhere, and removed from",
+    "every agent that already has it on the next run. The definition stays, which is",
+    "the point — deleting the entry also uninstalls it, but throws away the",
+    "definition, and most reasons to switch a server off are temporary.",
+    "",
     "`purpose` is documentation only — it preserves the grouping the retired",
     "purpose-plugins used, and nothing keys off it."
   ],

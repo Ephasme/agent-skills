@@ -25,6 +25,11 @@
 // 0600, and says so loudly: it turns a committed-safe reference into a secret at
 // rest, and rotating a credential then means re-running this script.
 //
+// A server carrying `"enabled": false` is parked: not rendered anywhere, and removed
+// from every agent that has it on the next run. Its definition stays in the manifest,
+// which is the point — deleting the entry uninstalls it too, but throws the
+// definition away, and most reasons to turn a server off are temporary.
+//
 // Usage:
 //   node scripts/install-mcp.mjs                 write every detected target
 //   node scripts/install-mcp.mjs --list          show targets and what each supports
@@ -66,6 +71,9 @@ export function validateManifest(manifest, fail) {
     if (!/^[a-z0-9][a-z0-9-]*$/.test(name)) at('name must be lowercase kebab-case');
     if (seen.has(name.toLowerCase())) at('duplicate name');
     seen.add(name.toLowerCase());
+    // Absent means enabled. A disabled server keeps its full definition — it is
+    // parked, not deleted — so the rest of the shape is still validated.
+    if ('enabled' in def && typeof def.enabled !== 'boolean') at('`enabled` must be a boolean');
 
     if (def.transport === 'http') {
       if (!def.url) at('http transport needs `url`');
@@ -442,7 +450,16 @@ async function main() {
 
   const manifestPath = opts.manifest ?? join(ROOT, 'mcp', 'servers.json');
   const manifest = await loadManifest(manifestPath);
-  const servers = Object.entries(manifest.servers);
+
+  // `"enabled": false` parks a server: it keeps its full definition in the
+  // manifest, is not rendered anywhere, and — because the lock records what was
+  // written last time — is removed from every agent on the next run. Deleting the
+  // entry outright would remove it too, but loses the definition, which is the
+  // wrong trade for a server that is only down, or only temporarily unwanted.
+  const all = Object.entries(manifest.servers);
+  const servers = all.filter(([, def]) => def.enabled !== false);
+  const disabled = new Set(all.filter(([, def]) => def.enabled === false).map(([name]) => name));
+  const known = new Set(all.map(([name]) => name));
 
   let adapters = ADAPTERS;
   if (opts.agents.length) {
@@ -456,12 +473,17 @@ async function main() {
   }
 
   if (opts.list) {
+    console.log(`${servers.length} enabled, ${disabled.size} disabled${disabled.size ? `: ${[...disabled].join(', ')}` : ''}\n`);
     for (const adapter of ADAPTERS) {
       const targets = adapter.targets();
       const where = targets.length ? targets.map((t) => t.file).join(', ') : 'not installed';
       console.log(`${adapter.id.padEnd(12)} env:${adapter.caps.env.padEnd(12)} headers:${adapter.caps.headers.padEnd(12)} ${where}`);
     }
     return;
+  }
+
+  if (disabled.size && !opts.prune) {
+    console.log(`  · disabled in the manifest, will be removed where installed: ${[...disabled].join(', ')}\n`);
   }
 
   if (opts.materialize) {
@@ -523,8 +545,18 @@ async function main() {
           ? `${opts.dryRun ? 'would write' : 'wrote'} ${count}/${servers.length} servers`
           : `unchanged — ${count}/${servers.length} servers`;
       console.log(`${mark} ${target.id.padEnd(20)} ${what} → ${target.file}`);
+      // Three different things land in `dropped`, and they are not interchangeable
+      // to someone deciding whether something broke: a server parked on purpose, a
+      // server deleted from the manifest, and a server this agent stopped being able
+      // to express. Say which.
       if (dropped.length && !opts.prune) {
-        console.log(`    dropped ${dropped.join(', ')} — no longer in the manifest`);
+        const why = (n) =>
+          disabled.has(n) ? 'disabled in the manifest'
+          : known.has(n) ? 'no longer expressible by this agent'
+          : 'removed from the manifest';
+        const groups = new Map();
+        for (const n of dropped) groups.set(why(n), [...(groups.get(why(n)) ?? []), n]);
+        for (const [reason, names] of groups) console.log(`    dropped ${names.join(', ')} — ${reason}`);
       }
 
       if (count) lock.targets[target.id] = { file: target.file, servers: Object.keys(entries) };

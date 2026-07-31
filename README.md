@@ -107,6 +107,31 @@ node scripts/install-mcp.mjs -a codex     # one agent
 node scripts/install-mcp.mjs --prune      # remove everything it wrote
 ```
 
+### Turning one off
+
+`"enabled": false` on a server parks it — rendered nowhere, and removed from every agent that
+already has it the next time the renderer runs.
+
+```json
+"bank": {
+  "enabled": false,
+  "transport": "http",
+  "url": "https://bank.loup-peluso.com/mcp",
+  …
+}
+```
+
+Deleting the entry uninstalls it too, and the difference is the definition: most reasons to switch
+a server off are temporary (the origin is down, the upstream package is broken, it is noisy in one
+season of work), and re-adding it later means reconstructing the URL and the header names from
+nothing. Parked is the recoverable version of the same act.
+
+Removal runs off `~/.agents/.mcp-lock.json`, not off the manifest — by the time the renderer sees
+a disabled server, the only record that it was ever installed is the lock. Both the disabling and
+the re-enabling are idempotent, and `--list` reports what is currently parked.
+
+### Why a manifest and not a store
+
 Skills get portability for free because they are inert files: one store, one symlink per agent.
 MCP configuration cannot work that way. It is structured state, and every agent keeps it in its
 own file, under its own key, in its own dialect — there is nothing to symlink, so the manifest has
