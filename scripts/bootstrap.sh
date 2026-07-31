@@ -29,12 +29,9 @@ command -v skills >/dev/null || {
 echo "==> $REPO"
 skills add "$REPO" -s '*' -y
 
-# Third-party skills, from their own upstreams so they keep receiving updates.
+# The one third-party skill, from its own upstream so it keeps receiving updates.
 echo "==> third-party skills"
-skills add vercel-labs/skills       -s find-skills -y
-skills add vercel-labs/agent-skills -s web-design-guidelines -y
-skills add tamagui/tamagui          -s tamagui -y
-skills add kunchenguid/gnhf         -s gnhf -y
+skills add kunchenguid/gnhf -s gnhf -y
 
 # MCP servers. Deliberately after the skills and independent of them: this renders
 # mcp/servers.json into each agent's own config format. It needs no credentials —

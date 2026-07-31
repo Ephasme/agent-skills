@@ -288,9 +288,11 @@ that used to carry these skills, removed from the dotfiles on 2026-07-31 in yadm
 shape any more, because `.mcp.json` is a Claude Code plugin file and nothing else reads it. The
 manifest plus the renderer is the agent-neutral replacement.
 
-**Third-party skills.** `tamagui`, `find-skills`, `web-design-guidelines` and `gnhf` are installed
-from their own upstreams and tracked in `~/.agents/.skill-lock.json`. Vendoring them here would
-fork them off upstream updates.
+**Third-party skills.** One is installed: `gnhf`, from `kunchenguid/gnhf`, tracked by name in
+`~/.agents/.skill-lock.json` rather than vendored here — a copy in this repo would fork it off
+upstream updates. `tamagui`, `find-skills` and `web-design-guidelines` were dropped on 2026-07-31;
+they were recorded in the lock but present nowhere on disk, so the record was removed and
+`scripts/bootstrap.sh` no longer reinstalls them. Copies sit in `~/code/perso/ai-backups/skills.bkp/`.
 
 **`agents/tcc-expert.md`.** The one file here that is not portable: subagent definitions are a
 per-product format, and this one is Claude Code's. It is kept beside the corpus it drives. The
