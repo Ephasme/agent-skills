@@ -3,19 +3,25 @@ name: greenfield
 description: >-
   Converts one or more documents into a "greenfield" version describing only the
   current state — as if the system were freshly designed with no past — by stripping
-  every kind of legacy content: history and evolution narratives, decision records and
-  ADRs, deprecation and migration notes, embedded changelogs and release notes,
-  rejected alternatives, back-compat sections, and dated commentary. Nothing is deleted
-  by default: each removed passage is preserved verbatim, with its original location,
-  in a sibling {name}.changelog.md; --no-changelog makes the trim destructive instead.
-  Use whenever the user says "greenfield this", "make this doc read fresh", "strip the
-  history / legacy / ADRs / decision records", "remove the migration and deprecation
-  notes", "clean this up for handoff", or "I want only the current state, no baggage".
-  Handles one document directly and many documents — a list, a glob, or a directory —
-  one at a time, in parallel where possible.
+  every kind of legacy content: history narratives, ADRs and decision records,
+  deprecation and migration notes, embedded changelogs, rejected alternatives,
+  back-compat sections, and dated commentary. Nothing is deleted by default: each
+  removed passage is preserved verbatim, with its original location, in a sibling
+  {name}.changelog.md; --no-changelog makes the trim destructive instead. Use when the
+  user says "greenfield this", "make this doc read fresh", "strip the history / legacy /
+  ADRs / decision records", "clean this up for handoff", or "I want only the current
+  state, no baggage". Handles one document or many — a list, a glob, or a directory — in
+  parallel where possible. Invoke only on an explicit request — never load it on your own
+  initiative, since it rewrites the user's documents in place.
+disable-model-invocation: true
 ---
 
 # Greenfield
+
+**Explicit invocation only.** It rewrites the user's documents in place, which must never happen
+on a guess. Some agents honour the `disable-model-invocation` frontmatter above; where that key is
+ignored, this paragraph is the rule — do not load this skill because a document looks like it
+carries history, only because the user asked.
 
 Take a document that has accumulated cruft over time — design docs, specs, READMEs,
 architecture notes carrying history, decisions, deprecations, migrations — and

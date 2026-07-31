@@ -13,7 +13,8 @@ The loop is what stops that.
    haste is a classic way to break a build you already proved green.
 3. **Push the fixes.** Pushing more commits to your *own already-open* PR branch is fine without a
    fresh prompt — the outward-facing decision was made at Phase 6's PR gate.
-4. **Re-review.** Run `two-axis-review` again on the updated range.
+4. **Re-review.** Dispatch a fresh whole-branch reviewer over the updated range (Phase 7), with a
+   new review package. A reviewer that already argued a finding is not the one to judge the fix.
 5. **Repeat until a clean pass** — no critical/major findings (loop-until-clean, SKILL Operating
    rules).
 
@@ -25,9 +26,8 @@ size of the fix decides the shape:
 - **Small and local** (a naming fix, a guard clause, a missed null check) → fix it inline as the
   orchestrator, re-verify, push. No subagent loop needed for a one-liner.
 - **Substantial** (a finding that invalidates a task's approach, or spans several tasks) → treat it
-  as implementation work: re-open **Phase 4**, and run the fix through its implementer → reviewers
-  loop the same way the original task was
-  built. Don't hand-roll a large change outside the discipline you built precisely to keep large
+  as implementation work: re-open **Phase 4**, and run the fix through its implementer → reviewer
+  loop the same way the original task was built. Don't hand-roll a large change outside the discipline you built precisely to keep large
   changes honest — a hand-patched fix arrives with none of it.
 - **A finding that says the plan was wrong** → back to **Phase 2**, and through hardening again.
   Rare at this point (that's what Phase 3 was for), but if it happens, the plan is the thing to

@@ -1,8 +1,0 @@
-{
-  "name": "boursobank-actual-import-scripts",
-  "private": true,
-  "type": "module",
-  "dependencies": {
-    "@actual-app/api": "^26"
-  }
-}

@@ -1,9 +1,15 @@
 ---
 name: harden-case
-description: Makes a case in this repository trustworthy before a deadline, payment, meeting, filing, third-party message, handoff, or archive. Use when asked to harden, audit, stress-test, poke holes in, comprehensively fact-check, tighten, or “durcir / vérifier / fiabiliser” a case; when a tracked journal has accumulated without human review; or when repeated updates have left uncertainty about what still holds.
+description: Makes a case in this repository trustworthy before a deadline, payment, meeting, filing, third-party message, handoff, or archive. Use when asked to harden, audit, stress-test, poke holes in, comprehensively fact-check, tighten, or “durcir / vérifier / fiabiliser” a case — including when the ask is prompted by a tracked journal that has accumulated without human review, or by repeated updates leaving uncertainty about what still holds. Invoke only on an explicit request — never load it on your own initiative, since it rewrites the case from primary sources and costs a long run.
+disable-model-invocation: true
 ---
 
 # Harden a case
+
+**Explicit invocation only.** It rewrites the case and runs long, which must never happen on a
+guess. Some agents honour the `disable-model-invocation` frontmatter above; where that key is
+ignored, this paragraph is the rule — do not load this skill because a journal looks unreviewed,
+only because the user asked.
 
 Make the case safe for a stranger to act on tomorrow without checking everything twice. Find what
 is false, stale, contradictory, unsupported, missing, misplaced, or needlessly difficult to use;

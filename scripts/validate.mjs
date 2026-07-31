@@ -32,9 +32,7 @@ const CATEGORIES = [
   'finance',
   'health',
   'meta',
-  'ops',
   'research',
-  'security',
   'setup',
   'trackers',
 ];

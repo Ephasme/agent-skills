@@ -21,12 +21,11 @@ phases*: each step refuses to advance on a shaky foundation, so a misread requir
 test never silently rides through to a merged PR.
 
 This skill **owns** the phases at the heart of the pipeline — planning (Phase 2), the per-task
-build loop (Phase 4), and verification (Phase 5) are procedures it carries inline. The two it
-delegates go to two skills from this same catalog: **`plan-hardening`** hardens the plan
-(Phase 3) and **`two-axis-review`** reviews the finished branch (Phase 7). Both are hard
-requirements, not preferences — see the operating rules. Nothing here depends on a third-party
-skill or a workflow runtime; the fan-out that remains is plain parallel agent dispatch, where
-the work is genuinely parallel.
+build loop (Phase 4), verification (Phase 5), and the whole-branch review (Phase 7) are procedures
+it carries inline. The one it delegates goes to a skill from this same catalog: **`plan-hardening`**
+hardens the plan (Phase 3). That is a hard requirement, not a preference — see the operating rules.
+Nothing here depends on a third-party skill or a workflow runtime; every review in the pipeline is a
+plain subagent dispatch this skill constructs itself.
 
 **Explicit invocation only.** It pushes branches and opens PRs, which must never happen on a
 guess. Some agents honour the `disable-model-invocation` frontmatter above; where that key is
@@ -81,11 +80,11 @@ what to do when you think you need an exception.
                       │ its closing structural sweep, loop-until-clean           │
                       └───────────────────────────────────────────────────────────┘
 4  IMPLEMENT      ← ─ the freeze LIFTS here, and only here ─ ─
-                      owned per-task loop: fresh implementer per plan task, two
-                      parallel reviewers (spec ‖ quality) after each
+                      owned per-task loop: fresh implementer per plan task, one
+                      independent reviewer after each
 5  VERIFY             → full build/test/lint must pass, with evidence
 6  PR                 → GATE: confirm before push & PR; link the ticket
-7  REVIEW             → two-axis-review: Standards ‖ Spec, in parallel
+7  REVIEW             → one reviewer over the whole branch: Standards + Spec
 8  FIX FINDINGS       → address all, push, re-review, loop-until-clean
 9  HANDOFF            → summary, PR link, leftovers → back to the human
 ```
@@ -124,7 +123,7 @@ above, outranks every one of them.**
   `✅ Phase N (<NAME>) — <which path ran> — <evidence>`, e.g.
   `✅ Phase 5 (VERIFY) — ran pnpm test+lint+build — 142 passed, 0 failed (output above)`, or
   `✅ Phase 3 (HARDEN) — plan-hardening --fix — 2 rounds, closing sweep clean`, or
-  `✅ Phase 4 (IMPLEMENT) — owned per-task loop, 7 tasks, both reviewers clean on each`.
+  `✅ Phase 4 (IMPLEMENT) — owned per-task loop, 7 tasks, reviewer clean on each`.
   The receipt names the skill that ran and points at the concrete evidence that the phase's
   stated **Exit** condition is met. No receipt → the phase isn't done → you may not move on.
   This is what makes a skipped step impossible to hide.
@@ -137,18 +136,17 @@ above, outranks every one of them.**
   plateau), not a fixed number of rounds, is the stop signal — and it's what keeps "clean"
   meaning clean. Minor/nice-to-have findings don't block; carry them to the handoff.
 
-- **A missing companion skill stops the run — it is not a cue to improvise.** The only skills
-  this pipeline invokes are `plan-hardening` (Phase 3) and `two-axis-review` (Phase 7), both
-  from this catalog. If one is not in this session's skill list, that is a broken install —
-  install it from the same source as this skill — **not** a degraded environment to work
-  around. **Stop, name the missing skill, and say the run can't be trusted without it.** An inline
-  substitute would produce a receipt that claims a phase ran when the rigorous version didn't,
-  which is the one failure this pipeline exists to prevent. Every receipt names the skill that
-  ran.
+- **A missing companion skill stops the run — it is not a cue to improvise.** The only skill
+  this pipeline invokes is `plan-hardening` (Phase 3), from this catalog. If it is not in this
+  session's skill list, that is a broken install — install it from the same source as this
+  skill — **not** a degraded environment to work around. **Stop, name the missing skill, and say
+  the run can't be trusted without it.** An inline substitute would produce a receipt that claims a
+  phase ran when the rigorous version didn't, which is the one failure this pipeline exists to
+  prevent. Every receipt names the skill that ran.
 
 - **Fan-out cost guard — more than ~20 agents, confirm first.** Phase 4 is where the agents go:
-  an implementer plus **two parallel reviewers** (spec ‖ quality) per plan task — budget `3T` at
-  the floor and `~4T` in practice for `T` tasks, fix rounds included. Phase 7 adds exactly two.
+  an implementer plus **one reviewer** per plan task — budget `2T` at the floor and `~3T` in
+  practice for `T` tasks, fix rounds included. Phase 7 adds exactly one.
   Invoking this skill opts you into multi-agent work in general, but a big fan-out costs real
   tokens: if a run would spawn **more than ~20 agents**, say the number and **confirm with the
   human before launching**. (An agent that caps concurrency or total agents is a backstop, not
@@ -156,9 +154,9 @@ above, outranks every one of them.**
 
 - **Always set a subagent's model *and* reasoning effort — where you're the one dispatching.**
   Left unset, both inherit the orchestrator's, which is the most expensive combination
-  available. This binds Phase 4's per-task loop — an implementer and two reviewers per task,
-  all dispatched by you — so pick each one's tier per Phase 4's Model Selection section
-  (mechanical tasks cheap, judgment tasks standard), and Phase 7's two axes. If this agent
+  available. This binds Phase 4's per-task loop — an implementer and a reviewer per task, all
+  dispatched by you — so pick each one's tier per Phase 4's Model Selection section (mechanical
+  tasks cheap, judgment tasks standard), and Phase 7's whole-branch reviewer. If this agent
   exposes no model or effort selector, skip the flags and say so once in the Phase 4 receipt;
   everything else is unchanged.
 
@@ -241,7 +239,7 @@ ordered implementation plan: numbered tasks, the files each touches, the tests, 
 Write it yourself in plan mode (Rule Zero — no code), to the structure Phase 4 reads directly: a
 header with a **Global Constraints** block, numbered `### Task N` sections carrying per-task files,
 named contracts, and TDD steps, with no placeholders. The Global Constraints block is load-bearing —
-Phase 4 hands it to both task reviewers verbatim.
+Phase 4 hands it to every task reviewer verbatim.
 
 **Exit:** a written plan file exists, with the header, Global Constraints, and `### Task N` sections.
 → [`references/phase-2-plan.md`](references/phase-2-plan.md)
@@ -265,12 +263,12 @@ plateau reached and the remainder surfaced).
 
 ## Phase 4 — IMPLEMENT  *(the code freeze lifts here — and only here)*
 
-Run the plan through this skill's **owned per-task loop**: a fresh implementer per plan task, two
-independent reviewers in parallel after each — one for spec compliance, one for code quality — a
-fix loop until that task is clean, then the next. One task in flight at a time; no
-worktree-per-task swarm, no task graph, no wave gates. **Stop once the last task's review comes
-back clean** — no whole-branch review and no merge/PR/discard menu here; Phases 5–9 of *this*
-skill own verification, the PR, the whole-branch review, and the handoff.
+Run the plan through this skill's **owned per-task loop**: a fresh implementer per plan task, one
+independent reviewer after each — judging spec compliance and code quality together — a fix loop
+until that task is clean, then the next. One task in flight at a time; no worktree-per-task swarm,
+no task graph, no wave gates. **Stop once the last task's review comes back clean** — no
+whole-branch review and no merge/PR/discard menu here; Phases 5–9 of *this* skill own verification,
+the PR, the whole-branch review, and the handoff.
 
 - **Primary** → dispatch the loop via the **Agent** tool, one task at a time in plan order, using
   the bundled implementer and task-reviewer prompt templates and the `task-brief` /
@@ -278,10 +276,13 @@ skill own verification, the PR, the whole-branch review, and the handoff.
 - **Fallback (no subagent dispatch at all)** → implement the plan yourself, task by task, and say
   so — a self-reviewed implementation is materially weaker evidence.
 
+The reviewer is a **different agent in a fresh context**, never you and never the implementer. That
+separation is the whole gate: an agent that reads its own diff reads what it meant to write.
+
 Before dispatching anything: verify the freeze held (`git status --porcelain` shows only the
 plan file), create the feature branch (never build on the default branch — this is content-free,
 so it's allowed before the freeze lifts), and run the **pre-flight gate** — count the plan's
-tasks, project the agent count (`3T` floor), and pause for go-ahead unless hands-off
+tasks, project the agent count (`2T` floor), and pause for go-ahead unless hands-off
 pre-authorized (subject to the **fan-out cost guard**, Operating rules).
 
 **Exit:** every task in the plan implemented and reviewed clean (spec + quality), committed on
@@ -320,17 +321,20 @@ URL captured for the handoff. → [`references/phase-6-pr.md`](references/phase-
 
 ## Phase 7 — REVIEW
 
-Get the whole assembled change reviewed by reviewers that are not you, along two axes that run in
-parallel and are reported separately: **Standards** (does it follow this repo's documented
-standards, plus the code-smell baseline?) and **Spec** (does it faithfully implement what was
-asked — nothing missing, nothing extra, nothing built wrong?).
+Get the whole assembled change reviewed by **one general reviewer that is not you**, answering two
+questions it reports separately: **Standards** (does it follow this repo's documented standards,
+plus the code-smell baseline?) and **Spec** (does it faithfully implement what was asked — nothing
+missing, nothing extra, nothing built wrong?).
 
-Run **`two-axis-review`**, handing it the fixed point (the feature branch's
-merge-base) and the spec (the hardened plan, backed by the ticket's acceptance criteria) so it
-skips its own discovery. Hand it the Minor findings deferred from Phase 4's task reviews as well,
-for re-triage now that they can be seen together.
+Dispatch it over the feature branch's merge-base with the default branch, handing it a
+`review-package` diff, the hardened plan backed by the ticket's acceptance criteria, and the repo's
+own standards files to read before judging. Hand it the Minor findings deferred from Phase 4's task
+reviews as well, for re-triage now that they can be seen together.
 
-**Exit:** two reports, findings enumerated and triaged by severity.
+This is the first pass that sees the change whole — every Phase 4 review was blind to everything
+outside its own task, so the seams between tasks have not been looked at until now.
+
+**Exit:** findings enumerated and triaged by severity, Standards and Spec reported separately.
 → [`references/phase-7-review.md`](references/phase-7-review.md)
 
 ## Phase 8 — FIX REVIEW FINDINGS
@@ -360,18 +364,17 @@ a plateau). Then hand it back.
 ## Bundled files
 
 Every file this skill ships, listed here so each is one link from this page rather than
-buried behind another reference. Phase files are linked from their phase above; the three
+buried behind another reference. Phase files are linked from their phase above; the two
 prompt templates are filled in and dispatched during Phase 4.
 
 | File | Read it when |
 |---|---|
 | [`references/rule-zero-no-code.md`](references/rule-zero-no-code.md) | Any Phase 0–3 dispatch — paste it into the sub-agent verbatim |
 | [`references/prompts/implementer.md`](references/prompts/implementer.md) | Dispatching a Phase 4 implementer for one plan task |
-| [`references/prompts/task-spec-reviewer.md`](references/prompts/task-spec-reviewer.md) | Dispatching the Phase 4 spec reviewer for a finished task |
-| [`references/prompts/task-quality-reviewer.md`](references/prompts/task-quality-reviewer.md) | Dispatching the Phase 4 quality reviewer for a finished task |
+| [`references/prompts/task-reviewer.md`](references/prompts/task-reviewer.md) | Dispatching the Phase 4 reviewer for a finished task |
 | `scripts/build-workspace` | Phase 4 — set up an isolated workspace for a task |
 | `scripts/task-brief` | Phase 4 — cut one task's brief out of the plan file |
-| `scripts/review-package` | Phase 4 and 7 — write the diff to a file so reviewers read the same bytes |
+| `scripts/review-package` | Phase 4 and 7 — write the diff to a file so the reviewer reads stable bytes |
 
 ## If a phase can't proceed
 

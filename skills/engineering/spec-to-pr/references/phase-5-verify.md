@@ -56,7 +56,7 @@ Re-open the Phase 4 todo; don't leave it falsely complete.
 
 - **Small and local** (a naming fix, a guard clause, a missed null check) → fix it inline as the
   orchestrator, re-verify, push.
-- **Anything else** → re-run the affected task through Phase 4's implementer → reviewers loop
+- **Anything else** → re-run the affected task through Phase 4's implementer → reviewer loop
   rather than hand-patching it.
 - **If it can't be made green** — genuinely environmental, a pre-existing failure on the default
   branch, flaky in a way you can demonstrate, or out of scope — **stop and tell the human exactly

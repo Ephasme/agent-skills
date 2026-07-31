@@ -7,16 +7,22 @@ description: >-
   closes done and obsolete tickets, reopens regressed ones, and creates tickets for
   uncovered gaps, so the board reads as if it were planned from scratch today. Grounds
   every status change in evidence and reports everything it changed. Resolves the project
-  from a "Linear project" section in the repo's agent instructions file, asking for the
-  project and team and writing that section when missing. Use whenever the user wants to
-  sync, groom, triage, or refresh the Linear board for the current project, get the
-  backlog in shape, or prep the project for the next session — including "update linear",
-  "sort out the tickets", "get the board ready", "greenfield the linear project". Applies
-  changes autonomously; pass --dry-run for a preview with no writes.
+  from a "Linear project" section in the repo's agent instructions file, asking and
+  writing that section when missing. Use when the user asks to sync,
+  groom, triage, or refresh the Linear board for the current project — including "update
+  linear", "sort out the tickets", or "greenfield the linear project". Applies changes
+  autonomously; pass --dry-run for a preview with no writes. Invoke only on an explicit
+  request — never load it on your own initiative, since it writes to a live board.
 compatibility: Requires a Linear integration (MCP server or API access) and a git checkout of the repo.
+disable-model-invocation: true
 ---
 
 # linear-project-sync
+
+**Explicit invocation only.** It closes, reopens, and creates tickets on a live board, which must
+never happen on a guess. Some agents honour the `disable-model-invocation` frontmatter above; where
+that key is ignored, this paragraph is the rule — do not load this skill because the board looks
+stale, only because the user asked.
 
 Take the Linear project attached to the repo you're in and make it **true and greenfield**:
 every ticket's status, priority, estimate, and description reflect where the work actually

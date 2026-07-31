@@ -1,11 +1,10 @@
 # Phase 4 — IMPLEMENT  *(the code freeze lifts here — and only here)*
 
 Hand the hardened, reviewed plan to a **per-task build loop that this skill owns outright**: a
-fresh implementer subagent per task, **two independent reviewers dispatched in parallel** after
-each — one for spec compliance, one for code quality — a fix loop until that task's review is
-clean, then the next task. One task in flight at a time — no worktree-per-task swarm, no wave
-gates, no task graph. Every task is built by one agent and checked by two others before the next
-one starts.
+fresh implementer subagent per task, **one independent reviewer** after each — judging both spec
+compliance and code quality — a fix loop until that task's review is clean, then the next task. One
+task in flight at a time — no worktree-per-task swarm, no wave gates, no task graph. Every task is
+built by one agent and checked by another before the next one starts.
 
 **Why subagents:** each task goes to an agent with isolated context that you construct exactly —
 the task brief, the interfaces it touches, the global constraints, nothing else. It never inherits
@@ -33,7 +32,7 @@ don't smuggle in what it never saw.)
 - [The per-task loop](#the-per-task-loop)
 - [Handling implementer status](#handling-implementer-status)
 - [Model selection](#model-selection)
-- [Constructing reviewer prompts — the discipline](#constructing-reviewer-prompts-the-discipline)
+- [Constructing the reviewer prompt — the discipline](#constructing-the-reviewer-prompt-the-discipline)
 - [File handoffs](#file-handoffs)
 - [Durable progress](#durable-progress)
 - [Handling a stuck task](#handling-a-stuck-task)
@@ -51,8 +50,7 @@ don't smuggle in what it never saw.)
    mandates it, asking which governs — before execution begins, not one interrupt per discovery
    mid-plan. If the scan is clean, proceed without comment.
 3. **Per task, in plan order,** run the loop below. One task in flight; never dispatch two
-   implementers in parallel (they conflict). The two *reviewers* of a single task DO run in
-   parallel — they only read.
+   implementers in parallel (they conflict).
 4. **Last-resort fallback (no subagent dispatch available at all):** implement the plan yourself,
    task by task, running each task's verification as you finish it — and **say so**. You are then
    your own implementer and reviewer, which is materially weaker evidence, and the handoff should
@@ -81,8 +79,8 @@ fine this early (Rule Zero).
 
 Count the plan's tasks (its `### Task N` headings). Project the agent count:
 
-- **Floor:** `3T` — one implementer and two parallel reviewers per task.
-- **Realistic:** `~4T` once fix rounds are counted in.
+- **Floor:** `2T` — one implementer and one reviewer per task.
+- **Realistic:** `~3T` once fix rounds are counted in.
 
 This is the **fan-out cost guard** (SKILL Operating rules): above **~20 agents**, say the number and
 confirm before launching, regardless of pre-authorization. Below that, still **pause for go-ahead**
@@ -113,26 +111,26 @@ the resolved absolute paths rather than the notation.
 4. **Handle the implementer's status** (see below) until it reports DONE.
 5. **Build the review package.** `$SKILL_DIR/scripts/review-package BASE HEAD` — writes the commit list, stat
    summary, and full diff to one file and prints the path. It never enters your context.
-6. **Dispatch both task reviewers, in parallel.** One turn, two sub-agents — one using
-   [`prompts/task-spec-reviewer.md`](prompts/task-spec-reviewer.md), one using
-   [`prompts/task-quality-reviewer.md`](prompts/task-quality-reviewer.md). Hand each the same three
-   paths — the brief, the implementer's report, and the review package — plus the Global Constraints
-   that bind this task, copied verbatim. They are independent judgements of the same diff and must
-   not see each other's verdicts: one context that holds both is a context where a clean spec
-   verdict quietly softens a quality finding. Set `model` and `effort` explicitly on both.
-7. **Fix loop.** Merge the two reviewers' lists, then dispatch a fix subagent for **Critical and
-   Major** findings — one fixer with the complete merged list, not one per reviewer and not one per
-   finding: parallel fixers on one tree produce conflicting edits. The fix subagent carries the
-   implementer contract: re-run the tests covering its change and append results to the report file.
-   Then re-review (a fresh `review-package` for the new range). Repeat until **both** reviewers
-   return clean — spec ✅ and quality Approved. Record Minor findings in the ledger for the Phase 7
-   whole-branch review to triage.
+6. **Dispatch the task reviewer** using [`prompts/task-reviewer.md`](prompts/task-reviewer.md). Hand
+   it three paths — the brief, the implementer's report, and the review package — plus the Global
+   Constraints that bind this task, copied verbatim. It judges both questions on this diff: does the
+   change match what was asked, and is it well-built. Set `model` and `effort` explicitly.
 
-   **Merging the two lists.** The reviewers judge the same diff from different angles and will
-   sometimes flag the same line. When they do, **the higher severity wins** and the finding appears
-   once, carrying both reviewers' reasoning — a quality Minor that the spec reviewer calls Critical
-   is Critical. Never average them, and never let one reviewer's Approved verdict suppress the
-   other's finding; that suppression is the exact failure the split exists to prevent.
+   **It must be a fresh context.** The reviewer's whole value is that it never watched the code
+   being written, so it reads what is there rather than what was intended. Never review a task in
+   the implementer's context, and never review it in your own — a controller that reviews the work
+   it just dispatched is the self-review this loop exists to replace.
+7. **Fix loop.** Dispatch a fix subagent for the reviewer's **Critical and Major** findings — one
+   fixer with the complete list, not one per finding: parallel fixers on one tree produce
+   conflicting edits. The fix subagent carries the implementer contract: re-run the tests covering
+   its change and append results to the report file. Then re-review (a fresh `review-package` for
+   the new range). Repeat until the reviewer returns clean — spec ✅ and quality Approved. Record
+   Minor findings in the ledger for the Phase 7 whole-branch review to triage.
+
+   **Don't let one verdict suppress the other.** The reviewer returns a spec verdict and a quality
+   verdict, and a task is clean only when both are. A ✅ on spec compliance never downgrades a Major
+   quality finding, and Approved quality never excuses a missed requirement — they are two gates
+   that happen to be judged by one agent, not one gate with two labels.
 8. **Mark the task complete** in the todo list and append one line to the ledger (see Durable
    progress). Then move to the next task.
 
@@ -149,7 +147,7 @@ Implementers report one of four statuses:
   itself is wrong** → escalate (see Handling a stuck task). Never force the same model to retry
   unchanged, and never ignore an escalation.
 
-**Reviewer ⚠️ items.** The *spec* reviewer may report "⚠️ Cannot verify from diff" — requirements
+**Reviewer ⚠️ items.** The reviewer may report "⚠️ Cannot verify from diff" — requirements
 that live in unchanged code or span tasks. These don't block, but resolve each yourself before marking
 the task complete (you hold the cross-task context the reviewer lacks). A confirmed gap is a failed
 spec review — send it back to the implementer and re-review.
@@ -164,17 +162,18 @@ cheapest models often take 2–3× the turns on multi-step work.
   mechanical fix): cheapest tier.
 - **Prose-description implementer / reviewer:** mid-tier as the floor.
 - **Integration/judgment implementer** (multi-file coordination, debugging): standard model.
-- **Reviewers:** scale to the diff — a small mechanical diff doesn't need the top model; a subtle
-  concurrency change does. Note you are paying for two per task, so the choice matters twice.
+- **Reviewer:** scale to the diff — a small mechanical diff doesn't need the top model; a subtle
+  concurrency change does. It is the only check on the task, so don't cut below the mid tier to
+  save a few tokens.
 
 The model/effort operating rule binds every dispatch here — this loop is the one you dispatch.
 
-## Constructing reviewer prompts — the discipline
+## Constructing the reviewer prompt — the discipline
 
 Per-task reviews are task-scoped gates; the broad review happens once, at Phase 7. When you fill
-either reviewer template:
+the reviewer template:
 
-- **Copy the Global Constraints verbatim** from the plan into each reviewer's constraints block —
+- **Copy the Global Constraints verbatim** from the plan into the reviewer's constraints block —
   exact values, formats, and stated relationships between components ("same layout as X"). That
   block is the reviewer's attention lens; the template already carries the process rules.
 - **Never pre-judge.** Don't tell a reviewer what not to flag, don't pre-rate a finding's severity
@@ -189,12 +188,12 @@ either reviewer template:
 
 ## File handoffs
 
-- **Task brief** (`$SKILL_DIR/scripts/task-brief`) — the implementer's and reviewers'
+- **Task brief** (`$SKILL_DIR/scripts/task-brief`) — the implementer's and reviewer's
   single source of requirements.
 - **Report file** — the implementer writes its full report there and returns only status, commits, a
   one-line test summary, and concerns. Fix dispatches append their fix report (with test results) to
   the same file.
-- **Review package** (`$SKILL_DIR/scripts/review-package`) — the reviewers' view of the
+- **Review package** (`$SKILL_DIR/scripts/review-package`) — the reviewer's view of the
   diff, in one Read.
 
 ## Durable progress
@@ -222,4 +221,4 @@ back to **Phase 2**, run the change through hardening, and re-open the todos you
 feature branch — nothing merged, pushed, or opened yet; that's Phase 6.
 
 **Exit receipt example:**
-`✅ Phase 4 (IMPLEMENT) — owned per-task loop, 7 tasks, both reviewers clean on each — 7 commits on abc-123-rate-limiting`
+`✅ Phase 4 (IMPLEMENT) — owned per-task loop, 7 tasks, reviewer clean on each — 7 commits on abc-123-rate-limiting`

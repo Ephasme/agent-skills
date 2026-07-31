@@ -1,8 +1,8 @@
 # Phase 7 — REVIEW
 
-Get the **whole change** reviewed by reviewers that are **not you**. You just spent eight phases
+Get the **whole change** reviewed by a reviewer that is **not you**. You just spent eight phases
 becoming invested in this plan being right; that's exactly the state of mind that misses its flaws.
-The value here comes from the reviewers' independence, so run them and take the findings seriously.
+The value here comes from the reviewer's independence, so run it and take the findings seriously.
 
 **This is not a repeat of Phase 4's task reviews.** Those were *task-scoped gates*: each judged
 one task's diff against one task's brief, deliberately blind to the rest of the codebase. Every
@@ -15,8 +15,10 @@ assembled.
 
 ## The call
 
-Run the `two-axis-review` skill with `--since <merge-base> --spec <plan-file>`, with the
-arguments filled in so it skips its own discovery. Hand it:
+Dispatch **one general reviewer subagent** over the whole branch. Set `model` and `effort`
+explicitly (Operating rules) — this is the last check before a human reads the PR, so it is not
+the dispatch to economise on. Build its diff with `$SKILL_DIR/scripts/review-package BASE HEAD` so
+the package never enters your context, and hand the reviewer:
 
 - **The fixed point** — the feature branch's merge-base with the default branch, so the review
   sees the whole branch and nothing else. Resolve the base ref in this order, and **keep the
@@ -35,20 +37,39 @@ arguments filled in so it skips its own discovery. Hand it:
   it; name them too, because a reviewer that knows what the change was *supposed* to do catches
   the most dangerous class of bug in this pipeline: code that is internally correct but doesn't do
   what was asked.
-- **The deferred Minors** from Phase 4, for re-triage. Pass them as prose alongside the
-  invocation and ask which of them must be fixed before merge, now that they can be seen
-  together. Three Minors that each looked like polish in isolation can be one Major when they turn
-  out to be the same smell in three places. **A roll-up nobody reads is a silent discard** — this
-  is where it gets read.
+- **The deferred Minors** from Phase 4, for re-triage. Ask which of them must be fixed before
+  merge, now that they can be seen together. Three Minors that each looked like polish in isolation
+  can be one Major when they turn out to be the same smell in three places. **A roll-up nobody
+  reads is a silent discard** — this is where it gets read.
 
-**There is no fallback.** `two-axis-review` is a sibling skill in this plugin; if it isn't in this
-session's skill list, the install is broken — stop and say so (Operating rules). A self-review is
-not a substitute, and calling it one in a receipt is worse than skipping the phase.
+## What to ask it for
+
+The reviewer answers two questions about the assembled branch, and reports them separately:
+
+- **Standards** — does the change follow this repo's documented conventions, plus the ordinary
+  code-smell baseline? Point it at the repo's own standards files (`AGENTS.md` / `CLAUDE.md`, a
+  `CONTRIBUTING.md`, a `docs/` style guide) and tell it to read them before judging, rather than
+  applying generic taste.
+- **Spec** — does the branch faithfully implement what was asked: nothing missing, nothing extra,
+  nothing built wrong? This is judged against the hardened plan and the acceptance criteria, not
+  against what the code appears to be trying to do.
+
+Tell it to keep the two answers apart in its report and to tag every finding as one or the other.
+They are different repairs and Phase 8 routes them differently.
+
+Give it the same evidence discipline the task reviewer works under: read the review package rather
+than crawling the codebase, cite `file:line` for every finding, treat the plan's authorship as no
+defence, and stay read-only on the checkout.
+
+**A self-review is not a substitute.** If this agent cannot dispatch a subagent at all, say so
+plainly in the receipt and in the Phase 9 handoff — a whole-branch review you performed on your own
+work is materially weaker evidence, and a receipt that doesn't admit it is worse than a skipped
+phase.
 
 ## Enumerate the findings
 
-The two axes come back as separate reports and stay separate — don't merge them into one ranked
-list. End the phase with the findings written out and **triaged by severity**:
+The two answers stay separate — don't merge them into one ranked list. End the phase with the
+findings written out and **triaged by severity**:
 
 - **critical / major** → blocking. These drive Phase 8's loop.
 - **minor / nice-to-have** → non-blocking. These go to the Phase-9 handoff notes.
@@ -58,7 +79,7 @@ what the reviewer read. Then either fix it, or say plainly why you reject it, wi
 — performative agreement and quiet dismissal are the same failure wearing different clothes. A
 finding you reject on inspection is a fine outcome; a finding you quietly ignore is not.
 
-**Exit:** two reports, findings enumerated and triaged.
+**Exit:** findings enumerated and triaged, Standards and Spec reported separately.
 
 **Exit receipt example:**
-`✅ Phase 7 (REVIEW) — two-axis-review on abc1234...HEAD — Standards: 3 findings (1 major); Spec: 2 findings (1 critical: rate limit applied per key, AC says per tenant)`
+`✅ Phase 7 (REVIEW) — whole-branch reviewer on abc1234...HEAD — Standards: 3 findings (1 major); Spec: 2 findings (1 critical: rate limit applied per key, AC says per tenant)`

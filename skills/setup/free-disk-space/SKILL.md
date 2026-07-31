@@ -2,19 +2,25 @@
 name: free-disk-space
 description: >-
   Reclaims as much disk space as possible on a machine, aggressively but safely.
-  Use this whenever the user is low on disk space or wants to clean up their
-  machine — phrasings like "free up space", "my disk is full", "running out of
-  space", "clean my mac", "reclaim disk", "make room on this drive", or in French
-  "libère de la place", "mon disque est plein", "vide la machine", "nettoie mon
-  mac", "j'ai plus de place". Trigger even when the user doesn't name a specific
-  folder — the skill figures out where the space went. It distinguishes
-  regenerable caches (safe to wipe) from recoverable-with-impact artifacts
-  (node_modules, Docker, SDKs) from genuine personal data (back up or confirm
-  first), clears the safe tier autonomously, and confirms before anything
-  destructive. macOS-first (APFS-aware); see references/linux.md for Linux.
+  Use this when the user asks to free space or clean up their machine — phrasings
+  like "free up space", "my disk is full", "running out of space", "clean my mac",
+  "reclaim disk", "make room on this drive", or in French "libère de la place",
+  "mon disque est plein", "vide la machine", "nettoie mon mac", "j'ai plus de
+  place". They need not name a folder — the skill figures out where the space went.
+  It distinguishes regenerable caches (safe to wipe) from recoverable-with-impact
+  artifacts (node_modules, Docker, SDKs) from genuine personal data (back up or
+  confirm first), clears the safe tier autonomously, and confirms before anything
+  destructive. macOS-first (APFS-aware); see references/linux.md for Linux. Invoke
+  only on an explicit request — never load it on your own initiative, since it
+  deletes files.
+disable-model-invocation: true
 ---
 
 # Free disk space
+
+**Explicit invocation only.** It deletes files, which must never happen on a guess. Some agents
+honour the `disable-model-invocation` frontmatter above; where that key is ignored, this paragraph
+is the rule — do not load this skill because a disk looks full, only because the user asked.
 
 Reclaim disk space by working from the safest wins to the riskiest, never
 surprising the user with lost data. On a typical dev machine the easy, fully

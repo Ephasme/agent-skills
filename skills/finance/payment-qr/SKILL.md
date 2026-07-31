@@ -1,9 +1,16 @@
 ---
 name: payment-qr
-description: Génère un QR code de paiement SEPA (EPC069-12) scannable par les apps bancaires FR/EU pour pré-remplir un virement (bénéficiaire, IBAN, montant, libellé). À utiliser dès qu'on demande un « QR de paiement / de virement », « un QR pour que X me paie N € », ou tout virement SEPA en euros. Pas pour PayPal/Lydia/carte.
+description: Génère un QR code de paiement SEPA (EPC069-12) scannable par les apps bancaires FR/EU pour pré-remplir un virement (bénéficiaire, IBAN, montant, libellé). À utiliser dès qu'on demande un « QR de paiement / de virement », « un QR pour que X me paie N € », ou tout virement SEPA en euros. Pas pour PayPal/Lydia/carte. À n'invoquer que sur demande explicite — ne jamais la charger de sa propre initiative, car elle produit un instrument de paiement portant un IBAN.
+disable-model-invocation: true
 ---
 
 # payment-qr — QR code de paiement SEPA (EPC)
+
+**Invocation explicite uniquement.** Cette skill produit un instrument de paiement portant un
+IBAN : cela ne doit jamais arriver au jugé. Certains agents respectent la clé
+`disable-model-invocation` ci-dessus ; là où elle est ignorée, ce paragraphe fait règle — ne
+charge pas cette skill parce qu'il est question d'argent, seulement parce que l'utilisateur l'a
+demandée.
 
 Génère un **QR code de paiement EPC069-12** (SEPA Credit Transfer). Une fois
 scanné par une app bancaire FR/EU, il pré-remplit le virement : bénéficiaire,

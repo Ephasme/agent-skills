@@ -1,9 +1,15 @@
 ---
 name: prune-branches
-description: Safely cleans up git branches — from removing only branches whose work is already merged into the default (including squash-merges that `git branch --merged` cannot see) up to a full wipe leaving just main/master/trunk. Use whenever the user wants to delete, nuke, wipe, prune, tidy, or reset branches, drop merged/stale branches, or shrink a cluttered branch list. Destructive — classify branches first, confirm scope, rescue unsaved work, then delete. Requires explicit user authorization.
+description: Safely cleans up git branches — from removing only branches whose work is already merged into the default (including squash-merges that `git branch --merged` cannot see) up to a full wipe leaving just main/master/trunk. Use when the user asks to delete, nuke, wipe, prune, tidy, or reset branches, drop merged/stale branches, or shrink a cluttered branch list. Destructive — classify branches first, confirm scope, rescue unsaved work, then delete. Invoke only on an explicit request — never load it on your own initiative, since it destroys branches.
+disable-model-invocation: true
 ---
 
 # prune-branches
+
+**Explicit invocation only.** It destroys branches, which must never happen on a guess. Some agents
+honour the `disable-model-invocation` frontmatter above; where that key is ignored, this paragraph
+is the rule — do not load this skill because a branch list looks cluttered, only because the user
+asked.
 
 Clean up git branches without losing work. Requests range from the gentle ("delete branches that are already merged") to the absolute ("wipe everything except main"). The danger is that the blunt version — force-delete every non-default branch and every remote — also destroys unmerged commits, uncommitted changes sitting in worktrees, and open pull requests. So the job is not "delete branches"; it's **classify what's safe, confirm how far to go, rescue anything unsaved, then delete.**
 

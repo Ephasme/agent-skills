@@ -1,9 +1,15 @@
 ---
 name: no-verbose
-description: Reinjects Loup's response-style rules — maximum concision, numbered lists, no narration or process storytelling. Use when the user invokes it by name, when they say responses are getting verbose, bloated, chatty, or "too much bla-bla", when they ask to tighten up or reset how you write, or at the start of a long session where output discipline matters. Also use after a context summarization, when the always-on copy of these rules in the agent instructions file may have decayed.
+description: Reinjects Loup's response-style rules — maximum concision, numbered lists, no narration or process storytelling. Use when the user invokes it by name, when they say responses are getting verbose, bloated, chatty, or "too much bla-bla", or when they ask to tighten up or reset how you write — including after a context summarization, when the always-on copy of these rules in the agent instructions file may have decayed. Invoke only on an explicit request — never load it on your own initiative, since it restyles the whole session.
+disable-model-invocation: true
 ---
 
 # Response style
+
+**Explicit invocation only.** It restyles the rest of the session, which is the user's call rather
+than yours. Some agents honour the `disable-model-invocation` frontmatter above; where that key is
+ignored, this paragraph is the rule — do not load this skill because your own output looks long,
+only because the user asked.
 
 Correct, unambiguous, complete — then as short as possible.
 Chat only. Code, comments, commits, PRs, docs, thinking: full length.

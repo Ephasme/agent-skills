@@ -9,8 +9,8 @@ Copilot, Goose and dozens of others read. Installed with the
 `skills/<category>/<skill>/` layout natively.
 
 Self-hosted and private, on the Forgejo at `git.loup-peluso.com` — several skills carry personal
-or employer-adjacent detail (bank import recipes, a medical research corpus, a production-database
-runbook), and none of it needs to sit on someone else's server. Managed with
+detail (a medical research corpus, a hardening workflow over private case records, response-style
+rules written for one person), and none of it needs to sit on someone else's server. Managed with
 [`tea`](https://gitea.com/gitea/tea), not `gh`.
 
 ```
@@ -45,9 +45,9 @@ matters, and it can be bought with files and ordering. The two exceptions are st
 
 **Declare hard requirements in `compatibility`.** The spec's optional `compatibility` field is
 where an external binary, a credential, a network dependency, or a specific target product
-belongs. `plugin-config` configures Claude Code plugins — that's its subject, declared in the
-field, and it still runs from any agent because it drives the `claude` CLI rather than living
-inside it.
+belongs. `linear-project-sync` needs a Linear integration and a git checkout — that's a hard
+requirement, declared in the field, and it still runs from any agent because it drives whatever
+Linear channel the host offers rather than assuming one.
 
 **Frontmatter stays inside the standard.** `name` and `description` are required;
 `license`, `compatibility`, `metadata` and `allowed-tools` are the rest of the field set. One
@@ -85,7 +85,7 @@ Anywhere else — another machine, another agent — use the upstream CLI direct
 
 ```sh
 npx skills add "$SRC" -g -a codex -a cursor -a opencode -a gemini-cli -s '*' -y
-npx skills add "$SRC" -s two-axis-review   # one skill, project scope
+npx skills add "$SRC" -s spec-to-pr        # one skill, project scope
 ```
 
 Agent names are the CLI's own (`gemini-cli`, not `gemini`); `npx skills add . -a bogus` prints
@@ -234,31 +234,44 @@ Portability — the contract above:
 Hygiene:
 
 11. No absolute home paths (`/home/you/…`, `/Users/you/…`), no `__pycache__`, nothing over 1 MiB.
-12. Only the nine categories below.
+12. Only the seven categories below.
 
 A skill must be **self-contained**: anything it runs lives in its own `scripts/`. Where two skills
-need the same helper, both ship a copy (`spec-to-pr` and `two-axis-review` each carry
-`review-package` + `build-workspace`) — they install independently and cannot reach each other.
+need the same helper, both ship a copy rather than sharing one — they install independently and
+cannot reach each other. `spec-to-pr` carries `review-package`, `build-workspace` and `task-brief`
+for exactly that reason.
 
 ## Catalog
 
 | Category | Skills |
 | --- | --- |
-| `engineering` | code-quality-scan, document-codebase, greenfield, linear-project-sync, plan-hardening, prune-branches, spec-to-pr, two-axis-review, update-documentation, writing-technical-specs |
-| `finance` | bank-actual-import, payment-qr, receipt-split |
+| `engineering` | code-quality-scan, greenfield, linear-project-sync, plan-hardening, prune-branches, spec-to-pr |
+| `finance` | payment-qr |
 | `research` | cite-or-refuse, fact-check-document |
-| `setup` | free-disk-space, git-multi-identity-setup, plugin-config |
-| `trackers` | harden-case, track-case |
+| `setup` | free-disk-space |
+| `trackers` | harden-case |
 | `meta` | executing-autonomously, handoff, no-verbose |
 | `health` | tcc |
-| `ops` | cancel-trial-courses |
-| `security` | 1password-passkey-audit |
 
 `skills/<category>/<skill>/SKILL.md` is discovered natively — the CLI walks one extra level inside
 `skills/` for exactly this catalog layout. No manifest file is needed. Categories organise the
 repo only; installed skills are flat.
 
 ## What is deliberately not here
+
+**Eleven retired skills.** `1password-passkey-audit`, `bank-actual-import`, `cancel-trial-courses`,
+`document-codebase`, `git-multi-identity-setup`, `plugin-config`, `receipt-split`, `track-case`,
+`two-axis-review`, `update-documentation` and `writing-technical-specs` were removed on 2026-07-31.
+Git history is the archive — nothing is vendored into an `archive/` directory, because the `skills`
+CLI discovers any `SKILL.md` two levels down from the repo root and would reinstall them. Restore
+one with `git checkout 9c9c809 -- skills/<category>/<skill>`. Their departure emptied the
+`ops` and `security` categories, which went with them.
+
+**A second reviewer per task.** `spec-to-pr` used to run a spec reviewer and a quality reviewer in
+parallel on every task, then delegate a whole-branch pass to `two-axis-review`. Both collapsed into
+one general reviewer that answers both questions — per task in Phase 4, and once over the assembled
+branch in Phase 7. The independence that mattered was the reviewer not being the implementer, which
+one agent in a fresh context provides just as well as two.
 
 **A GitHub mirror.** This lived briefly at `Ephasme/agent-skills` before moving here. There is no
 mirror and no sync — Forgejo is the only remote.
@@ -277,7 +290,6 @@ fork them off upstream updates.
 per-product format, and this one is Claude Code's. It is kept beside the corpus it drives. The
 `skills` CLI installs skills only — symlink it into `~/.claude-<profile>/agents/` by hand.
 
-**Machine infrastructure.** `track-case` drives the `trackers` CLI, which cron invokes too, so it
+**Machine infrastructure.** `harden-case` drives the `trackers` CLI, which cron invokes too, so it
 belongs to the machine rather than to the skill. The skill looks for it on PATH, then at
-`~/.agents/plugins/trackers/scripts/trackers`, and stops if neither resolves — which is the case
-right now, since that store was removed in `1803e8c`.
+`~/.agents/plugins/trackers/scripts/trackers`, and stops if neither resolves.
