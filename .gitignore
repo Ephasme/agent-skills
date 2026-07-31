@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+.venv/
+.DS_Store
+node_modules/
+
+# The skills CLI writes these when the repo is used as a project scope.
+.agents/
+.claude/
+skills-lock.json

@@ -1,0 +1,111 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.invalid/harden-case/tasks.schema.json",
+  "title": "Hardened case tasks",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "case", "generated", "horizon", "tasks", "analysis"],
+  "properties": {
+    "version": {"const": 1},
+    "case": {"type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"},
+    "generated": {"$ref": "#/$defs/date"},
+    "horizon": {"anyOf": [{"$ref": "#/$defs/date"}, {"type": "null"}]},
+    "tasks": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/task"}
+    },
+    "analysis": {"$ref": "#/$defs/analysis"}
+  },
+  "$defs": {
+    "date": {
+      "type": "string",
+      "format": "date",
+      "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])-([0-2][0-9]|3[01])$"
+    },
+    "nullableString": {
+      "anyOf": [{"type": "string", "minLength": 1}, {"type": "null"}]
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+    },
+    "task": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id", "title", "status", "priority", "due", "due_source", "owner",
+        "waiting_on", "depends_on", "parent", "file", "evidence", "notes"
+      ],
+      "properties": {
+        "id": {"$ref": "#/$defs/id"},
+        "title": {"type": "string", "minLength": 1},
+        "status": {
+          "enum": ["todo", "in_progress", "blocked", "done", "cancelled"]
+        },
+        "priority": {"enum": ["P0", "P1", "P2", "P3"]},
+        "due": {"anyOf": [{"$ref": "#/$defs/date"}, {"type": "null"}]},
+        "due_source": {"$ref": "#/$defs/nullableString"},
+        "owner": {"$ref": "#/$defs/nullableString"},
+        "waiting_on": {"$ref": "#/$defs/nullableString"},
+        "depends_on": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/id"}
+        },
+        "parent": {
+          "anyOf": [{"$ref": "#/$defs/id"}, {"type": "null"}]
+        },
+        "file": {"type": "string", "minLength": 1},
+        "evidence": {"type": "string", "minLength": 1},
+        "notes": {"$ref": "#/$defs/nullableString"}
+      }
+    },
+    "dateConflict": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["task", "depends_on", "reason"],
+      "properties": {
+        "task": {"$ref": "#/$defs/id"},
+        "depends_on": {"$ref": "#/$defs/id"},
+        "reason": {"type": "string", "minLength": 1}
+      }
+    },
+    "externalBlock": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["task", "waiting_on", "risk"],
+      "properties": {
+        "task": {"$ref": "#/$defs/id"},
+        "waiting_on": {"type": "string", "minLength": 1},
+        "risk": {"type": "string", "minLength": 1}
+      }
+    },
+    "idArray": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"$ref": "#/$defs/id"}
+    },
+    "analysis": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "cycles", "date_conflicts", "overdue", "unowned_deadlines",
+        "external_blocks", "critical_path"
+      ],
+      "properties": {
+        "cycles": {"$ref": "#/$defs/idArray"},
+        "date_conflicts": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/dateConflict"}
+        },
+        "overdue": {"$ref": "#/$defs/idArray"},
+        "unowned_deadlines": {"$ref": "#/$defs/idArray"},
+        "external_blocks": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/externalBlock"}
+        },
+        "critical_path": {"$ref": "#/$defs/idArray"}
+      }
+    }
+  }
+}

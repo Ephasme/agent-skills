@@ -1,0 +1,34 @@
+name: validate
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Validate the catalog
+        run: node scripts/validate.mjs
+
+      # Guards against a layout change the validator cannot see: the CLI must
+      # still discover every skill from the repo root, and skip none of them.
+      - name: Discovery smoke test
+        run: |
+          set -euo pipefail
+          expected=$(find skills -name SKILL.md | wc -l)
+          out=$(npx -y skills add . -l 2>&1 | sed 's/\x1b\[[0-9;]*[a-zA-Z]//g')
+          echo "$out"
+          if grep -q 'Skipped' <<<"$out"; then
+            echo "::error::the skills CLI skipped at least one skill"
+            exit 1
+          fi
+          if ! grep -q "Found $expected skills" <<<"$out"; then
+            echo "::error::expected $expected skills, CLI reported otherwise"
+            exit 1
+          fi

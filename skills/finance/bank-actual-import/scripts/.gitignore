@@ -1,0 +1,12 @@
+node_modules/
+package-lock.json
+budget-cache/
+*.csv
+*.qif
+transactions.json
+jar.txt
+cookies*.txt
+.server_pw
+.e2e_pw
+__pycache__/
+.venv/
