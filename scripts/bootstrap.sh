@@ -1,37 +1,46 @@
 #!/usr/bin/env bash
-# Reinstall the full skill set on a fresh machine: this repo into both Claude
-# profiles, plus the third-party skills that are tracked here only by name, plus
-# the MCP servers rendered into every agent that is installed.
+# Reinstall the full skill set on a fresh machine: this repo plus the third-party
+# skills that are tracked here only by name, and the MCP servers rendered into
+# every agent that is installed.
 #
-# Uses the `skills` wrapper at ~/.local/bin/skills (yadm-tracked), which runs the
-# upstream CLI once per profile with CLAUDE_CONFIG_DIR set and pairs claude-code
-# with a universal store-agent so upstream symlinks natively into the shared
-# store. Never pass -a here: that suppresses the store-agent injection and each
-# profile gets its own full copy instead of a symlink.
+# Layout: content in ~/.agents/skills/<name>, and a relative symlink per skill per
+# profile at ~/.claude-{perso,work}/skills/<name>. The CLI produces the store on
+# its own — with no --agent flag it adds its "universal" agents, whose skills dir
+# *is* ~/.agents/skills, which is what makes it symlink instead of copy — and it
+# links the agents it detects. It does not detect ~/.claude-{perso,work}, so
+# installing a skill activates it in neither profile. That is deliberate: each
+# profile links only the skills that belong in it, and work and perso do not get
+# the same set.
 #
-# Result: ~/.agents/skills/<name> holds the content, and
-# ~/.claude-{perso,work}/skills/<name> are relative symlinks at it.
+# So this script rebuilds the store only. The per-profile symlinks are yadm content
+# (they are the sole record of which profile gets which skill), so `yadm clone`
+# restores them; they simply dangle until this script has populated the store.
+# Anything left unlinked afterwards is reported at the end.
+#
+# Every install runs with CLAUDE_CONFIG_DIR cleared, so the incidental claude-code
+# link lands in ~/.claude/skills — a directory no profile reads — rather than in
+# whichever profile happened to be active.
+#
+# This calls npx directly and deliberately NOT the ~/.local/bin/skills wrapper,
+# even though the wrapper exists to make exactly these symlinks. The wrapper
+# activates whatever this run adds to an empty .skill-lock.json — which on a fresh
+# machine is everything, in both profiles. yadm has already restored the real
+# per-profile selection by this point, so letting it run here would flatten it.
 #
 # Usage: scripts/bootstrap.sh
 set -euo pipefail
 
-# Self-hosted Forgejo. The CLI has no shorthand for it, so the full URL is the
-# source string; it takes the generic git path and is cloned with plain `git
-# clone`, using the git-ssh.loup-peluso.com block in ~/.ssh/config for the key
-# and the :2222 port. No forge API and no token involved.
-REPO=ssh://git@git-ssh.loup-peluso.com:2222/loup/agent-skills.git
+REPO=git@github.com:Ephasme/agent-skills.git
+STORE=$HOME/.agents/skills
 
-command -v skills >/dev/null || {
-  echo "skills wrapper not found at ~/.local/bin/skills — run 'yadm clone' first." >&2
-  exit 1
-}
+skills_add() { env -u CLAUDE_CONFIG_DIR npx -y skills add "$@" -g --yes; }
 
 echo "==> $REPO"
-skills add "$REPO" -s '*' -y
+skills_add "$REPO" --skill '*'
 
 # The one third-party skill, from its own upstream so it keeps receiving updates.
 echo "==> third-party skills"
-skills add kunchenguid/gnhf -s gnhf -y
+skills_add kunchenguid/gnhf --skill gnhf
 
 # MCP servers. Deliberately after the skills and independent of them: this renders
 # mcp/servers.json into each agent's own config format. It needs no credentials —
@@ -40,5 +49,21 @@ skills add kunchenguid/gnhf -s gnhf -y
 echo "==> MCP servers"
 node "$(dirname "$0")/install-mcp.mjs"
 
+# A skill in the store that no profile links is loaded by neither Claude. On a
+# fresh clone that means yadm did not carry the link, or the skill is new since.
 echo
-echo "Done. Verify with: skills list && node scripts/install-mcp.mjs --list"
+unlinked=()
+for path in "$STORE"/*/; do
+  name=$(basename "$path")
+  [ -e "$HOME/.claude-perso/skills/$name" ] || [ -e "$HOME/.claude-work/skills/$name" ] \
+    || unlinked+=("$name")
+done
+if [ ${#unlinked[@]} -gt 0 ]; then
+  echo "In the store but linked by no profile — activate what you want, per profile:"
+  for name in "${unlinked[@]}"; do
+    echo "  ln -s ../../.agents/skills/$name ~/.claude-perso/skills/$name"
+  done
+fi
+
+echo
+echo "Done. Verify with: agents-doctor"

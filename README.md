@@ -63,34 +63,48 @@ its own directory rather than an exported variable.
 
 ## Install
 
-On Loup's machines `skills` is the wrapper at `~/.local/bin/skills`, not the upstream CLI. It runs
-upstream once per Claude profile with `CLAUDE_CONFIG_DIR` set, and pairs `claude-code` with a
-universal store-agent so upstream symlinks natively into `~/.agents/skills` instead of copying.
-**Do not pass `-a` yourself** — that suppresses the store-agent injection and you get real copies
-in each profile instead of symlinks into one store.
+Upstream CLI. Install into the store, then link the skill into the profiles that should have
+it — two steps, because work and perso do not get the same set.
 
 ```sh
-SRC=ssh://git@git-ssh.loup-peluso.com:2222/loup/agent-skills.git
+SRC=git@github.com:Ephasme/agent-skills.git
 
-skills add "$SRC" -s '*' -y              # both profiles
-skills --target=perso add "$SRC" -s '*' -y
-skills list                              # what is installed, and where
-skills update                            # pull newer versions
+npx -y skills add "$SRC" --skill spec-to-pr -g --yes             # 1. into the store
+ln -s ../../.agents/skills/spec-to-pr ~/.claude-perso/skills/    # 2. activate, per profile
+ln -s ../../.agents/skills/spec-to-pr ~/.claude-work/skills/
+
+npx -y skills list                       # what is installed
+npx -y skills update                     # pull newer versions into the store
 ```
 
-Result: content in `~/.agents/skills/<name>`, with `~/.claude-perso/skills/<name>` and
-`~/.claude-work/skills/<name>` as relative symlinks at it.
+On Loup's machines `~/.local/bin/skills` wraps those three commands — `skills add "$SRC"
+--skill spec-to-pr [-t perso|-t work]`, both profiles by default — and links only what the run
+introduced, so a `--skill '*'` refresh does not flatten existing per-profile choices. Anything
+that is not `add` passes straight through.
 
-Anywhere else — another machine, another agent — use the upstream CLI directly:
+**Pass no `--agent`.** With none, the CLI adds its *universal* agents — whose skills dir **is**
+`~/.agents/skills` — so it sees more than one target directory and symlinks into that store
+instead of copying (`dist/cli.mjs`: `ensureUniversalAgents`, then `uniqueDirs.size <= 1` is what
+forces copy mode). Naming a single agent is what makes it copy. `--skill '*'` takes the whole
+catalog.
+
+Step 1 also links the agents the CLI *detects*. It does not detect `~/.claude-{perso,work}`, so
+an install activates a skill in neither profile — hence step 2. Run step 1 with
+`CLAUDE_CONFIG_DIR` unset (a plain terminal already is; otherwise prefix `env -u
+CLAUDE_CONFIG_DIR`) so the incidental claude-code link lands in `~/.claude/skills`, which no
+profile reads, rather than in whichever profile is active.
+
+The step-2 symlinks are yadm content: the lock file records which skills are installed, and
+these are the only record of which profile gets which. `yadm add -f ~/.claude-{perso,work}/skills`
+after adding one.
+
+Other agents are named the same way — the CLI's own names (`gemini-cli`, not `gemini`);
+`npx skills add . -a bogus` prints the full list of the ~75 it accepts.
 
 ```sh
-npx skills add "$SRC" -g -a codex -a cursor -a opencode -a gemini-cli -s '*' -y
-npx skills add "$SRC" -s spec-to-pr        # one skill, project scope
+npx skills add "$SRC" -g -a cursor -a gemini-cli -s '*' -y   # extra non-universal agents
+npx skills add "$SRC" -s spec-to-pr                          # one skill, project scope
 ```
-
-Agent names are the CLI's own (`gemini-cli`, not `gemini`); `npx skills add . -a bogus` prints
-the full list of the ~75 it accepts. Multiple `-a` targets that share the `.agents/skills/`
-store install once and are seen by all of them.
 
 `scripts/bootstrap.sh` runs the whole set for a fresh machine.
 
@@ -208,11 +222,13 @@ the record of them is not.
 git -C ~/code/perso/agent-skills pull
 $EDITOR skills/<category>/<skill>/SKILL.md
 node scripts/validate.mjs
-skills add ~/code/perso/agent-skills -s '*' -y   # reinstall from the working tree
+# reinstall the store from the working tree
+env -u CLAUDE_CONFIG_DIR npx -y skills add ~/code/perso/agent-skills --skill '*' -g --yes
 ```
 
-A global install **copies** into `~/.agents/skills/<name>`; edits in this working tree are not
-live. Re-run `skills add` (or `skills update` once pushed) to pick them up.
+The install **copies** into `~/.agents/skills/<name>`; edits in this working tree are not live.
+Re-run the add (or `skills update` once pushed) to pick them up. The profile symlinks point at
+the store, so they need no touching — a re-add refreshes what they already resolve to.
 
 ### What the validator enforces, and why
 
