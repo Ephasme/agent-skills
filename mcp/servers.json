@@ -89,14 +89,14 @@
     },
     "whatsapp": {
       "purpose": "communication",
-      "description": "Self-hosted WhatsApp bridge (wa-mcp: Baileys, SQLite/FTS5, media + transcription)",
+      "description": "Self-hosted WhatsApp bridge (whatsapp-mcp: Baileys, SQLite/FTS5, media + transcription)",
       "transport": "http",
       "url": "https://wacli.loup-peluso.com/mcp",
       "headers": {
-        "CF-Access-Client-Id": { "env": "WACLI_CF_ACCESS_CLIENT_ID" },
-        "CF-Access-Client-Secret": { "env": "WACLI_CF_ACCESS_CLIENT_SECRET" }
+        "CF-Access-Client-Id": { "env": "WHATSAPP_CF_ACCESS_CLIENT_ID" },
+        "CF-Access-Client-Secret": { "env": "WHATSAPP_CF_ACCESS_CLIENT_SECRET" }
       },
-      "auth": { "type": "bearer", "token": { "env": "WA_MCP_TOKEN" } }
+      "auth": { "type": "bearer", "token": { "env": "WHATSAPP_MCP_TOKEN" } }
     },
     "imessage": {
       "purpose": "communication",
