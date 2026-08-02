@@ -91,7 +91,7 @@
       "purpose": "communication",
       "description": "Self-hosted WhatsApp bridge (whatsapp-mcp: Baileys, SQLite/FTS5, media + transcription)",
       "transport": "http",
-      "url": "https://wacli.loup-peluso.com/mcp",
+      "url": "https://whatsapp.loup-peluso.com/mcp",
       "headers": {
         "CF-Access-Client-Id": { "env": "WHATSAPP_CF_ACCESS_CLIENT_ID" },
         "CF-Access-Client-Secret": { "env": "WHATSAPP_CF_ACCESS_CLIENT_SECRET" }
