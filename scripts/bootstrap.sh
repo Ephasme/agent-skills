@@ -61,6 +61,31 @@ command -v jq >/dev/null 2>&1 || {
 
 skills_add() { env -u CLAUDE_CONFIG_DIR npx -y skills add "$@" -g --yes; }
 
+# A missing or empty "source" must fail loudly here, before it ever reaches the
+# TSV loop below. IFS=$'\t' is whitespace for `read`'s purposes, so it strips
+# leading tabs and collapses runs of them instead of yielding an empty field:
+#   $ printf '\tbrainstorming\n' | { IFS=$'\t' read -r source names; ... }
+#   source=[brainstorming] names=[]
+# A group with no source would silently read as source=<skill name>, names=
+# (empty) — feeding the skill's own name to `skills add` as its SOURCE, with no
+# --skill filter at all, since a leading "-g" stops the CLI's variadic arg
+# consumption cold. Worse, jq's group_by sorts null/"" first, so that group
+# would run first and its failure — under `set -euo pipefail` — would abort
+# every group after it. Guarding here, not just formatting the loop more
+# carefully, is what keeps that failure mode from ever reaching `skills_add`.
+bad_sources=$(jq -r '
+  .skills
+  | to_entries[]
+  | select(.value.source == null or .value.source == "")
+  | .key
+' "$LOCK")
+if [ -n "$bad_sources" ]; then
+  echo "error: $LOCK has skill(s) with no \"source\" recorded — cannot derive an install command for:" >&2
+  echo "$bad_sources" | sed 's/^/  /' >&2
+  echo "fix the lock (each entry needs the package source it came from) and rerun." >&2
+  exit 1
+fi
+
 # One TSV line per source package: the source string, then its skill names,
 # space-joined. group_by sorts by the grouping key and each group's names are
 # sorted too, so the install order — and this echo's output — is deterministic
