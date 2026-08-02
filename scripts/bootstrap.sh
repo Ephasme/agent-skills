@@ -103,14 +103,36 @@ groups=$(jq -r '
 if [ -z "$groups" ]; then
   echo "no skills recorded in $LOCK — nothing to install"
 else
-  while IFS=$'\t' read -r source names; do
+  # 🔴 The loop reads from fd 3, NOT stdin, and that is load-bearing.
+  #
+  # `npx` reads stdin. With the herestring on fd 0, the FIRST skills_add call drained
+  # every remaining line of $groups, `read` hit EOF, and the loop exited after one
+  # iteration — silently, with exit 0.
+  #
+  # Measured on mac-coding-machine-1, 2026-08-02, on a lock with three sources:
+  #   ==> git@github.com:Ephasme/agent-skills.git (…15 skills…)
+  #   ==> MCP servers                        <- groups 2 and 3 never ran
+  # Result: 15 of 17 skills in the store, and `agents-doctor` reporting
+  # `perso: gnhf -> ../../.agents/skills/gnhf is broken` for the two that were skipped
+  # (kunchenguid/gnhf, obra/superpowers). Running the identical `skills add` by hand
+  # installed both without complaint, which is what made it obvious the commands were
+  # right and were simply never issued.
+  #
+  # This defeated the whole point of deriving the list from the lock: it computed all
+  # three groups correctly and then dropped two — reintroducing exactly the "third-party
+  # entries silently missing on a fresh machine" gap this script was rewritten to close.
+  #
+  # Redirecting only this one command (`skills_add … </dev/null`) would also work, but
+  # fd 3 protects the loop from ANY future stdin-reading command in its body, which is
+  # the failure mode worth designing out rather than patching per-call.
+  while IFS=$'\t' read -r source names <&3; do
     echo "==> $source ($names)"
     # $names is unquoted on purpose: it's a jq-built, space-joined list of bare
     # skill names (never containing spaces or shell metacharacters), and --skill
     # is variadic — it consumes every argument up to the next flag — so word
     # splitting here is what turns one string back into separate skill names.
     skills_add "$source" --skill $names
-  done <<<"$groups"
+  done 3<<<"$groups"
 fi
 
 # MCP servers. Deliberately after the skills and independent of them: this renders
