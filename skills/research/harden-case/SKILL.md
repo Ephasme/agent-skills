@@ -165,9 +165,10 @@ external communication, attendance, safety, privacy, ownership, task priority, o
 Give every role the same brief, one mandate, the guardrails, and the exact structured return
 contract from [references/protocols.md](references/protocols.md). Require null/empty values rather
 than omitted keys. `facts` and `maths` must show source locations and calculations. `tasker` returns
-proposed YAML text based on [references/tasks-contract.md](references/tasks-contract.md); it does
-not write. It must also emit one `tasker-*` finding per proposed task and per analysis invariant so
-the adversary can judge its evidence, dates, priority, and dependency edges.
+proposed tasks in the data model of [references/tasks-contract.md](references/tasks-contract.md) —
+never a storage decision, and never a write. It must also emit one `tasker-*` finding per proposed
+task and per analysis invariant so the adversary can judge its evidence, dates, priority, and
+dependency edges.
 
 Before using a connected source, confirm authorization and the `cases/RUNBOOK.md` health signals.
 Never interpret silence as evidence from an unhealthy or unverified source.
@@ -204,12 +205,15 @@ and guardrails. Require it to:
 - use absolute dates, explicit currencies, clear ownership, and working pointers;
 - update structured tasks only after factual fixes.
 
-Discover history, wrong-facts, and prose-task authorities from local instructions; do not invent
-them. Put `tasks.yaml` at case root unless local rules define another location. A case with no open
-work gets an empty task list unless local rules forbid structured tasks. Synchronize a prose task
-view only when one is locally defined.
+Discover history, wrong-facts, prose-task, and **structured-task** authorities from local
+instructions; do not invent them. The structured task authority is whatever the repository or the
+case declares — typically an external tracker project reached through its MCP server. **Never
+create a task file on your own initiative**, and never mirror a declared tracker into one: where
+no authority is declared, report the proposed tasks and ask. A case with no open work gets an
+empty list, not a placeholder file. Synchronize a prose task view only when one is locally defined.
 
-Validate task data against [references/tasks-contract.md](references/tasks-contract.md) and
+Validate task data against [references/tasks-contract.md](references/tasks-contract.md); when the
+declared authority is a file, also validate it against
 [references/tasks.schema.json](references/tasks.schema.json). If no JSON Schema validator exists,
 perform every invariant manually and disclose that validation was manual.
 

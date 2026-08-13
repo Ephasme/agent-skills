@@ -1,8 +1,31 @@
 # Structured task contract
 
-Use one flat task list. Express grouping with `parent` and sequencing with `depends_on`. Validate the
-parsed YAML data against `tasks.schema.json`; JSON Schema validates YAML after parsing because the
-data model is the same.
+Use one flat task list. Express grouping with `parent` and sequencing with `depends_on`.
+
+## Where the list lives — ask the case, do not assume
+
+This contract defines the **task model**, not the storage. Before writing anything, read the
+repository's and the case's own instructions for a declared **task authority**:
+
+- **An external tracker is declared** (a Plane / Linear / Jira project, reached through its MCP
+  server): that project is the authority. One work item per task. Carry the fields below into the
+  tracker's own concepts — `title` → name, `status` → state, `priority` → priority, `due` →
+  target date, `parent` → parent item, `depends_on` → the tracker's relations — and put whatever
+  has no native field (`id`, `due_source`, `evidence`, `file`, `waiting_on`, `notes`) in the item
+  description, each on its own labelled line. **Never mirror the tracker into a repo file**: a
+  second list is a second truth, and the copy is the one that goes stale.
+- **Nothing is declared**: you have no storage, so **create none**. Report the proposed tasks in
+  the run output, state that the case declares no task authority, and ask where they should live.
+  Writing `tasks.yaml` — or any other task file — on your own initiative is how a repository ends
+  up with two task lists and one of them silently rotting. A repo that wants that file says so.
+
+The invariants further down hold either way. Only the storage changes.
+
+## The task model
+
+Rendered as YAML for readability. When a case declares a file store, this is also its literal
+shape, and `tasks.schema.json` validates the parsed data — JSON Schema validates YAML after
+parsing, because the data model is the same.
 
 ```yaml
 version: 1
@@ -54,5 +77,7 @@ analysis:
    semantically even when a JSON Schema implementation does not enforce the `date` format.
 9. `analysis.cycles`, `overdue`, `unowned_deadlines`, and `critical_path` contain task IDs.
    `date_conflicts` and `external_blocks` use the object shapes enforced by the schema.
-10. Synchronize a prose task view only when local instructions define one. Otherwise `tasks.yaml` is
-    the structured task authority.
+10. Synchronize a prose task view only when local instructions define one. The declared task
+    authority is the only structured list; where none is declared there is no structured list to
+    write. Where a prose view exists, it restates the same items and never adds a parallel
+    deadline table of its own.
