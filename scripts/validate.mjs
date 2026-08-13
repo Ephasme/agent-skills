@@ -31,6 +31,7 @@ const CATEGORIES = [
   'engineering',
   'finance',
   'health',
+  'legal',
   'meta',
   'research',
   'setup',

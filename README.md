@@ -281,6 +281,7 @@ for exactly that reason.
 | `setup` | free-disk-space |
 | `meta` | executing-autonomously, handoff, no-verbose |
 | `health` | tcc |
+| `legal` | assurance-fr |
 
 `skills/<category>/<skill>/SKILL.md` is discovered natively — the CLI walks one extra level inside
 `skills/` for exactly this catalog layout. No manifest file is needed. Categories organise the
