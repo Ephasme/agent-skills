@@ -77,6 +77,31 @@
       "auth": { "type": "bearer", "token": { "env": "LINEAR_API_KEY" } }
     },
 
+    "plane-life": {
+      "purpose": "planning",
+      "description": "Self-hosted Plane, `life` workspace — personal admin cases (coparenting, …). Version pinned: uvx re-resolves on every spawn, and an unpinned upstream is exactly what parked `n8n` below",
+      "transport": "stdio",
+      "command": "uvx",
+      "args": ["plane-mcp-server==0.2.10", "stdio"],
+      "env": {
+        "PLANE_BASE_URL": "https://plane.loup-peluso.com",
+        "PLANE_WORKSPACE_SLUG": "life",
+        "PLANE_API_KEY": { "env": "PLANE_API_KEY" }
+      }
+    },
+    "plane-decarvaloup": {
+      "purpose": "planning",
+      "description": "Self-hosted Plane, `decarvaloup` workspace — the wedding. One process serves one workspace: `PLANE_WORKSPACE_SLUG` is read once at startup, hence the second entry",
+      "transport": "stdio",
+      "command": "uvx",
+      "args": ["plane-mcp-server==0.2.10", "stdio"],
+      "env": {
+        "PLANE_BASE_URL": "https://plane.loup-peluso.com",
+        "PLANE_WORKSPACE_SLUG": "decarvaloup",
+        "PLANE_API_KEY": { "env": "PLANE_API_KEY" }
+      }
+    },
+
     "slack": {
       "purpose": "communication",
       "description": "Self-hosted Slack bridge",
