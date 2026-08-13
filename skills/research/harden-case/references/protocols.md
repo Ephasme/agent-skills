@@ -26,7 +26,9 @@ findings:
     untouchable: false
     unverifiable: false
 failures: []
-tasks_yaml: null # tasker only: complete YAML document as a block string; add tasker-* findings
+task_proposals: null # tasker only: the proposed tasks + analysis in the tasks-contract data model,
+                     # rendered as a YAML block string. A PROPOSAL, never a file and never a
+                     # storage decision — the case's declared authority owns that. Add tasker-* findings
 ```
 
 ## Adversary
