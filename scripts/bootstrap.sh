@@ -5,23 +5,18 @@
 # installed.
 #
 # Layout: content in ~/.agents/skills/<name>, and one symlink per skill per profile
-# per harness — ~/.claude-{perso,work}/skills/<name> for Claude Code, and
-# ~/.omp/profiles/{perso,work}/agent/skills/<name> for omp, which reads nothing else
-# at user level (~/.agents/omp/config.shared.yml turns the foreign sources off). The
-# CLI produces the store on its own — every "universal" agent's skills dir *is*
-# ~/.agents/skills — and it links the agents it detects. It detects none of those
-# four directories, so installing a skill activates it nowhere. That is deliberate:
-# each profile links only the skills that belong in it, and work and perso do not
-# get the same set.
+# — ~/.omp/profiles/{perso,work}/agent/skills/<name>, which is the only user-level
+# skill source omp reads (~/.agents/omp/config.shared.yml turns the foreign ones
+# off). The CLI produces the store on its own — every "universal" agent's skills
+# dir *is* ~/.agents/skills — and it links the agents it detects. It detects
+# neither of those two directories, so installing a skill activates it nowhere.
+# That is deliberate: each profile links only the skills that belong in it, and
+# work and perso do not get the same set.
 #
 # So this script rebuilds the store only. The per-profile symlinks are yadm content
 # (they are the sole record of which profile gets which skill), so `yadm clone`
 # restores them; they simply dangle until this script has populated the store.
 # Anything left unlinked afterwards is reported at the end.
-#
-# Every install runs with CLAUDE_CONFIG_DIR cleared, so the incidental claude-code
-# link lands in ~/.claude/skills — a directory no profile reads — rather than in
-# whichever profile happened to be active.
 #
 # This calls npx directly and deliberately NOT the ~/.local/bin/skills wrapper,
 # even though the wrapper exists to make exactly these symlinks. The wrapper
@@ -69,7 +64,7 @@ command -v jq >/dev/null 2>&1 || {
 # `universal` is itself an agent whose skills dir is the store, so the result is
 # what the bare command produced before the regression. Drop it once upstream
 # stops listing a global-incapable agent as universal.
-skills_add() { env -u CLAUDE_CONFIG_DIR npx -y skills add "$@" -g --yes --agent universal; }
+skills_add() { npx -y skills add "$@" -g --yes --agent universal; }
 
 # A missing or empty "source" must fail loudly here, before it ever reaches the
 # TSV loop below. IFS=$'\t' is whitespace for `read`'s purposes, so it strips
@@ -152,39 +147,25 @@ fi
 echo "==> MCP servers"
 node "$(dirname "$0")/install-mcp.mjs"
 
-# A skill in the store that no profile links is loaded by nothing. Both harnesses
-# have to be checked: Claude Code reads ~/.claude-<p>/skills, while omp reads only
+# A skill in the store that no profile links is loaded by nothing. omp reads only
 # ~/.omp/profiles/<p>/agent/skills — ~/.agents/omp/config.shared.yml turns the
-# foreign user-level skill sources off. A skill linked in one and not the other is
-# active in one harness only, which is worth reporting too.
+# foreign user-level skill sources off — so that one symlink is the whole of
+# activation, and its absence is silent: the content is installed and the skill is
+# simply never offered to anything.
 echo
 unlinked=()
-partial=()
 for path in "$STORE"/*/; do
   name=$(basename "$path")
-  claude=""
-  omp=""
+  linked=""
   for p in perso work; do
-    [ -e "$HOME/.claude-$p/skills/$name" ] && claude="yes"
-    [ -e "$HOME/.omp/profiles/$p/agent/skills/$name" ] && omp="yes"
+    [ -e "$HOME/.omp/profiles/$p/agent/skills/$name" ] && linked="yes"
   done
-  if [ -z "$claude" ] && [ -z "$omp" ]; then
-    unlinked+=("$name")
-  elif [ -z "$claude" ] || [ -z "$omp" ]; then
-    partial+=("$name ($([ -n "$claude" ] && echo "Claude Code only" || echo "omp only"))")
-  fi
+  [ -n "$linked" ] || unlinked+=("$name")
 done
 if [ ${#unlinked[@]} -gt 0 ]; then
   echo "In the store but linked by no profile — activate what you want, per profile:"
   for name in "${unlinked[@]}"; do
-    echo "  ln -s ../../.agents/skills/$name ~/.claude-perso/skills/$name"
     echo "  ln -s ~/.agents/skills/$name ~/.omp/profiles/perso/agent/skills/$name"
-  done
-fi
-if [ ${#partial[@]} -gt 0 ]; then
-  echo "Linked for one harness only — intentional, or a half-finished activation:"
-  for entry in "${partial[@]}"; do
-    echo "  $entry"
   done
 fi
 

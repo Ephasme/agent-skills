@@ -11,7 +11,6 @@
 // a secret in a request header, and the agents disagree sharply about whether a
 // header value may reference an environment variable:
 //
-//   Claude Code   ${NAME}          in env and headers          (verified, 2.1.220)
 //   Oh My Pi      ${NAME}          in env and headers          (verified, 17.2.9)
 //   opencode      {env:NAME}       in env and headers
 //   VS Code       ${env:NAME}      in env and headers
@@ -259,8 +258,10 @@ function parseJsonc(text) {
 }
 
 // Read-modify-write of a single top-level key, preserving everything else in the
-// file. Claude Code's `.claude.json` is 60 KB of live session state that happens to
-// also hold `mcpServers`, so touching anything else would be destructive.
+// file. None of these targets is a file this script owns: opencode's and Gemini
+// CLI's hold that agent's entire settings, and the MCP servers are one key among
+// many. So the write claims that one key and leaves the rest of the document as it
+// found it, rather than rendering a file of its own over the agent's.
 async function writeJsonKey(file, key, entries, dropped, opts) {
   let doc = {};
   let hadComments = false;
@@ -325,11 +326,10 @@ const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 async function atomicWrite(file, content, opts) {
   await mkdir(dirname(file), { recursive: true });
 
-  // The target may be live session state that its agent is writing to right now
-  // (Claude Code's `.claude.json`). There is no lock to take, so compare-and-swap:
-  // if the file changed between the caller's read and this write, the merge was
-  // computed against a stale document and renaming over it would discard whatever
-  // the agent wrote in between.
+  // The target belongs to its agent, which may be running and may rewrite the file
+  // itself. There is no lock to take, so compare-and-swap: if the file changed
+  // between the caller's read and this write, the merge was computed against a stale
+  // document and renaming over it would discard whatever the agent wrote in between.
   let before;
   if (existsSync(file)) {
     const s = await stat(file);
@@ -339,9 +339,10 @@ async function atomicWrite(file, content, opts) {
     }
   }
 
-  // Preserve the target's permissions. Claude Code creates `.claude.json` 0600 and
-  // it holds oauth state and the whole per-project history; taking the mode from the
-  // umask instead would quietly publish it to every other local account.
+  // A file this script creates starts at 0600 — it holds credential *references*
+  // today and the credentials themselves under `--materialize`, and neither is
+  // anything to hand every other local account. An existing file keeps the mode its
+  // own agent chose, which is usually stricter for the same reason.
   let mode = 0o600;
   if (existsSync(file)) mode = (await stat(file)).mode & 0o777;
   if (opts.materialize) mode &= 0o600;
@@ -383,54 +384,9 @@ async function atomicWrite(file, content, opts) {
 
 const ADAPTERS = [
   {
-    id: 'claude-code',
-    label: 'Claude Code',
-    // Verified on 2.1.220: user-scope `.claude.json` expands ${VAR} in both stdio
-    // `env` values and HTTP `headers` values.
-    caps: { env: 'template', headers: 'template' },
-    ref: (n) => `\${${n}}`,
-    // One target per profile, and every profile gets the same set. CLAUDE_CONFIG_DIR
-    // is a *candidate*, never an override: running this from inside a claude-perso
-    // session must still configure the work profile, or the two would drift.
-    //
-    // The default profile is NOT `~/.claude/.claude.json`. With CLAUDE_CONFIG_DIR
-    // unset Claude Code reads `~/.claude.json` — verified against 2.1.220 — and
-    // `~/.claude` exists here for unrelated reasons (rtk artefacts), so treating it
-    // as a config dir writes 13 servers to a file nothing ever loads.
-    targets() {
-      const found = [];
-      for (const name of ['.claude-work', '.claude-perso']) {
-        const dir = join(HOME, name);
-        if (existsSync(dir)) found.push({ id: `claude-code:${name.slice('.claude-'.length)}`, file: join(dir, '.claude.json') });
-      }
-      if (process.env.CLAUDE_CONFIG_DIR) {
-        const dir = process.env.CLAUDE_CONFIG_DIR;
-        const file = join(dir, '.claude.json');
-        if (!found.some((t) => t.file === file)) {
-          found.push({ id: `claude-code:${dir.replace(/.*\.claude-?/, '') || 'env'}`, file });
-        }
-      }
-      // Only claim the profile-less config when it is actually in use; creating it
-      // would hand a bare `claude` a config it never had.
-      const bare = join(HOME, '.claude.json');
-      if (existsSync(bare) && !found.some((t) => t.file === bare)) {
-        found.push({ id: 'claude-code:default', file: bare });
-      }
-      return found;
-    },
-    server(def, r) {
-      if (def.transport === 'stdio') {
-        return { command: def.command, ...(def.args && { args: def.args }), ...(r.env && { env: r.env }) };
-      }
-      return { type: 'http', url: def.url, ...(r.headers && { headers: r.headers }) };
-    },
-    write: (t, entries, dropped, opts) => writeJsonKey(t.file, 'mcpServers', entries, dropped, opts),
-  },
-
-  {
     id: 'omp',
     label: 'Oh My Pi',
-    // Same `${NAME}` dialect as Claude Code, and rather more thoroughly: omp maps
+    // omp resolves `${NAME}` more thoroughly than any other adapter here: it maps
     // its expander over the entire parsed `mcpServers` object, so every string at
     // any depth is substituted — env values, header values, url, command, args.
     // It also understands `${NAME:-default}`, and leaves an unresolved reference
@@ -440,10 +396,9 @@ const ADAPTERS = [
     // Bun.env).
     caps: { env: 'template', headers: 'template' },
     ref: (n) => `\${${n}}`,
-    // One target per profile, mirroring the Claude Code adapter — and for the
-    // same reason: running this from inside an omp-perso session must still
-    // configure the work profile, or the two drift. PI_CONFIG_DIR is therefore a
-    // *candidate*, never an override.
+    // One target per profile, and every profile gets the same set: running this
+    // from inside an omp-perso session must still configure the work profile, or
+    // the two drift. PI_CONFIG_DIR is therefore a *candidate*, never an override.
     //
     // The user-scope file is <root>/agent/mcp.json, one level below the config
     // root (`omp config path` prints that agent dir). The profile-less
@@ -469,8 +424,8 @@ const ADAPTERS = [
       if (existsSync(join(bare, 'agent', 'mcp.json'))) add('default', bare);
       return found;
     },
-    // `type` is omp's transport discriminator, the same key Claude Code uses; a
-    // stdio server omits it and is recognised by `command`.
+    // `type` is omp's transport discriminator; a stdio server omits it and is
+    // recognised by `command`.
     server(def, r) {
       if (def.transport === 'stdio') {
         return { command: def.command, ...(def.args && { args: def.args }), ...(r.env && { env: r.env }) };

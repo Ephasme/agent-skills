@@ -69,9 +69,11 @@ it — two steps, because work and perso do not get the same set.
 ```sh
 SRC=git@github.com:Ephasme/agent-skills.git
 
-npx -y skills add "$SRC" --skill spec-to-pr -g --yes             # 1. into the store
-ln -s ../../.agents/skills/spec-to-pr ~/.claude-perso/skills/    # 2. activate, per profile
-ln -s ../../.agents/skills/spec-to-pr ~/.claude-work/skills/
+npx -y skills add "$SRC" --skill spec-to-pr -g --yes    # 1. into the store
+ln -s ~/.agents/skills/spec-to-pr \
+      ~/.omp/profiles/perso/agent/skills/               # 2. activate, per profile
+ln -s ~/.agents/skills/spec-to-pr \
+      ~/.omp/profiles/work/agent/skills/
 
 npx -y skills list                       # what is installed
 npx -y skills update                     # pull newer versions into the store
@@ -88,15 +90,17 @@ instead of copying (`dist/cli.mjs`: `ensureUniversalAgents`, then `uniqueDirs.si
 forces copy mode). Naming a single agent is what makes it copy. `--skill '*'` takes the whole
 catalog.
 
-Step 1 also links the agents the CLI *detects*. It does not detect `~/.claude-{perso,work}`, so
-an install activates a skill in neither profile — hence step 2. Run step 1 with
-`CLAUDE_CONFIG_DIR` unset (a plain terminal already is; otherwise prefix `env -u
-CLAUDE_CONFIG_DIR`) so the incidental claude-code link lands in `~/.claude/skills`, which no
-profile reads, rather than in whichever profile is active.
+Step 1 also links the agents the CLI *detects*. It does not detect
+`~/.omp/profiles/{perso,work}/agent`, so an install activates a skill in neither profile — hence
+step 2. That tree is also the whole of activation: `~/.agents/omp/config.shared.yml` sets
+`skills.enableClaudeUser`, `enableCodexUser` and `enableAgentsUser` to `false`, so a profile's own
+`agent/skills` directory is the only user-level source omp reads. A skill in the store that no
+profile links is installed and offered to nothing, silently. The link is absolute, like every
+other link in that directory.
 
 The step-2 symlinks are yadm content: the lock file records which skills are installed, and
-these are the only record of which profile gets which. `yadm add -f ~/.claude-{perso,work}/skills`
-after adding one.
+these are the only record of which profile gets which. `yadm add -f
+~/.omp/profiles/{perso,work}/agent/skills` after adding one.
 
 Other agents are named the same way — the CLI's own names (`gemini-cli`, not `gemini`);
 `npx skills add . -a bogus` prints the full list of the ~75 it accepts.
@@ -170,23 +174,25 @@ manifest safe to commit, and it is also the thing the agents disagree about:
 
 | Agent | Config file | stdio `env` | HTTP headers |
 | --- | --- | --- | --- |
-| Claude Code | `$CLAUDE_CONFIG_DIR/.claude.json` → `mcpServers` | `${NAME}` | `${NAME}` |
+| Oh My Pi | `$PI_CONFIG_DIR/agent/mcp.json` → `mcpServers` | `${NAME}` | `${NAME}` |
 | opencode | `~/.config/opencode/opencode.json` → `mcp` | `{env:NAME}` | `{env:NAME}` |
 | VS Code | `~/.config/Code/User/mcp.json` → `servers` | `${env:NAME}` | `${env:NAME}` |
 | Codex | `~/.codex/config.toml` → `[mcp_servers]` | literal only — shimmed, see below | `env_http_headers`, `bearer_token_env_var` |
 | Cursor | `~/.cursor/mcp.json` → `mcpServers` | `${env:NAME}` | unresolved for remote servers |
 | Gemini CLI | `~/.gemini/settings.json` → `mcpServers` | `$NAME` | literal only |
 
-Claude Code's two rows are verified on 2.1.220 against a live endpoint that logged the headers it
-received; the rest are the agents' own documentation and open issues. Fifteen of the seventeen
+Oh My Pi's two rows are verified by reading 17.2.9: its loader maps a `${NAME}` /
+`${NAME:-default}` expander over the whole parsed `mcpServers` object, so every string at any
+depth is substituted and an unresolved reference is left literal rather than emptied. The rest
+are the agents' own documentation and open issues. Fifteen of the seventeen
 servers are HTTP with the secret in a header, so those last two rows are not a detail — **Cursor
 and Gemini CLI can only take the two stdio servers.** They are skipped with a printed reason
 rather than written with a literal `${TOKEN}` that would go out as a credential. Codex is the
 mirror image: its `env_http_headers` covers all fifteen HTTP servers, and its stdio `env` covers
 none of them.
 
-Process inheritance does not save the stdio ones there, as it does elsewhere — Claude Code hands a
-stdio server the full parent environment, but **Codex scrubs it**. Probed on codex-cli 0.146.0 with
+Process inheritance does not save the stdio ones there, as it does elsewhere: **Codex scrubs the
+environment** before it spawns one. Probed on codex-cli 0.146.0 with
 a server whose command was `env`: the child sees exactly `HOME LANG LOGNAME PATH PWD SHELL TERM
 USER` plus the literal `[mcp_servers.x.env]` table, and nothing the launching shell exported.
 `shell_environment_policy.inherit = "all"` does not reach it either — the probed environment was
@@ -207,9 +213,12 @@ rest, and rotating a credential then means re-running the renderer.
 
 ### What it will not clobber
 
-Claude Code's `.claude.json` is 60 KB of live session state that happens to also hold
-`mcpServers`; the JSON targets are merged key-scoped and written through a temp file, with a
-`.bak` of the previous contents. `config.toml` cannot be merged structurally without a TOML
+Every target belongs to its agent, not to this repo — `opencode.json` and Gemini's
+`settings.json` hold that agent's entire configuration, and the MCP servers are one key in it.
+So the JSON targets are merged key-scoped and written through a temp file, with a `.bak` of the
+previous contents, and the rename is refused outright if the file changed on disk between the
+read and the write: an agent that has it open would otherwise lose whatever it wrote in the
+meantime. `config.toml` cannot be merged structurally without a TOML
 parser, and this repo stays dependency-free, so the Codex adapter owns a delimited block and
 leaves hand-written TOML above and below it alone. `~/.agents/.mcp-lock.json` records what was
 written where — alongside `.skill-lock.json`, and for the same reason: a server dropped from the
@@ -223,7 +232,7 @@ git -C ~/code/perso/agent-skills pull
 $EDITOR skills/<category>/<skill>/SKILL.md
 node scripts/validate.mjs
 # reinstall the store from the working tree
-env -u CLAUDE_CONFIG_DIR npx -y skills add ~/code/perso/agent-skills --skill '*' -g --yes
+npx -y skills add ~/code/perso/agent-skills --skill '*' -g --yes
 ```
 
 The install **copies** into `~/.agents/skills/<name>`; edits in this working tree are not live.
@@ -316,8 +325,11 @@ mirror and no sync — Forgejo is the only remote.
 **`.mcp.json` files.** The seventeen servers in `mcp/servers.json` came from the purpose-plugins
 that used to carry these skills, removed from the dotfiles on 2026-07-31 in yadm commit `1803e8c`
 (still restorable with `yadm checkout debe473 -- .agents/plugins`). They are not stored in that
-shape any more, because `.mcp.json` is a Claude Code plugin file and nothing else reads it. The
-manifest plus the renderer is the agent-neutral replacement.
+shape any more, because a plugin's `.mcp.json` is loaded only by the agent whose plugin system
+ships it — and it was carrying the servers for exactly one of them. The manifest plus the
+renderer is the agent-neutral replacement, and the one `.mcp.json` still on this machine is
+`~/.agents/mcp/omp-shared.json`, symlinked into both omp profiles and maintained by hand rather
+than rendered.
 
 **Third-party skills.** One is installed: `gnhf`, from `kunchenguid/gnhf`, tracked by name in
 `~/.agents/.skill-lock.json` rather than vendored here — a copy in this repo would fork it off
@@ -325,7 +337,15 @@ upstream updates. `tamagui`, `find-skills` and `web-design-guidelines` were drop
 they were recorded in the lock but present nowhere on disk, so the record was removed and
 `scripts/bootstrap.sh` no longer reinstalls them. Copies sit in `~/code/perso/ai-backups/skills.bkp/`.
 
-**`agents/tcc-expert.md`.** The one file here that is not portable: subagent definitions are a
-per-product format, and this one is Claude Code's. It is kept beside the corpus it drives. The
-`skills` CLI installs skills only — symlink it into `~/.claude-<profile>/agents/` by hand.
+**The `agents/` directory.** `tcc-expert.md` and `assurance-fr.md` are the two files here that the
+portability contract does not reach: a subagent definition is a per-product format, and these are
+written to omp's task-agent contract — `autoloadSkills`, a full `model` selector, `thinking-level`,
+`read-summarize`. Each is kept beside the skill it drives and autoloads that skill rather than
+restating it, which is why the pair lives here instead of in the omp config. The `skills` CLI
+installs skills only, so activation is a symlink made by hand, per profile that should see the
+agent:
 
+```sh
+ln -s ~/code/perso/agent-skills/agents/tcc-expert.md \
+      ~/.omp/profiles/perso/agent/agents/
+```

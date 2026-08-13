@@ -41,9 +41,12 @@ jobs:
         run: |
           set -euo pipefail
           fake=$(mktemp -d)
-          mkdir -p "$fake"/{.claude-perso,.claude-work,.codex,.cursor,.gemini} \
+          mkdir -p "$fake"/{.omp-perso,.omp-work,.codex,.cursor,.gemini} \
                    "$fake"/.config/{opencode,Code/User}
-          env -u CLAUDE_CONFIG_DIR HOME="$fake" node scripts/install-mcp.mjs
+          # PI_CONFIG_DIR is a *candidate* target in the omp adapter, not an override,
+          # so a runner that happened to export it would add a target nothing here
+          # asserts on.
+          env -u PI_CONFIG_DIR HOME="$fake" node scripts/install-mcp.mjs
           python3 - "$fake" <<'PY'
           import json, re, sys, tomllib, pathlib
           home = pathlib.Path(sys.argv[1])
@@ -51,11 +54,11 @@ jobs:
 
           # One exact pattern per agent, not a substring test. `ok in value` was
           # vacuous for gemini-cli ('$' is implied by every dialect) and could not
-          # tell claude-code's ${NAME} from Cursor's ${env:NAME} — so the one
+          # tell omp's ${NAME} from Cursor's ${env:NAME} — so the one
           # regression this step exists to catch, an adapter given the wrong
           # dialect, passed. Anything matching ANY dialect must match THIS one.
           DIALECTS = {
-              'claude-code': re.compile(r'\$\{(?!env:)[A-Za-z_][A-Za-z0-9_]*\}'),
+              'omp':         re.compile(r'\$\{(?!env:)[A-Za-z_][A-Za-z0-9_]*\}'),
               'opencode':    re.compile(r'\{env:[A-Za-z_][A-Za-z0-9_]*\}'),
               'vscode':      re.compile(r'\$\{env:[A-Za-z_][A-Za-z0-9_]*\}'),
               'cursor':      re.compile(r'\$\{env:[A-Za-z_][A-Za-z0-9_]*\}'),
@@ -67,7 +70,7 @@ jobs:
           SECRETISH = re.compile(r'key|token|secret|password|session|client[-_]?id|auth', re.I)
 
           for rel, key, agent in [
-              ('.claude-perso/.claude.json', 'mcpServers', 'claude-code'),
+              ('.omp-perso/agent/mcp.json', 'mcpServers', 'omp'),
               ('.config/opencode/opencode.json', 'mcp', 'opencode'),
               ('.config/Code/User/mcp.json', 'servers', 'vscode'),
               ('.cursor/mcp.json', 'mcpServers', 'cursor'),
@@ -103,22 +106,22 @@ jobs:
           json.dump({'name': name, **m}, open('/tmp/off.json', 'w'))
           "
           off=$(python3 -c "import json; print(json.load(open('/tmp/off.json'))['name'])")
-          env -u CLAUDE_CONFIG_DIR HOME="$fake" node scripts/install-mcp.mjs --manifest /tmp/off.json
+          env -u PI_CONFIG_DIR HOME="$fake" node scripts/install-mcp.mjs --manifest /tmp/off.json
           python3 - "$fake" "$off" <<'PY'
           import json, sys, pathlib
           home, off = pathlib.Path(sys.argv[1]), sys.argv[2]
-          for rel, key in [('.claude-perso/.claude.json', 'mcpServers'),
+          for rel, key in [('.omp-perso/agent/mcp.json', 'mcpServers'),
                            ('.config/opencode/opencode.json', 'mcp'),
                            ('.config/Code/User/mcp.json', 'servers')]:
               servers = json.loads((home / rel).read_text())[key]
               assert off not in servers, f'{rel}: disabled server {off} was not removed'
               assert servers, f'{rel}: everything was removed, not just {off}'
-          assert off not in json.loads((home / '.agents/.mcp-lock.json').read_text())['targets']['claude-code:perso']['servers']
+          assert off not in json.loads((home / '.agents/.mcp-lock.json').read_text())['targets']['omp:perso']['servers']
           print(f'MCP disable OK ({off} removed)')
           PY
 
-      # Proves the portability claim rather than asserting it: the whole catalog
-      # must install for agents that are not Claude Code.
+      # Proves the portability claim rather than asserting it: the whole catalog must
+      # install for every one of these agents, none of which it is written against.
       - name: Portability install
         run: |
           set -euo pipefail
@@ -130,6 +133,6 @@ jobs:
                 | sed 's/\x1b\[[0-9;]*[a-zA-Z]//g')
           echo "$out"
           if ! grep -q "Installed $expected skills" <<<"$out"; then
-            echo "::error::not every skill installed for the non-Claude targets"
+            echo "::error::not every skill installed for one of the portability targets"
             exit 1
           fi
