@@ -12,6 +12,7 @@
 // header value may reference an environment variable:
 //
 //   Claude Code   ${NAME}          in env and headers          (verified, 2.1.220)
+//   Oh My Pi      ${NAME}          in env and headers          (verified, 17.2.9)
 //   opencode      {env:NAME}       in env and headers
 //   VS Code       ${env:NAME}      in env and headers
 //   Codex         env_http_headers / bearer_token_env_var for headers; env is literal
@@ -417,6 +418,59 @@ const ADAPTERS = [
       }
       return found;
     },
+    server(def, r) {
+      if (def.transport === 'stdio') {
+        return { command: def.command, ...(def.args && { args: def.args }), ...(r.env && { env: r.env }) };
+      }
+      return { type: 'http', url: def.url, ...(r.headers && { headers: r.headers }) };
+    },
+    write: (t, entries, dropped, opts) => writeJsonKey(t.file, 'mcpServers', entries, dropped, opts),
+  },
+
+  {
+    id: 'omp',
+    label: 'Oh My Pi',
+    // Same `${NAME}` dialect as Claude Code, and rather more thoroughly: omp maps
+    // its expander over the entire parsed `mcpServers` object, so every string at
+    // any depth is substituted — env values, header values, url, command, args.
+    // It also understands `${NAME:-default}`, and leaves an unresolved reference
+    // as the literal `${NAME}` rather than the empty string. Verified by reading
+    // 17.2.9 (packages/coding-agent discovery: `K1(h.mcpServers)` over the file,
+    // where K1 recurses and applies /\$\{([^}:]+)(?::-([^}]*))?\}/g against
+    // Bun.env).
+    caps: { env: 'template', headers: 'template' },
+    ref: (n) => `\${${n}}`,
+    // One target per profile, mirroring the Claude Code adapter — and for the
+    // same reason: running this from inside an omp-perso session must still
+    // configure the work profile, or the two drift. PI_CONFIG_DIR is therefore a
+    // *candidate*, never an override.
+    //
+    // The user-scope file is <root>/agent/mcp.json, one level below the config
+    // root (`omp config path` prints that agent dir). The profile-less
+    // ~/.omp/agent/mcp.json is claimed only when it already exists: this machine
+    // launches omp exclusively through omp-work / omp-perso, so creating it would
+    // hand a bare `omp` a config it never had.
+    targets() {
+      const found = [];
+      const add = (id, root) => {
+        const file = join(root, 'agent', 'mcp.json');
+        if (!found.some((t) => t.file === file)) found.push({ id: `omp:${id}`, file });
+      };
+      for (const name of ['.omp-work', '.omp-perso']) {
+        const dir = join(HOME, name);
+        if (existsSync(dir)) add(name.slice('.omp-'.length), dir);
+      }
+      // A bare name, not a path — omp resolves it against $HOME.
+      if (process.env.PI_CONFIG_DIR) {
+        const dir = join(HOME, process.env.PI_CONFIG_DIR);
+        if (existsSync(dir)) add(process.env.PI_CONFIG_DIR.replace(/^\.omp-?/, '') || 'env', dir);
+      }
+      const bare = join(HOME, '.omp');
+      if (existsSync(join(bare, 'agent', 'mcp.json'))) add('default', bare);
+      return found;
+    },
+    // `type` is omp's transport discriminator, the same key Claude Code uses; a
+    // stdio server omits it and is recognised by `command`.
     server(def, r) {
       if (def.transport === 'stdio') {
         return { command: def.command, ...(def.args && { args: def.args }), ...(r.env && { env: r.env }) };
