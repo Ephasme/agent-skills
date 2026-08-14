@@ -284,7 +284,7 @@ for exactly that reason.
 
 | Category | Skills |
 | --- | --- |
-| `engineering` | code-quality-scan, greenfield, linear-project-sync, plan-hardening, prune-branches, spec-to-pr |
+| `engineering` | code-quality-scan, greenfield, linear-project-sync, plan-hardening, prune-branches, spec-to-pr, workspace-attachments |
 | `finance` | payment-qr |
 | `research` | cite-or-refuse, fact-check-document, harden-case |
 | `setup` | free-disk-space |
