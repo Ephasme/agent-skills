@@ -24,6 +24,8 @@
     "exa": {
       "purpose": "research",
       "description": "Exa web search",
+      "enabled": false,
+      "note": "2026-08-05: omp discards every Exa entry on discovery (filterExa, 8 hits in the 17.3.4 binary) and no other harness installed here uses it. Re-enable when a harness that keeps it arrives.",
       "transport": "http",
       "url": "https://mcp.exa.ai/mcp",
       "headers": {
@@ -65,6 +67,8 @@
     "github": {
       "purpose": "engineering",
       "description": "GitHub via the Copilot MCP endpoint",
+      "enabled": false,
+      "note": "2026-08-05: the endpoint answers 401 — the token this was built for is dead. Re-enable once a working credential exists; gh with GH_CONFIG_DIR covers the same ground meanwhile.",
       "transport": "http",
       "url": "https://api.githubcopilot.com/mcp/",
       "auth": { "type": "bearer", "token": { "env": "GITHUB_PAT" } }
@@ -218,6 +222,13 @@
         "BW_CLIENT_ID": { "env": "BW_CLIENT_ID" },
         "BW_CLIENT_SECRET": { "env": "BW_CLIENT_SECRET" }
       }
+    },
+    "notion": {
+      "purpose": "workspace",
+      "description": "Notion workspace — work only; authorization is a per-profile OAuth grant, not a header",
+      "transport": "http",
+      "url": "https://mcp.notion.com/mcp",
+      "identities": ["work"]
     }
   }
 }
