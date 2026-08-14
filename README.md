@@ -98,9 +98,9 @@ step 2. That tree is also the whole of activation: `~/.agents/omp/config.shared.
 profile links is installed and offered to nothing, silently. The link is absolute, like every
 other link in that directory.
 
-The step-2 symlinks are yadm content: the lock file records which skills are installed, and
-these are the only record of which profile gets which. `yadm add -f
-~/.omp/profiles/{perso,work}/agent/skills` after adding one.
+The step-2 symlinks are derived output, not yadm content: `~/.agents/selection.json` records
+which profile gets which skill, and `skills reconcile` rebuilds every activation link from it —
+the same operation `scripts/bootstrap.sh` runs on a fresh machine.
 
 Other agents are named the same way — the CLI's own names (`gemini-cli`, not `gemini`);
 `npx skills add . -a bogus` prints the full list of the ~75 it accepts.
@@ -322,14 +322,13 @@ one agent in a fresh context provides just as well as two.
 **A GitHub mirror.** This lived briefly at `Ephasme/agent-skills` before moving here. There is no
 mirror and no sync — Forgejo is the only remote.
 
-**`.mcp.json` files.** The seventeen servers in `mcp/servers.json` came from the purpose-plugins
+**`.mcp.json` files.** The nineteen servers in `mcp/servers.json` came from the purpose-plugins
 that used to carry these skills, removed from the dotfiles on 2026-07-31 in yadm commit `1803e8c`
 (still restorable with `yadm checkout debe473 -- .agents/plugins`). They are not stored in that
 shape any more, because a plugin's `.mcp.json` is loaded only by the agent whose plugin system
 ships it — and it was carrying the servers for exactly one of them. The manifest plus the
-renderer is the agent-neutral replacement, and the one `.mcp.json` still on this machine is
-`~/.agents/mcp/omp-shared.json`, symlinked into both omp profiles and maintained by hand rather
-than rendered.
+renderer is the agent-neutral replacement: every harness's MCP file is rendered rather than
+hand-maintained, and where each one lives is declared in `~/.agents/harnesses.json`.
 
 **Third-party skills.** One is installed: `gnhf`, from `kunchenguid/gnhf`, tracked by name in
 `~/.agents/.skill-lock.json` rather than vendored here — a copy in this repo would fork it off
