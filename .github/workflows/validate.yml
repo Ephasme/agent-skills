@@ -14,7 +14,11 @@ jobs:
           node-version: '22'
 
       - name: Validate the catalog
-        run: node scripts/validate.mjs
+        # --no-registry: the harness registry is machine state in $HOME (yadm
+        # content), not repo content, so there is nothing here to lint — the standing
+        # check is agents-doctor, on the machine. Spelled out rather than defaulted,
+        # so that the same command run locally stays strict.
+        run: node scripts/validate.mjs --no-registry
 
       # Guards against a layout change the validator cannot see: the CLI must
       # still discover every skill from the repo root, and skip none of them.

@@ -412,7 +412,7 @@ async function atomicWrite(file, content, opts) {
 // with a visible reason, where a wrong `template` would ship a config that silently
 // sends the literal string `${TOKEN}` as a credential.
 
-const ADAPTERS = [
+export const ADAPTERS = [
   {
     id: 'omp',
     label: 'Oh My Pi',
@@ -434,6 +434,8 @@ const ADAPTERS = [
       }
       return { type: 'http', url: def.url, ...(r.headers && { headers: r.headers }) };
     },
+    // Renders into a keyed JSON object, so the registry entry must name the key.
+    keyed: true,
     write: (t, entries, dropped, opts) => writeJsonKey(t.file, t.key, entries, dropped, opts),
   },
 
@@ -501,6 +503,8 @@ const ADAPTERS = [
       // otherwise opencode attempts an OAuth handshake the endpoint will refuse.
       return { type: 'remote', url: def.url, enabled: true, oauth: false, ...(r.headers && { headers: r.headers }) };
     },
+    // Renders into a keyed JSON object, so the registry entry must name the key.
+    keyed: true,
     write: (t, entries, dropped, opts) => writeJsonKey(t.file, t.key, entries, dropped, opts),
   },
 
@@ -515,6 +519,8 @@ const ADAPTERS = [
       }
       return { type: 'http', url: def.url, ...(r.headers && { headers: r.headers }) };
     },
+    // Renders into a keyed JSON object, so the registry entry must name the key.
+    keyed: true,
     write: (t, entries, dropped, opts) => writeJsonKey(t.file, t.key, entries, dropped, opts),
   },
 
@@ -531,6 +537,8 @@ const ADAPTERS = [
       }
       return { url: def.url, ...(r.headers && { headers: r.headers }) };
     },
+    // Renders into a keyed JSON object, so the registry entry must name the key.
+    keyed: true,
     write: (t, entries, dropped, opts) => writeJsonKey(t.file, t.key, entries, dropped, opts),
   },
 
@@ -547,6 +555,8 @@ const ADAPTERS = [
       }
       return { httpUrl: def.url, ...(r.headers && { headers: r.headers }) };
     },
+    // Renders into a keyed JSON object, so the registry entry must name the key.
+    keyed: true,
     write: (t, entries, dropped, opts) => writeJsonKey(t.file, t.key, entries, dropped, opts),
   },
 ];

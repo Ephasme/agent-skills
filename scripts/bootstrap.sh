@@ -13,16 +13,17 @@
 # That is deliberate: each profile links only the skills that belong in it, and
 # work and perso do not get the same set.
 #
-# So this script rebuilds the store only. The per-profile symlinks are yadm content
-# (they are the sole record of which profile gets which skill), so `yadm clone`
-# restores them; they simply dangle until this script has populated the store.
-# Anything left unlinked afterwards is reported at the end.
+# So this script rebuilds the store, then replays activation. Which identity gets
+# which skill is not in the lock and never was: it is declared in
+# ~/.agents/selection.json — yadm content, like the two locks — and
+# ~/.local/bin/skills is the only thing that turns that declaration into symlinks.
+# This script calls `skills reconcile` for that and links nothing itself.
 #
-# This calls npx directly and deliberately NOT the ~/.local/bin/skills wrapper,
-# even though the wrapper exists to make exactly these symlinks. The wrapper
-# activates whatever this run adds to an empty .skill-lock.json — which on a fresh
-# machine is everything, in both profiles. yadm has already restored the real
-# per-profile selection by this point, so letting it run here would flatten it.
+# The install pass below still calls npx directly and deliberately NOT that wrapper,
+# for the reason it always did: `skills add` activates whatever the run adds, which
+# on a fresh machine is everything, in every identity. Reconciliation is a separate
+# subcommand precisely so this script can ask for the second half without the first
+# — it posts the links selection.json names, and no others.
 #
 # The install list is derived from the lock rather than hardcoded, so a package
 # added to it is reinstalled without this script also being edited by hand. The
@@ -42,7 +43,6 @@
 # Usage: scripts/bootstrap.sh
 set -euo pipefail
 
-STORE=$HOME/.agents/skills
 LOCK=$HOME/.agents/.skill-lock.json
 
 command -v jq >/dev/null 2>&1 || {
@@ -147,26 +147,37 @@ fi
 echo "==> MCP servers"
 node "$(dirname "$0")/install-mcp.mjs"
 
-# A skill in the store that no profile links is loaded by nothing. omp reads only
-# ~/.omp/profiles/<p>/agent/skills — ~/.agents/omp/config.shared.yml turns the
-# foreign user-level skill sources off — so that one symlink is the whole of
-# activation, and its absence is silent: the content is installed and the skill is
-# simply never offered to anything.
+# Activation. The store is content; which identity gets which skill is a separate
+# declared fact, and `skills reconcile` is the one code path that turns it into
+# symlinks. It is called rather than reimplemented here because it knows the three
+# things this script does not: which harnesses are installed, which read
+# ~/.agents/skills natively and get no link at all, and which are residue and must
+# never be written into.
+#
+# This replaces the "in the store but linked by no profile" report that used to sit
+# here. That report hard-coded `for p in perso work` over
+# ~/.omp/profiles/$p/agent/skills — one of the harness lists the registry exists to
+# delete — and agents-doctor answers the same question against selection.json,
+# precisely, in the very command the last line of this script points at.
+SELECTION=$HOME/.agents/selection.json
 echo
-unlinked=()
-for path in "$STORE"/*/; do
-  name=$(basename "$path")
-  linked=""
-  for p in perso work; do
-    [ -e "$HOME/.omp/profiles/$p/agent/skills/$name" ] && linked="yes"
-  done
-  [ -n "$linked" ] || unlinked+=("$name")
-done
-if [ ${#unlinked[@]} -gt 0 ]; then
-  echo "In the store but linked by no profile — activate what you want, per profile:"
-  for name in "${unlinked[@]}"; do
-    echo "  ln -s ~/.agents/skills/$name ~/.omp/profiles/perso/agent/skills/$name"
-  done
+if [ ! -s "$SELECTION" ]; then
+  # A machine predating selection.json has its links from `yadm clone` and nothing
+  # to replay. Not an error — and not silent either.
+  echo "==> Activation: no $SELECTION — nothing to replay"
+elif ! command -v skills >/dev/null 2>&1; then
+  # Loud on purpose. A selection that exists and cannot be replayed leaves the store
+  # populated and every skill activated nowhere: this script's worst outcome and its
+  # least visible one. ~/.local/bin is yadm content, restored by `yadm clone`.
+  echo "error: $SELECTION exists but the \`skills\` wrapper is not on PATH — ~/.local/bin is yadm content; check 'yadm status'." >&2
+  exit 1
+else
+  echo "==> Activation (from $SELECTION)"
+  # No redirection or fd juggling needed: this is outside the fd-3 loop above, and
+  # `skills reconcile` reads no stdin. A non-zero exit aborts the script under
+  # `set -e` (line 43), which is the intent — a failed reconciliation is not a
+  # cosmetic problem.
+  skills reconcile
 fi
 
 echo
