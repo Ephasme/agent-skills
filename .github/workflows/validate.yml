@@ -41,8 +41,20 @@ jobs:
         run: |
           set -euo pipefail
           fake=$(mktemp -d)
-          mkdir -p "$fake"/{.omp-perso,.omp-work,.codex,.cursor,.gemini} \
+          mkdir -p "$fake"/.omp/profiles/{perso,work}/agent "$fake"/.codex \
+                   "$fake"/.cursor "$fake"/.gemini "$fake"/.agents \
                    "$fake"/.config/{opencode,Code/User}
+          # Each file below is the probe the fixture registry names: root presence alone is
+          # no longer enough to claim a target (design decision 9), which is the whole point
+          # of the port this step guards.
+          : > "$fake"/.omp/profiles/perso/agent/config.yml
+          : > "$fake"/.omp/profiles/work/agent/config.yml
+          : > "$fake"/.codex/installation_id
+          : > "$fake"/.config/opencode/.probe
+          : > "$fake"/.config/Code/User/settings.json
+          : > "$fake"/.cursor/settings.json
+          : > "$fake"/.gemini/.probe
+          cp mcp/ci-registry.json "$fake"/.agents/harnesses.json
           # PI_CONFIG_DIR is a *candidate* target in the omp adapter, not an override,
           # so a runner that happened to export it would add a target nothing here
           # asserts on.
@@ -70,7 +82,8 @@ jobs:
           SECRETISH = re.compile(r'key|token|secret|password|session|client[-_]?id|auth', re.I)
 
           for rel, key, agent in [
-              ('.omp-perso/agent/mcp.json', 'mcpServers', 'omp'),
+              ('.omp/profiles/perso/agent/mcp.json', 'mcpServers', 'omp'),
+              ('.omp/profiles/work/agent/mcp.json', 'mcpServers', 'omp'),
               ('.config/opencode/opencode.json', 'mcp', 'opencode'),
               ('.config/Code/User/mcp.json', 'servers', 'vscode'),
               ('.cursor/mcp.json', 'mcpServers', 'cursor'),
@@ -100,7 +113,7 @@ jobs:
           python3 -c "
           import json
           m = json.load(open('mcp/servers.json'))
-          name = next(iter(m['servers']))
+          name = next(n for n, s in m['servers'].items() if s.get('enabled', True))
           m['servers'][name]['enabled'] = False
           m['servers'][name]['note'] = 'parked by CI to exercise the removal path'
           json.dump({'name': name, **m}, open('/tmp/off.json', 'w'))
@@ -110,7 +123,7 @@ jobs:
           python3 - "$fake" "$off" <<'PY'
           import json, sys, pathlib
           home, off = pathlib.Path(sys.argv[1]), sys.argv[2]
-          for rel, key in [('.omp-perso/agent/mcp.json', 'mcpServers'),
+          for rel, key in [('.omp/profiles/perso/agent/mcp.json', 'mcpServers'),
                            ('.config/opencode/opencode.json', 'mcp'),
                            ('.config/Code/User/mcp.json', 'servers')]:
               servers = json.loads((home / rel).read_text())[key]
