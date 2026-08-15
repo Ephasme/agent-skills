@@ -458,15 +458,35 @@ async function checkRegistry() {
             bad(`harness \`${name}\`: sessions.${field} must be a non-empty string`);
           }
         }
-        // events is the one optional field, and null is the only accepted absence — a
-        // harness may hold a tmux pane and speak no event vocabulary, which is what
-        // opencode declares. Both readers stop on a dropped key, so this stops too:
-        // "no producer" is a fact worth writing, and a typo is not that fact.
+        // events is one of the two optional fields, and null is the only accepted
+        // absence — a harness may hold a tmux pane and speak no event vocabulary, which
+        // is what the tabs-only shape declares. Both readers stop on a dropped key, so
+        // this stops too: "no vocabulary" is a fact worth writing, and a typo is not
+        // that fact.
         if (!('events' in h.sessions)) {
           bad(`harness \`${name}\`: sessions.events is missing — declare null for no event vocabulary`);
         } else if (h.sessions.events !== null
                    && (typeof h.sessions.events !== 'string' || !h.sessions.events)) {
           bad(`harness \`${name}\`: sessions.events must be a non-empty string or null`);
+        }
+        // producer is the other one: the file that actually calls agent-notify — omp's
+        // extension, opencode's plugin — or null where the harness has no file to
+        // install. Same rule, same reason. It is what catches the quietest failure in
+        // this setup: a harness declaring a vocabulary whose producer was never
+        // installed launches, draws its pane, and reads 💤 forever.
+        if (!('producer' in h.sessions)) {
+          bad(`harness \`${name}\`: sessions.producer is missing — declare null for no producer file`);
+        } else if (h.sessions.producer !== null
+                   && (typeof h.sessions.producer !== 'string' || !h.sessions.producer)) {
+          bad(`harness \`${name}\`: sessions.producer must be a non-empty string or null`);
+        } else if (h.sessions.producer !== null
+                   && (h.sessions.events === null || !('events' in h.sessions))) {
+          // Coherence between the two, checked here and in neither reader: a producer
+          // reports INTO a vocabulary, so a file declared with no vocabulary to report
+          // into is read by nothing. The reverse is legal and live — claude-code
+          // declares events `claude` with a null producer, because its hook entries
+          // lived inside settings.json and there was never a second file to look for.
+          bad(`harness \`${name}\`: sessions.producer \`${h.sessions.producer}\` reports into no event vocabulary (sessions.events is null) — a producer nothing listens for is dead code`);
         }
       }
     }
@@ -484,6 +504,7 @@ async function checkRegistry() {
       ['sessions.launcher', h.sessions?.launcher],
       ['sessions.comm', h.sessions?.comm],
       ['sessions.events', h.sessions?.events],
+      ['sessions.producer', h.sessions?.producer],
     ]) {
       if (typeof template !== 'string') continue;
       const stray = template.replaceAll('{identity}', '').replaceAll('{root}', '').match(/\{[^}]*\}?/);

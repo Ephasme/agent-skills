@@ -355,6 +355,45 @@ export function mcpFile(inst, reg) {
   });
 }
 
+// The optional-field rule of `sessions`, in one place because two readers of it must spell
+// its two stops identically — producerFile() below, and dump()'s `events`. `null` is a
+// declared absence and a fact about the harness: one that holds a pane and speaks no event
+// vocabulary, or speaks one from inside another file and so has no second path to name. A
+// dropped key states neither and would resolve to the same silence, so it is a stop.
+// agent_registry._optional() pins both wordings.
+function optionalField(spec, key, where) {
+  if (!(key in spec)) {
+    throw new RegistryError(`${where}.${key} is missing (declare null for none)`);
+  }
+  const v = spec[key];
+  if (v === null) return null;
+  if (typeof v !== 'string' || !v) {
+    throw new RegistryError(`${where}.${key} is not a non-empty string or null`);
+  }
+  return v;
+}
+
+// The file that must exist for inst to report its state, or null when the harness declares
+// none. The producer is the half of `sessions` that lives on disk — omp's extension,
+// opencode's plugin — one file symlinked into every installed root, and a missing link is
+// the quietest failure this registry has: the harness still launches, the pane still draws,
+// and the tab reads 💤 forever because nothing ever calls agent-notify. Resolved for a
+// residue or absent instance too, since "where would it have been" is the question that
+// follows "why is this not installed". Mirrors agent_registry.producer_file(), null for
+// null and for no `sessions` section at all.
+export function producerFile(inst, reg) {
+  const r = reg ?? load();
+  const spec = r.harnesses[inst.harness]?.sessions;
+  if (!isObject(spec)) return null;                // no sessions capability at all
+  const home = homeOf(r);
+  const where = `${registryPath(home)}: harnesses.${inst.harness}.sessions`;
+  const template = optionalField(spec, 'producer', where);
+  if (!template) return null;                      // declared null — no file to check
+  return resolvedPath(template, {
+    root: inst.root, identity: inst.identity, home, where: `${where}.producer`,
+  });
+}
+
 // Not exported: `skills` and `agents-doctor` do the linking and both are Python, so dump()
 // is the only JS caller. `native` and "no such capability" both answer null — the caller
 // that needs to tell them apart reads the entry, which is what dump() does.
@@ -425,22 +464,17 @@ export function dump(home) {
         }
         return resolve(v, { harness: inst.harness, identity: inst.identity, reg });
       };
-      // events is the one optional field of the three, and `null` is the only accepted
-      // absence — agent_registry._optional(), with both wordings pinned there too. A
-      // harness may hold a pane and speak no event vocabulary; a dropped key says
-      // nothing at all, and the two are different facts.
-      const spoken = () => {
-        if (!('events' in h.sessions)) {
-          throw at(reg, `harnesses.${inst.harness}.sessions.events is missing (declare null for none)`);
-        }
-        const v = h.sessions.events;
-        if (v === null) return '-';
-        if (typeof v !== 'string' || !v) {
-          throw at(reg, `harnesses.${inst.harness}.sessions.events is not a non-empty string or null`);
-        }
-        return resolve(v, { harness: inst.harness, identity: inst.identity, reg });
-      };
-      lines.push(`sessions ${inst.id} launcher=${s('launcher')} comm=${s('comm')} events=${spoken()}`);
+      // events and producer are the two optional fields of the four, through the one
+      // optionalField() so that a dropped or empty key stops here with the same words
+      // producerFile() stops with. Each renders as the `-` every absent optional value
+      // gets: a null vocabulary, and a producer the harness declares no file for.
+      const where = `${registryPath(homeOf(reg))}: harnesses.${inst.harness}.sessions`;
+      const spoken = optionalField(h.sessions, 'events', where);
+      const events = spoken
+        ? resolve(spoken, { harness: inst.harness, identity: inst.identity, reg })
+        : '-';
+      lines.push(`sessions ${inst.id} launcher=${s('launcher')} comm=${s('comm')}`
+        + ` events=${events} producer=${producerFile(inst, reg) ?? '-'}`);
     }
   }
 
@@ -473,10 +507,10 @@ export function dump(home) {
 // uses, case for case, so that a divergence between the two readers surfaces as one named
 // failing case instead of a mystery diff.
 //
-// The fixture is synthetic on purpose: alpha/beta/gamma cover both `identities.mode`s, a
-// file probe and a bin probe, installed/residue/absent, a `native` skills harness and an
-// mcp entry with no `key`. Asserting against this machine's real registry would test
-// today's machine rather than the contract.
+// The fixture is synthetic on purpose: alpha/beta/gamma/delta cover both `identities.mode`s,
+// a file probe and a bin probe, installed/residue/absent, a `native` skills harness, an mcp
+// entry with no `key`, and all three shapes of a `sessions` producer. Asserting against this
+// machine's real registry would test today's machine rather than the contract.
 
 const FIXTURE = {
   version: 1,
@@ -494,7 +528,12 @@ const FIXTURE = {
       skills: { dir: '{root}/skills' },
       agents: { dir: '{root}/agents' },
       mcp: { file: '{root}/mcp.json', key: 'mcpServers', adapter: 'alpha' },
-      sessions: { launcher: 'alpha-{identity}', comm: 'alpha', events: 'alpha' },
+      // A real producer template, resolved per identity: alpha's installed one and its
+      // residue sibling both answer, which is what agents-doctor checks for existence.
+      sessions: {
+        launcher: 'alpha-{identity}', comm: 'alpha', events: 'alpha',
+        producer: '{root}/extensions/agent-tabs.ts',
+      },
     },
     beta: {
       label: 'Beta',
@@ -503,6 +542,10 @@ const FIXTURE = {
       identities: { mode: 'single', owner: 'work' },
       skills: { native: true },
       mcp: { file: '{root}/config.toml', adapter: 'beta' },
+      // Owned by the second identity, and holding a pane it reports nothing from: `events`
+      // null is the harness saying it speaks no vocabulary, and a producer would have
+      // nowhere to report into, so it is null too.
+      sessions: { launcher: 'beta-{identity}', comm: 'beta', events: null, producer: null },
     },
     gamma: {
       label: 'Gamma',
@@ -510,6 +553,17 @@ const FIXTURE = {
       probe: { file: '{root}/settings.json' },
       identities: { mode: 'single', owner: 'perso' },
       mcp: { file: '{root}/mcp.json', key: 'servers', adapter: 'gamma' },
+    },
+    // A vocabulary with a null producer, the shape claude-code has: its hook entries lived
+    // inside settings.json, so there was never a second file to look for. `sessions` only,
+    // and absent — gamma stays the harness declaring none, so `cap: 'sessions'` still
+    // excludes something. The undeclared-harness cases below say `ghost`, not `delta`.
+    delta: {
+      label: 'Delta',
+      root: '~/.delta',
+      probe: { file: '{root}/settings.json' },
+      identities: { mode: 'single', owner: 'perso' },
+      sessions: { launcher: 'delta-{identity}', comm: 'delta', events: 'delta', producer: null },
     },
   },
 };
@@ -549,7 +603,7 @@ function fixture(mutate) {
   mkdirSync(join(home, 'bin'));
   writeFileSync(join(home, 'bin', 'beta-bin'), '#!/bin/sh\nexit 0\n');
   chmodSync(join(home, 'bin', 'beta-bin'), 0o755);
-  // ~/.gamma is deliberately never created: absent.
+  // ~/.gamma and ~/.delta are deliberately never created: absent.
   return home;
 }
 
@@ -566,14 +620,22 @@ function selftest() {
       console.log(`FAIL ${label}\n  want ${JSON.stringify(want)}\n  got  ${JSON.stringify(got)}`);
     }
   };
-  const refuses = (label, fn) => {
+  // `want` is a message tail, not the whole message: the prefix is a fresh tmpdir path on
+  // every call, and the pinned part of a text is what follows it.
+  const refuses = (label, fn, want) => {
     cases++;
     try {
       fn();
     } catch (e) {
-      if (e instanceof RegistryError) return;
-      failures++;
-      console.log(`FAIL ${label}: ${e.name}: ${e.message}`);
+      if (!(e instanceof RegistryError)) {
+        failures++;
+        console.log(`FAIL ${label}: ${e.name}: ${e.message}`);
+        return;
+      }
+      if (want !== undefined && !e.message.endsWith(want)) {
+        failures++;
+        console.log(`FAIL ${label}\n  want tail ${JSON.stringify(want)}\n  got  ${JSON.stringify(e.message)}`);
+      }
       return;
     }
     failures++;
@@ -597,6 +659,7 @@ function selftest() {
       `instance alpha:perso harness=alpha identity=perso state=installed root=${home}/.alpha-perso`,
       `instance alpha:work harness=alpha identity=work state=residue root=${home}/.alpha-work`,
       `instance beta:work harness=beta identity=work state=installed root=${home}/.beta`,
+      `instance delta:perso harness=delta identity=perso state=absent root=${home}/.delta`,
       `instance gamma:perso harness=gamma identity=perso state=absent root=${home}/.gamma`,
       `mcp alpha:perso ${home}/.alpha-perso/mcp.json key=mcpServers adapter=alpha`,
       `mcp alpha:work ${home}/.alpha-work/mcp.json key=mcpServers adapter=alpha`,
@@ -604,8 +667,12 @@ function selftest() {
       `mcp gamma:perso ${home}/.gamma/mcp.json key=servers adapter=gamma`,
       'selection perso skills=one,two agents=solo',
       'selection work skills=one agents=-',
-      'sessions alpha:perso launcher=alpha-perso comm=alpha events=alpha',
-      'sessions alpha:work launcher=alpha-work comm=alpha events=alpha',
+      `sessions alpha:perso launcher=alpha-perso comm=alpha events=alpha`
+        + ` producer=${home}/.alpha-perso/extensions/agent-tabs.ts`,
+      `sessions alpha:work launcher=alpha-work comm=alpha events=alpha`
+        + ` producer=${home}/.alpha-work/extensions/agent-tabs.ts`,
+      'sessions beta:work launcher=beta-work comm=beta events=- producer=-',
+      'sessions delta:perso launcher=delta-perso comm=delta events=delta producer=-',
       `skills alpha:perso ${home}/.alpha-perso/skills`,
       `skills alpha:work ${home}/.alpha-work/skills`,
       'skills beta:work native',
@@ -615,19 +682,37 @@ function selftest() {
     check('mcp without a key renders key=-', line('mcp', 'beta:work'),
       `mcp beta:work ${home}/.beta/config.toml key=- adapter=beta`);
     check('sessions substitutes {identity}', line('sessions', 'alpha:work'),
-      'sessions alpha:work launcher=alpha-work comm=alpha events=alpha');
-    // `events: null` is the explicit "no producer": a harness that holds a pane and
-    // reports nothing from it, which agent_registry._optional() accepts and prints as the
-    // same `-` every absent optional value gets. The other two absences are faults, with
-    // the wordings its selftest pins.
+      `sessions alpha:work launcher=alpha-work comm=alpha events=alpha`
+      + ` producer=${home}/.alpha-work/extensions/agent-tabs.ts`);
+    // The two optional fields, in the three combinations the live registry holds: beta
+    // declares neither a vocabulary nor a file, delta a vocabulary and no file, and alpha
+    // both. The fourth — a file to check and no vocabulary to report into — is incoherent
+    // and is validate.mjs's to refuse; here alpha with its events dropped to null shows the
+    // rendering is per field, not one `-` for the pair.
+    check('sessions beta declares neither', line('sessions', 'beta:work'),
+      'sessions beta:work launcher=beta-work comm=beta events=- producer=-');
+    check('sessions delta declares a vocabulary and no file', line('sessions', 'delta:perso'),
+      'sessions delta:perso launcher=delta-perso comm=delta events=delta producer=-');
+    const mute = fixture((r) => { r.harnesses.alpha.sessions.events = null; });
     check('sessions with no vocabulary renders events=-',
-      dump(fixture((r) => { r.harnesses.alpha.sessions.events = null; }))
-        .split('\n').find((l) => l.startsWith('sessions alpha:perso ')),
-      'sessions alpha:perso launcher=alpha-perso comm=alpha events=-');
+      dump(mute).split('\n').find((l) => l.startsWith('sessions alpha:perso ')),
+      `sessions alpha:perso launcher=alpha-perso comm=alpha events=-`
+      + ` producer=${mute}/.alpha-perso/extensions/agent-tabs.ts`);
+    // Both keys are required, and a dropped one is a different fault from an unusable
+    // value. agent_registry._optional() pins these four texts; one helper spells all four,
+    // so a divergence would have to be a deliberate edit.
     refuses('sessions.events dropped entirely',
-      () => dump(fixture((r) => { delete r.harnesses.alpha.sessions.events; })));
+      () => dump(fixture((r) => { delete r.harnesses.alpha.sessions.events; })),
+      'harnesses.alpha.sessions.events is missing (declare null for none)');
     refuses('sessions.events as an empty string',
-      () => dump(fixture((r) => { r.harnesses.alpha.sessions.events = ''; })));
+      () => dump(fixture((r) => { r.harnesses.alpha.sessions.events = ''; })),
+      'harnesses.alpha.sessions.events is not a non-empty string or null');
+    refuses('sessions.producer dropped entirely',
+      () => dump(fixture((r) => { delete r.harnesses.alpha.sessions.producer; })),
+      'harnesses.alpha.sessions.producer is missing (declare null for none)');
+    refuses('sessions.producer as an empty string',
+      () => dump(fixture((r) => { r.harnesses.alpha.sessions.producer = ''; })),
+      'harnesses.alpha.sessions.producer is not a non-empty string or null');
     check('an empty selection list renders -', line('selection', 'work'),
       'selection work skills=one agents=-');
 
@@ -665,12 +750,12 @@ function selftest() {
     check('mode single carries its owner', identitiesOf('beta', reg).join(','), 'work');
     check('instance ids are <harness>:<identity>',
       instances({ state: null, reg }).map((i) => i.id).join(' '),
-      'alpha:perso alpha:work beta:work gamma:perso');
+      'alpha:perso alpha:work beta:work gamma:perso delta:perso');
     check('instances default to installed',
       instances({ reg }).map((i) => i.id).join(' '), 'alpha:perso beta:work');
     check('cap selects by declaration',
       instances({ cap: 'sessions', state: null, reg }).map((i) => i.id).join(' '),
-      'alpha:perso alpha:work');
+      'alpha:perso alpha:work beta:work delta:perso');
     check('cap and state together',
       instances({ cap: 'mcp', reg }).map((i) => i.id).join(' '), 'alpha:perso beta:work');
     // A declared-but-unusable section must not survive the cap filter, or Task 7's
@@ -681,9 +766,19 @@ function selftest() {
         .map((i) => i.id).join(' '),
       'alpha:perso alpha:work beta:work');
     check('label comes from the entry', instances({ reg })[0].label, 'Alpha');
-    const beta = instances({ reg }).find((i) => i.harness === 'beta');
+    const byId = Object.fromEntries(instances({ state: null, reg }).map((i) => [i.id, i]));
+    const beta = byId['beta:work'];
     check('mcpFile resolves {root}', mcpFile(beta, reg), `${home}/.beta/config.toml`);
-    check('mcpFile is null for an undeclared harness', mcpFile({ ...beta, harness: 'delta' }, reg), null);
+    check('mcpFile is null for an undeclared harness', mcpFile({ ...beta, harness: 'ghost' }, reg), null);
+    check('producerFile resolves {root}', producerFile(byId['alpha:perso'], reg),
+      `${home}/.alpha-perso/extensions/agent-tabs.ts`);
+    // A residue instance resolves one too: "where would it have been" is the question that
+    // follows "why is this not installed", and agents-doctor asks it in that order.
+    check('producerFile of a residue', producerFile(byId['alpha:work'], reg),
+      `${home}/.alpha-work/extensions/agent-tabs.ts`);
+    check('producerFile is null when declared null', producerFile(byId['delta:perso'], reg), null);
+    check('producerFile is null with no sessions section',
+      producerFile(byId['gamma:perso'], reg), null);
     check('selection reads the file', selection(home).perso.skills.join(','), 'one,two');
     check('selection is {} when absent', Object.keys(selection(join(home, 'nowhere'))).length, 0);
 
@@ -742,7 +837,7 @@ function selftest() {
       () => rootOf('beta', 'work', load(fixture((r) => { r.harnesses.beta.root = '.beta'; }))));
     refuses('a surviving brace', () => resolve('{root}/{oops}', { harness: 'beta', identity: 'work', reg }));
     refuses('{root} with no harness', () => resolve('{root}/x', { reg }));
-    refuses('an unknown harness', () => identitiesOf('delta', reg));
+    refuses('an unknown harness', () => identitiesOf('ghost', reg));
   } finally {
     process.env.PATH = savedPath;
   }
