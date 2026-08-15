@@ -36,6 +36,14 @@
 // which is the point — deleting the entry uninstalls it too, but throws the
 // definition away, and most reasons to turn a server off are temporary.
 //
+// Where each agent keeps that configuration is not discovered here. It is declared in
+// ~/.agents/harnesses.json, and this script writes the MCP file of every *installed*
+// instance the registry names for its adapter — one target per harness × identity, keyed
+// `<harness>:<identity>`. An adapter no entry names renders nothing; a harness whose root
+// is present but whose probe misses is residue and is never written into. A server may
+// name the identities it belongs to (`"identities": ["work"]`); absent, it renders for
+// every identity, and a single-configuration harness receives what its owner receives.
+//
 // Usage:
 //   node scripts/install-mcp.mjs                 write every detected target
 //   node scripts/install-mcp.mjs --list          show targets and what each supports
@@ -49,6 +57,7 @@ import { existsSync, realpathSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join, dirname, relative, isAbsolute, resolve as resolvePath } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { RegistryError, harnesses, identities, instances, load, mcpFile, registryPath, stateOf } from './registry.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const HOME = homedir();
@@ -99,6 +108,21 @@ export function validateManifest(manifest, fail) {
     // A parked server with no stated reason is the one that never gets switched
     // back on, because nobody left behind knows what would have to be true first.
     if (def.enabled === false && !def.note) at('a disabled server needs a `note` saying why');
+
+    // Absent means every identity. Present and empty would render the server nowhere
+    // while reading as a restriction, which is the one shape worth refusing outright;
+    // whether the names exist is the registry's business, checked where it is loaded.
+    if ('identities' in def) {
+      if (!Array.isArray(def.identities) || !def.identities.length) {
+        at('`identities` must be a non-empty array of identity names');
+      } else {
+        for (const i of def.identities) {
+          if (typeof i !== 'string' || !/^[a-z0-9][a-z0-9-]*$/.test(i)) {
+            at(`\`identities\` entry ${JSON.stringify(i)} must be a lowercase identity name`);
+          }
+        }
+      }
+    }
 
     if (def.transport === 'http') {
       if (!def.url) at('http transport needs `url`');
@@ -263,6 +287,13 @@ function parseJsonc(text) {
 // many. So the write claims that one key and leaves the rest of the document as it
 // found it, rather than rendering a file of its own over the agent's.
 async function writeJsonKey(file, key, entries, dropped, opts) {
+  // The key used to be a literal in the caller and now comes from the registry (or,
+  // for a target only `--prune` can still reach, from the lock). Writing `doc[undefined]`
+  // would produce a file whose MCP servers live under the string "undefined" — valid
+  // JSON, silently ignored by the agent, and indistinguishable from "nothing happened".
+  if (typeof key !== 'string' || !key) {
+    return { error: `no key to write under for ${file} — the registry entry declares no \`mcp.key\` and the lock recorded none; this adapter writes a keyed object and cannot guess it` };
+  }
   let doc = {};
   let hadComments = false;
   if (existsSync(file)) {
@@ -382,7 +413,7 @@ async function atomicWrite(file, content, opts) {
 // with a visible reason, where a wrong `template` would ship a config that silently
 // sends the literal string `${TOKEN}` as a credential.
 
-const ADAPTERS = [
+export const ADAPTERS = [
   {
     id: 'omp',
     label: 'Oh My Pi',
@@ -396,34 +427,6 @@ const ADAPTERS = [
     // Bun.env).
     caps: { env: 'template', headers: 'template' },
     ref: (n) => `\${${n}}`,
-    // One target per profile, and every profile gets the same set: running this
-    // from inside an omp-perso session must still configure the work profile, or
-    // the two drift. PI_CONFIG_DIR is therefore a *candidate*, never an override.
-    //
-    // The user-scope file is <root>/agent/mcp.json, one level below the config
-    // root (`omp config path` prints that agent dir). The profile-less
-    // ~/.omp/agent/mcp.json is claimed only when it already exists: this machine
-    // launches omp exclusively through omp-work / omp-perso, so creating it would
-    // hand a bare `omp` a config it never had.
-    targets() {
-      const found = [];
-      const add = (id, root) => {
-        const file = join(root, 'agent', 'mcp.json');
-        if (!found.some((t) => t.file === file)) found.push({ id: `omp:${id}`, file });
-      };
-      for (const name of ['.omp-work', '.omp-perso']) {
-        const dir = join(HOME, name);
-        if (existsSync(dir)) add(name.slice('.omp-'.length), dir);
-      }
-      // A bare name, not a path — omp resolves it against $HOME.
-      if (process.env.PI_CONFIG_DIR) {
-        const dir = join(HOME, process.env.PI_CONFIG_DIR);
-        if (existsSync(dir)) add(process.env.PI_CONFIG_DIR.replace(/^\.omp-?/, '') || 'env', dir);
-      }
-      const bare = join(HOME, '.omp');
-      if (existsSync(join(bare, 'agent', 'mcp.json'))) add('default', bare);
-      return found;
-    },
     // `type` is omp's transport discriminator; a stdio server omits it and is
     // recognised by `command`.
     server(def, r) {
@@ -432,7 +435,9 @@ const ADAPTERS = [
       }
       return { type: 'http', url: def.url, ...(r.headers && { headers: r.headers }) };
     },
-    write: (t, entries, dropped, opts) => writeJsonKey(t.file, 'mcpServers', entries, dropped, opts),
+    // Renders into a keyed JSON object, so the registry entry must name the key.
+    keyed: true,
+    write: (t, entries, dropped, opts) => writeJsonKey(t.file, t.key, entries, dropped, opts),
   },
 
   {
@@ -444,7 +449,6 @@ const ADAPTERS = [
     // #24401), so a stdio secret is resolved by the launch instead — see
     // `envShimCommand`.
     caps: { env: 'shim', headers: 'named' },
-    targets: () => (existsSync(join(HOME, '.codex')) ? [{ id: 'codex', file: join(HOME, '.codex', 'config.toml') }] : []),
     server(def, r, name) {
       const lines = [`[mcp_servers.${tomlKey(name)}]`];
       if (def.transport === 'stdio') {
@@ -492,10 +496,6 @@ const ADAPTERS = [
     // config loads, in every string value including headers.
     caps: { env: 'template', headers: 'template' },
     ref: (n) => `{env:${n}}`,
-    targets: () =>
-      existsSync(join(HOME, '.config', 'opencode'))
-        ? [{ id: 'opencode', file: join(HOME, '.config', 'opencode', 'opencode.json') }]
-        : [],
     server(def, r) {
       if (def.transport === 'stdio') {
         return { type: 'local', command: [def.command, ...(def.args ?? [])], enabled: true, ...(r.env && { environment: r.env }) };
@@ -504,7 +504,9 @@ const ADAPTERS = [
       // otherwise opencode attempts an OAuth handshake the endpoint will refuse.
       return { type: 'remote', url: def.url, enabled: true, oauth: false, ...(r.headers && { headers: r.headers }) };
     },
-    write: (t, entries, dropped, opts) => writeJsonKey(t.file, 'mcp', entries, dropped, opts),
+    // Renders into a keyed JSON object, so the registry entry must name the key.
+    keyed: true,
+    write: (t, entries, dropped, opts) => writeJsonKey(t.file, t.key, entries, dropped, opts),
   },
 
   {
@@ -512,17 +514,15 @@ const ADAPTERS = [
     label: 'VS Code',
     caps: { env: 'template', headers: 'template' },
     ref: (n) => `\${env:${n}}`,
-    targets: () =>
-      existsSync(join(HOME, '.config', 'Code', 'User'))
-        ? [{ id: 'vscode', file: join(HOME, '.config', 'Code', 'User', 'mcp.json') }]
-        : [],
     server(def, r) {
       if (def.transport === 'stdio') {
         return { type: 'stdio', command: def.command, ...(def.args && { args: def.args }), ...(r.env && { env: r.env }) };
       }
       return { type: 'http', url: def.url, ...(r.headers && { headers: r.headers }) };
     },
-    write: (t, entries, dropped, opts) => writeJsonKey(t.file, 'servers', entries, dropped, opts),
+    // Renders into a keyed JSON object, so the registry entry must name the key.
+    keyed: true,
+    write: (t, entries, dropped, opts) => writeJsonKey(t.file, t.key, entries, dropped, opts),
   },
 
   {
@@ -532,14 +532,15 @@ const ADAPTERS = [
     // of remote servers — a reported bug, so headers are treated as unsupported.
     caps: { env: 'template', headers: 'unsupported' },
     ref: (n) => `\${env:${n}}`,
-    targets: () => (existsSync(join(HOME, '.cursor')) ? [{ id: 'cursor', file: join(HOME, '.cursor', 'mcp.json') }] : []),
     server(def, r) {
       if (def.transport === 'stdio') {
         return { command: def.command, ...(def.args && { args: def.args }), ...(r.env && { env: r.env }) };
       }
       return { url: def.url, ...(r.headers && { headers: r.headers }) };
     },
-    write: (t, entries, dropped, opts) => writeJsonKey(t.file, 'mcpServers', entries, dropped, opts),
+    // Renders into a keyed JSON object, so the registry entry must name the key.
+    keyed: true,
+    write: (t, entries, dropped, opts) => writeJsonKey(t.file, t.key, entries, dropped, opts),
   },
 
   {
@@ -549,14 +550,15 @@ const ADAPTERS = [
     // strings (google-gemini/gemini-cli #5282).
     caps: { env: 'template', headers: 'unsupported' },
     ref: (n) => `$${n}`,
-    targets: () => (existsSync(join(HOME, '.gemini')) ? [{ id: 'gemini-cli', file: join(HOME, '.gemini', 'settings.json') }] : []),
     server(def, r) {
       if (def.transport === 'stdio') {
         return { command: def.command, ...(def.args && { args: def.args }), ...(r.env && { env: r.env }) };
       }
       return { httpUrl: def.url, ...(r.headers && { headers: r.headers }) };
     },
-    write: (t, entries, dropped, opts) => writeJsonKey(t.file, 'mcpServers', entries, dropped, opts),
+    // Renders into a keyed JSON object, so the registry entry must name the key.
+    keyed: true,
+    write: (t, entries, dropped, opts) => writeJsonKey(t.file, t.key, entries, dropped, opts),
   },
 ];
 
@@ -667,6 +669,85 @@ async function writeLock(lock, opts) {
 }
 
 // ---------------------------------------------------------------------------
+// Targets
+// ---------------------------------------------------------------------------
+//
+// Where each agent keeps its MCP configuration is declared in ~/.agents/harnesses.json
+// and resolved once, here. Two properties of the old per-adapter discovery are kept
+// deliberately: every identity of a harness is a target, so running this from inside an
+// omp-perso session still configures work (the registry is read, never the ambient
+// environment); and a target is claimed only on evidence — root present *and* probe
+// hit — so a half-removed harness is not handed a config file.
+
+// One contact surface with the registry: everything downstream sees a plain array.
+// Resolution is eager because identitiesOf() and stateOf() raise RegistryError of their
+// own — a `mode` that is neither each nor single, an owner naming no identity, a probe
+// declaring neither file nor bin — and a hard stop is only a hard stop if it happens
+// before the first write.
+function readRegistry() {
+  try {
+    const reg = load(HOME);
+    const declared = instances({ cap: 'mcp', state: null, reg }).map((inst) => {
+      const { mcp } = harnesses(reg)[inst.harness];
+      return {
+        id: inst.id,
+        identity: inst.identity,
+        label: inst.label,
+        adapter: mcp.adapter,
+        key: mcp.key,
+        file: mcpFile(inst, reg),
+        state: stateOf(inst.harness, inst.identity, reg),
+      };
+    });
+    return { reg, declared };
+  } catch (e) {
+    if (!(e instanceof RegistryError)) throw e;
+    console.error(`✗ ${e.message}`);
+    console.error('  The registry says which harnesses exist and where their MCP files are.');
+    console.error('  Without it this script cannot know what it would be writing to, and');
+    console.error('  rendering nothing while exiting 0 is how fifteen servers go missing.');
+    console.error(`  Fix ${registryPath(HOME)} and re-run.`);
+    process.exit(1);
+  }
+}
+
+// The installed instances of one adapter, in registry order, one target each.
+function targetsFor(adapter, declared) {
+  return declared
+    .filter((d) => d.adapter === adapter.id && d.state === 'installed')
+    .map(({ id, identity, file, key }) => ({ id, identity, file, key }));
+}
+
+// Every instance the registry declares for this adapter, in every state, so `--list`
+// and `-a <agent>` distinguish the three ways an adapter writes nothing: no entry names
+// it, its harness is residue, its harness is absent.
+function describeAdapter(adapter, declared) {
+  const mine = declared.filter((d) => d.adapter === adapter.id);
+  if (!mine.length) return 'no registry entry — renders nothing';
+  return mine.map((d) => `${d.id} → ${d.state === 'installed' ? d.file : d.state}`).join(', ');
+}
+
+// A lock key that names no detected target but records the file a detected target now
+// resolves to is a rename, not a stale entry: `codex` and `opencode` predate §3.1.5's
+// `<harness>:<identity>` ids. Left alone it is invisible to the write path, so
+// `previous` is empty, so a server parked between two runs is never dropped from a file
+// this script is still writing; and `--prune` would later reach the same file under two
+// keys. Adopting it re-keys the lock as a side effect of rendering, which is otherwise a
+// hand edit somebody has to remember to make first.
+function adoptRenamedLockKeys(lock, detected) {
+  const superseded = new Map();
+  for (const [id, entry] of Object.entries(lock.targets)) {
+    if (detected.some((t) => t.id === id)) continue;
+    const heir = detected.find((t) => t.file === entry.file);
+    if (!heir) continue;
+    superseded.set(heir.id, { id, servers: entry.servers ?? [] });
+    delete lock.targets[id];
+    console.log(`  ! ${heir.id}: adopted lock key \`${id}\` — same file, id renamed by the registry`);
+  }
+  return superseded;
+}
+
+// ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
 
@@ -719,6 +800,10 @@ async function main() {
   const servers = all.filter(([, def]) => def.enabled !== false);
   const disabled = new Map(all.filter(([, def]) => def.enabled === false).map(([name, def]) => [name, def.note]));
   const known = new Set(all.map(([name]) => name));
+  // A server may name the identities it belongs to; absent means every identity. Held as
+  // a lookup because the filter runs once per target, while the manifest is walked once
+  // per adapter.
+  const audience = new Map(all.map(([name, def]) => [name, def.identities ?? null]));
 
   let adapters = ADAPTERS;
   if (opts.agents.length) {
@@ -731,13 +816,39 @@ async function main() {
     adapters = ADAPTERS.filter((a) => opts.agents.includes(a.id));
   }
 
+  const { reg, declared } = readRegistry();
+
+  // Decision 4 cuts both ways: an adapter no entry names renders nothing, and an entry
+  // no adapter answers would render nothing while looking configured. `claude-code`
+  // declares no `mcp` section for exactly this reason — there is no adapter for it.
+  const adapterIds = new Set(ADAPTERS.map((a) => a.id));
+  const orphans = declared.filter((d) => !adapterIds.has(d.adapter));
+  if (orphans.length) {
+    console.error('✗ the registry names an MCP adapter that does not exist here:\n');
+    for (const d of orphans) console.error(`  ${d.id} → \`${d.adapter}\``);
+    console.error(`\n  adapters: ${[...adapterIds].join(', ')}`);
+    process.exit(1);
+  }
+
+  // A server naming an identity the registry does not declare renders nowhere, which
+  // looks exactly like a server that is switched off. One transposed pair —
+  // "identities": ["wrok"] — is otherwise fifteen minutes spent in the wrong file.
+  const declaredIdentities = new Set(Object.keys(identities(reg)));
+  const bogus = all.flatMap(([name, def]) =>
+    (def.identities ?? []).filter((i) => !declaredIdentities.has(i)).map((i) => `${name}: \`${i}\``));
+  if (bogus.length) {
+    console.error(`✗ ${manifestPath}: server names an identity the registry does not declare:\n`);
+    for (const b of bogus) console.error(`  ${b}`);
+    console.error(`\n  declared: ${[...declaredIdentities].sort().join(', ')}`);
+    process.exit(1);
+  }
+
   if (opts.list) {
     console.log(`${servers.length} enabled, ${disabled.size} disabled`);
     for (const [name, note] of disabled) console.log(`  · ${name} — ${note}`);
     console.log();
     for (const adapter of ADAPTERS) {
-      const targets = adapter.targets();
-      const where = targets.length ? targets.map((t) => t.file).join(', ') : 'not installed';
+      const where = describeAdapter(adapter, declared);
       console.log(`${adapter.id.padEnd(12)} env:${adapter.caps.env.padEnd(12)} headers:${adapter.caps.headers.padEnd(12)} ${where}`);
     }
     return;
@@ -756,23 +867,32 @@ async function main() {
   let wrote = 0;
 
   for (const adapter of adapters) {
-    const detected = adapter.targets();
+    const detected = targetsFor(adapter, declared);
+    const superseded = adoptRenamedLockKeys(lock, detected);
     // Pruning has to reach targets that are no longer detected — an agent can be
     // uninstalled after this script wrote to it, and the lock is the only record.
     const stale = opts.prune
       ? Object.entries(lock.targets)
           .filter(([id]) => id === adapter.id || id.startsWith(`${adapter.id}:`))
           .filter(([id]) => !detected.some((t) => t.id === id))
-          .map(([id, v]) => ({ id, file: v.file }))
+          // The key can be missing: every lock entry written before this task carries only
+          // { file, servers }, and a stale target has no registry instance to read it from.
+          // Fall back to the *declared* key for this adapter — `declared` is built with
+          // state: null, so it still contains residue instances like opencode:perso, which is
+          // exactly the case Task 9 Step 7 prunes. Without this, writeJsonKey's new
+          // no-key-to-write-under guard turns that prune into `✗ opencode:perso`, exit 1, and
+          // the file keeps its servers.
+          .map(([id, v]) => ({ id, identity: '', file: v.file,
+                               key: v.key ?? declared.find((d) => d.adapter === adapter.id)?.key }))
       : [];
     const targets = [...detected, ...stale];
 
     if (!targets.length) {
-      if (opts.agents.includes(adapter.id)) console.log(`- ${adapter.label}: not installed, nothing to do`);
+      if (opts.agents.includes(adapter.id)) console.log(`- ${adapter.label}: ${describeAdapter(adapter, declared)}, nothing to do`);
       continue;
     }
 
-    const entries = {};
+    const rendered = {};
     // Skips are grouped by reason rather than listed per server: an agent that
     // cannot do secret headers fails the same way fifteen times, and fifteen
     // identical lines bury the two that are actually different.
@@ -784,14 +904,23 @@ async function main() {
       if (skip) {
         skipped.set(skip.text, [...(skipped.get(skip.text) ?? []), name]);
         unexpressible.push(name);
-      } else entries[name] = entry;
+      } else rendered[name] = entry;
     }
     for (const [text, names] of skipped) {
       console.log(`  ! ${adapter.id}: skipped ${names.length} — ${text}\n    ${names.join(', ')}`);
     }
 
     for (const target of targets) {
-      const previous = lock.targets[target.id]?.servers ?? [];
+      // A single-configuration harness needs no special case here: its instance identity
+      // *is* its owner (registry §3.1.4), so "receives what its owner receives" falls out
+      // of the same filter.
+      const entries = {};
+      for (const [name, entry] of Object.entries(rendered)) {
+        const only = audience.get(name);
+        if (only && !only.includes(target.identity)) continue;
+        entries[name] = entry;
+      }
+      const previous = lock.targets[target.id]?.servers ?? superseded.get(target.id)?.servers ?? [];
       const dropped = previous.filter((n) => !(n in entries));
       // Stamp the target before the adapter reads it, so atomicWrite can tell
       // whether the agent that owns the file wrote to it in the meantime.
@@ -810,22 +939,29 @@ async function main() {
       for (const note of result.notes ?? []) console.log(`  ! ${target.id}: ${note}`);
 
       const count = Object.keys(entries).length;
+      // Rendered, but not for this identity: not a skip (the adapter can express it) and
+      // not a drop (it was never meant to be here). Both other cases already have a line.
+      const elsewhere = Object.keys(rendered).length - count;
+      const aside = elsewhere ? ` (${elsewhere} for another identity)` : '';
       const mark = result.changed || opts.dryRun ? '✓' : '·';
       const what = opts.prune
         ? `${opts.dryRun ? 'would remove' : 'removed'} ${dropped.length} server(s)`
         : result.changed || opts.dryRun
-          ? `${opts.dryRun ? 'would write' : 'wrote'} ${count}/${servers.length} servers`
-          : `unchanged — ${count}/${servers.length} servers`;
+          ? `${opts.dryRun ? 'would write' : 'wrote'} ${count}/${servers.length} servers${aside}`
+          : `unchanged — ${count}/${servers.length} servers${aside}`;
       console.log(`${mark} ${target.id.padEnd(20)} ${what} → ${target.file}`);
       // Three different things land in `dropped`, and they are not interchangeable
       // to someone deciding whether something broke: a server parked on purpose, a
       // server deleted from the manifest, and a server this agent stopped being able
       // to express. Say which.
       if (dropped.length && !opts.prune) {
-        const why = (n) =>
-          disabled.has(n) ? 'disabled in the manifest'
-          : known.has(n) ? 'no longer expressible by this agent'
-          : 'removed from the manifest';
+        const why = (n) => {
+          const only = audience.get(n);
+          return disabled.has(n) ? 'disabled in the manifest'
+            : only && !only.includes(target.identity) ? `only for ${only.join(', ')}, and this target is ${target.identity}`
+            : known.has(n) ? 'no longer expressible by this agent'
+            : 'removed from the manifest';
+        };
         const groups = new Map();
         for (const n of dropped) groups.set(why(n), [...(groups.get(why(n)) ?? []), n]);
         for (const [reason, names] of groups) console.log(`    dropped ${names.join(', ')} — ${reason}`);
@@ -837,6 +973,7 @@ async function main() {
       if (count || unexpressible.length) {
         lock.targets[target.id] = {
           file: target.file,
+          ...(target.key && { key: target.key }),
           servers: Object.keys(entries),
           ...(unexpressible.length && { unexpressible }),
         };

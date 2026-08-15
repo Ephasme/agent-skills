@@ -14,7 +14,11 @@ jobs:
           node-version: '22'
 
       - name: Validate the catalog
-        run: node scripts/validate.mjs
+        # --no-registry: the harness registry is machine state in $HOME (yadm
+        # content), not repo content, so there is nothing here to lint — the standing
+        # check is agents-doctor, on the machine. Spelled out rather than defaulted,
+        # so that the same command run locally stays strict.
+        run: node scripts/validate.mjs --no-registry
 
       # Guards against a layout change the validator cannot see: the CLI must
       # still discover every skill from the repo root, and skip none of them.
@@ -41,11 +45,24 @@ jobs:
         run: |
           set -euo pipefail
           fake=$(mktemp -d)
-          mkdir -p "$fake"/{.omp-perso,.omp-work,.codex,.cursor,.gemini} \
+          mkdir -p "$fake"/.omp/profiles/{perso,work}/agent "$fake"/.codex \
+                   "$fake"/.cursor "$fake"/.gemini "$fake"/.agents \
                    "$fake"/.config/{opencode,Code/User}
-          # PI_CONFIG_DIR is a *candidate* target in the omp adapter, not an override,
-          # so a runner that happened to export it would add a target nothing here
-          # asserts on.
+          # Each file below is the probe the fixture registry names: root presence alone is
+          # no longer enough to claim a target (design decision 9), which is the whole point
+          # of the port this step guards.
+          : > "$fake"/.omp/profiles/perso/agent/config.yml
+          : > "$fake"/.omp/profiles/work/agent/config.yml
+          : > "$fake"/.codex/installation_id
+          : > "$fake"/.config/opencode/.probe
+          : > "$fake"/.config/Code/User/settings.json
+          : > "$fake"/.cursor/settings.json
+          : > "$fake"/.gemini/.probe
+          cp mcp/ci-registry.json "$fake"/.agents/harnesses.json
+          # PI_CONFIG_DIR no longer reaches the renderer at all: targets come from the
+          # fixture registry copied above, never from the ambient environment. Unset
+          # anyway, so a runner that exported it cannot make this step differ from a
+          # local run.
           env -u PI_CONFIG_DIR HOME="$fake" node scripts/install-mcp.mjs
           python3 - "$fake" <<'PY'
           import json, re, sys, tomllib, pathlib
@@ -70,7 +87,8 @@ jobs:
           SECRETISH = re.compile(r'key|token|secret|password|session|client[-_]?id|auth', re.I)
 
           for rel, key, agent in [
-              ('.omp-perso/agent/mcp.json', 'mcpServers', 'omp'),
+              ('.omp/profiles/perso/agent/mcp.json', 'mcpServers', 'omp'),
+              ('.omp/profiles/work/agent/mcp.json', 'mcpServers', 'omp'),
               ('.config/opencode/opencode.json', 'mcp', 'opencode'),
               ('.config/Code/User/mcp.json', 'servers', 'vscode'),
               ('.cursor/mcp.json', 'mcpServers', 'cursor'),
@@ -100,7 +118,16 @@ jobs:
           python3 -c "
           import json
           m = json.load(open('mcp/servers.json'))
-          name = next(iter(m['servers']))
+          # Not next(iter(...)): that takes whichever server happens to come first in the
+          # file, and the first few are parked today — disabling an already-disabled
+          # server makes every assertion below pass vacuously, which is the invisible
+          # failure this step exists to prevent. Sorted, so manifest order cannot change
+          # what is tested, and restricted to a server with no 'identities' of its own:
+          # an identity-scoped server never reaches the perso files asserted below.
+          candidates = sorted(n for n, s in m['servers'].items()
+                              if s.get('enabled', True) and not s.get('identities'))
+          assert candidates, 'no enabled, unrestricted server to exercise the removal path'
+          name = candidates[0]
           m['servers'][name]['enabled'] = False
           m['servers'][name]['note'] = 'parked by CI to exercise the removal path'
           json.dump({'name': name, **m}, open('/tmp/off.json', 'w'))
@@ -110,7 +137,7 @@ jobs:
           python3 - "$fake" "$off" <<'PY'
           import json, sys, pathlib
           home, off = pathlib.Path(sys.argv[1]), sys.argv[2]
-          for rel, key in [('.omp-perso/agent/mcp.json', 'mcpServers'),
+          for rel, key in [('.omp/profiles/perso/agent/mcp.json', 'mcpServers'),
                            ('.config/opencode/opencode.json', 'mcp'),
                            ('.config/Code/User/mcp.json', 'servers')]:
               servers = json.loads((home / rel).read_text())[key]

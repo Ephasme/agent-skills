@@ -1,0 +1,53 @@
+{
+  "$comment": "Fixture for .github/workflows/validate.yml's MCP render step. Not this machine's registry — ~/.agents/harnesses.json is, and it is yadm-tracked, not in this repo. Roots here are relative to the throwaway $HOME the workflow builds; probes are files that step creates. Keep one entry per adapter, so the render step below resolves a target for every adapter this repo ships.",
+  "version": 1,
+  "identities": {
+    "perso": { "gh": "gh-perso", "glyph": "P" },
+    "work":  { "gh": "gh-work",  "glyph": "W" }
+  },
+  "harnesses": {
+    "omp": {
+      "label": "Oh My Pi",
+      "root": "~/.omp/profiles/{identity}/agent",
+      "probe": { "file": "{root}/config.yml" },
+      "identities": { "mode": "each" },
+      "identity": { "env": "OMP_PROFILE", "from": "value" },
+      "mcp": { "file": "{root}/mcp.json", "key": "mcpServers", "adapter": "omp" }
+    },
+    "codex": {
+      "label": "Codex",
+      "root": "~/.codex",
+      "probe": { "file": "{root}/installation_id" },
+      "identities": { "mode": "single", "owner": "perso" },
+      "mcp": { "file": "{root}/config.toml", "adapter": "codex" }
+    },
+    "opencode": {
+      "label": "opencode",
+      "root": "~/.config/opencode",
+      "probe": { "file": "{root}/.probe" },
+      "identities": { "mode": "single", "owner": "perso" },
+      "mcp": { "file": "{root}/opencode.json", "key": "mcp", "adapter": "opencode" }
+    },
+    "vscode": {
+      "label": "VS Code",
+      "root": "~/.config/Code/User",
+      "probe": { "file": "{root}/settings.json" },
+      "identities": { "mode": "single", "owner": "perso" },
+      "mcp": { "file": "{root}/mcp.json", "key": "servers", "adapter": "vscode" }
+    },
+    "cursor": {
+      "label": "Cursor",
+      "root": "~/.cursor",
+      "probe": { "file": "{root}/settings.json" },
+      "identities": { "mode": "single", "owner": "perso" },
+      "mcp": { "file": "{root}/mcp.json", "key": "mcpServers", "adapter": "cursor" }
+    },
+    "gemini-cli": {
+      "label": "Gemini CLI",
+      "root": "~/.gemini",
+      "probe": { "file": "{root}/.probe" },
+      "identities": { "mode": "single", "owner": "perso" },
+      "mcp": { "file": "{root}/settings.json", "key": "mcpServers", "adapter": "gemini-cli" }
+    }
+  }
+}
