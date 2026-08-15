@@ -225,10 +225,10 @@
     },
     "notion": {
       "purpose": "workspace",
-      "description": "Notion workspace — work only; authorization is a per-profile OAuth grant, not a header",
+      "description": "Notion workspace — both identities; authorization is a per-profile OAuth grant, not a header, so each identity grants separately",
       "transport": "http",
       "url": "https://mcp.notion.com/mcp",
-      "identities": ["work"]
+      "identities": ["work", "perso"]
     }
   }
 }
