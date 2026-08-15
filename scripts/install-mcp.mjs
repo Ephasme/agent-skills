@@ -369,13 +369,15 @@ async function atomicWrite(file, content, opts) {
     }
   }
 
-  // A file this script creates starts at 0600 — it holds credential *references*
-  // today and the credentials themselves under `--materialize`, and neither is
-  // anything to hand every other local account. An existing file keeps the mode its
-  // own agent chose, which is usually stricter for the same reason.
+  // A file this script writes never grants group or other, whatever it finds on disk:
+  // it holds credential *references* today and the credentials themselves under
+  // `--materialize`, and neither is anything to hand every other local account. An
+  // existing file keeps any bit it chose that is *stricter* than 0600 — clamping with
+  // `&` preserves 0400 and narrows 0644 — so an agent can tighten this but not widen
+  // it. Inheriting the found mode outright is what let a target created at the umask
+  // stay 0644 through every subsequent render.
   let mode = 0o600;
-  if (existsSync(file)) mode = (await stat(file)).mode & 0o777;
-  if (opts.materialize) mode &= 0o600;
+  if (existsSync(file)) mode = (await stat(file)).mode & 0o600;
 
   // The backup inherits the target's secrecy — after a `--materialize` run it holds
   // the same plaintext credentials the target does.
