@@ -453,10 +453,20 @@ async function checkRegistry() {
       if (!isObject(h.sessions)) {
         bad(`harness \`${name}\`: sessions must be an object`);
       } else {
-        for (const field of ['launcher', 'comm', 'events']) {
+        for (const field of ['launcher', 'comm']) {
           if (typeof h.sessions[field] !== 'string' || !h.sessions[field]) {
             bad(`harness \`${name}\`: sessions.${field} must be a non-empty string`);
           }
+        }
+        // events is the one optional field, and null is the only accepted absence — a
+        // harness may hold a tmux pane and speak no event vocabulary, which is what
+        // opencode declares. Both readers stop on a dropped key, so this stops too:
+        // "no producer" is a fact worth writing, and a typo is not that fact.
+        if (!('events' in h.sessions)) {
+          bad(`harness \`${name}\`: sessions.events is missing — declare null for no event vocabulary`);
+        } else if (h.sessions.events !== null
+                   && (typeof h.sessions.events !== 'string' || !h.sessions.events)) {
+          bad(`harness \`${name}\`: sessions.events must be a non-empty string or null`);
         }
       }
     }

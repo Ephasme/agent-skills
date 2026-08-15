@@ -425,7 +425,22 @@ export function dump(home) {
         }
         return resolve(v, { harness: inst.harness, identity: inst.identity, reg });
       };
-      lines.push(`sessions ${inst.id} launcher=${s('launcher')} comm=${s('comm')} events=${s('events')}`);
+      // events is the one optional field of the three, and `null` is the only accepted
+      // absence — agent_registry._optional(), with both wordings pinned there too. A
+      // harness may hold a pane and speak no event vocabulary; a dropped key says
+      // nothing at all, and the two are different facts.
+      const spoken = () => {
+        if (!('events' in h.sessions)) {
+          throw at(reg, `harnesses.${inst.harness}.sessions.events is missing (declare null for none)`);
+        }
+        const v = h.sessions.events;
+        if (v === null) return '-';
+        if (typeof v !== 'string' || !v) {
+          throw at(reg, `harnesses.${inst.harness}.sessions.events is not a non-empty string or null`);
+        }
+        return resolve(v, { harness: inst.harness, identity: inst.identity, reg });
+      };
+      lines.push(`sessions ${inst.id} launcher=${s('launcher')} comm=${s('comm')} events=${spoken()}`);
     }
   }
 
@@ -601,6 +616,18 @@ function selftest() {
       `mcp beta:work ${home}/.beta/config.toml key=- adapter=beta`);
     check('sessions substitutes {identity}', line('sessions', 'alpha:work'),
       'sessions alpha:work launcher=alpha-work comm=alpha events=alpha');
+    // `events: null` is the explicit "no producer": a harness that holds a pane and
+    // reports nothing from it, which agent_registry._optional() accepts and prints as the
+    // same `-` every absent optional value gets. The other two absences are faults, with
+    // the wordings its selftest pins.
+    check('sessions with no vocabulary renders events=-',
+      dump(fixture((r) => { r.harnesses.alpha.sessions.events = null; }))
+        .split('\n').find((l) => l.startsWith('sessions alpha:perso ')),
+      'sessions alpha:perso launcher=alpha-perso comm=alpha events=-');
+    refuses('sessions.events dropped entirely',
+      () => dump(fixture((r) => { delete r.harnesses.alpha.sessions.events; })));
+    refuses('sessions.events as an empty string',
+      () => dump(fixture((r) => { r.harnesses.alpha.sessions.events = ''; })));
     check('an empty selection list renders -', line('selection', 'work'),
       'selection work skills=one agents=-');
 
