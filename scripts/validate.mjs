@@ -12,37 +12,21 @@
 //   https://agentskills.io/specification
 //   https://platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices
 //
-// Usage: node scripts/validate.mjs [--quiet] [--home DIR] [--no-registry]
+// Usage: node scripts/validate.mjs [--quiet]
 
 import { readdir, readFile, stat } from 'node:fs/promises';
-import { homedir } from 'node:os';
 import { join, relative, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { ADAPTERS, validateManifest } from './install-mcp.mjs';
-import { RegistryError, harnesses, identities, load, selection } from './registry.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const SKILLS = join(ROOT, 'skills');
-const MCP = join(ROOT, 'mcp', 'servers.json');
 const QUIET = process.argv.includes('--quiet');
-// The harness registry is a machine fact, not repo content: ~/.agents/harnesses.json
-// is yadm content and no checkout carries it. Two flags follow from that.
-//   --home DIR      lint a fixture tree instead of this machine. There is no test
-//                   runner here, so this is how checkRegistry() is tested at all.
-//   --no-registry   there is no registry to lint. CI is the only such place, and
-//                   .github/workflows/validate.yml passes it for that reason and no
-//                   other: locally a missing registry is a hard failure, because a
-//                   consumer that degrades to an empty harness list reports success
-//                   having checked nothing. The standing registry check is
-//                   agents-doctor, which runs where the registry actually lives.
-const homeArg = process.argv.indexOf('--home');
-if (homeArg !== -1 && !process.argv[homeArg + 1]) {
-  console.error('validate.mjs: --home needs a directory');
-  process.exit(2);
-}
-const HOME = homeArg === -1 ? homedir() : process.argv[homeArg + 1];
-const NO_REGISTRY = process.argv.includes('--no-registry');
+// This lints repo content and nothing else. It used to also lint the harness
+// registry and the MCP manifest, which were machine facts no checkout carried —
+// hence a --home fixture flag and a --no-registry escape for CI. Both records were
+// deleted on 2026-08-16 when ~/.config/tack/config.yaml became the only one, and
+// `tack doctor` checks it where it actually lives.
 
 // Categories organise this repo only; installed skills are flat. The set is
 // deliberate — a new one is a decision, not a side effect of `mkdir`.
@@ -303,325 +287,6 @@ async function checkSkill(category, slug) {
   }
 }
 
-// The MCP manifest is committed, so the one failure that matters is a credential
-// pasted in as a literal instead of written as {"env": "NAME"}. Everything else is
-// shape validation, shared with the renderer so the two cannot disagree.
-async function checkMcpManifest() {
-  let manifest;
-  try {
-    manifest = JSON.parse(await readFile(MCP, 'utf8'));
-  } catch (e) {
-    if (e.code === 'ENOENT') return { total: 0, off: 0 }; // the manifest is optional
-    fail(MCP, `is not valid JSON (${e.message})`);
-    return { total: 0, off: 0 };
-  }
-
-  validateManifest(manifest, (msg) => fail(MCP, msg));
-
-  const SECRETY = /token|key|secret|password|session|auth|bearer|pat\b|credential/i;
-  for (const [name, def] of Object.entries(manifest.servers ?? {})) {
-    for (const [slot, bag] of [['header', def.headers], ['env', def.env]]) {
-      for (const [k, v] of Object.entries(bag ?? {})) {
-        if (typeof v === 'string' && SECRETY.test(k)) {
-          fail(MCP, `server \`${name}\`: ${slot} \`${k}\` is a literal — use {"env": "NAME"}`);
-        }
-      }
-    }
-  }
-  const defs = Object.values(manifest.servers ?? {});
-  return { total: defs.length, off: defs.filter((d) => d.enabled === false).length };
-}
-
-// One harness list, in ~/.agents/harnesses.json, read by five tools that each used
-// to carry a list of their own. None of them can check it — they consume it — so it
-// is checked here. Two of these rules are not shape validation and carry more weight
-// than the rest:
-//   * an adapter named by no entry renders nothing (design decision 4). Without this
-//     check ADAPTERS drifts back into being a second harness list, which is the
-//     duplication the registry exists to remove.
-//   * mcp.key is required for exactly the adapters whose writer is writeJsonKey and
-//     forbidden for the others (§3.1.6), so codex's omission — it owns a delimited
-//     TOML block, not a JSON key — is verified rather than merely tolerated.
-// Errors are pushed with a fixed prefix rather than through fail(), whose
-// relative(ROOT, file) would render a $HOME path as ../../../.agents/harnesses.json.
-const MODES = new Set(['each', 'single']);
-const IDENTIFIER = /^[a-z][a-z0-9-]*$/;
-// Not imported from registry.mjs: that module's own isObject is a private helper,
-// unexported by design (§7's boundary — checkRegistry owns shape validation, the
-// reader owns only the envelope), so the same one-liner is declared again here.
-const isObject = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
-
-async function checkRegistry() {
-  const bad = (msg) => errors.push(`harnesses.json: ${msg}`);
-  const badSelection = (msg) => errors.push(`selection.json: ${msg}`);
-
-  let reg;
-  try {
-    reg = await load(HOME);
-  } catch (e) {
-    if (!(e instanceof RegistryError)) throw e;
-    errors.push(e.message); // already names the file and the reason
-    return null;
-  }
-
-  const ids = identities(reg);
-  const declared = Object.keys(ids).join(', ');
-  const known = new Map(ADAPTERS.map((a) => [a.id, a]));
-  const claimed = new Set();
-  const hs = harnesses(reg);
-
-  // ---- identities: shared labels for account selection and tab rendering ----
-  for (const [identity, spec] of Object.entries(ids)) {
-    if (!IDENTIFIER.test(identity)) {
-      bad(`identity \`${identity}\`: name must match ^[a-z][a-z0-9-]*$`);
-    }
-    if (!isObject(spec)) {
-      bad(`identity \`${identity}\`: must be an object`);
-      continue;
-    }
-    for (const field of ['gh', 'glyph']) {
-      if (typeof spec[field] !== 'string' || !spec[field]) {
-        bad(`identity \`${identity}\`: ${field} must be a non-empty string`);
-      }
-    }
-  }
-
-  for (const [name, h] of Object.entries(hs)) {
-    if (!IDENTIFIER.test(name)) {
-      bad(`harness \`${name}\`: name must match ^[a-z][a-z0-9-]*$`);
-    }
-    if (typeof h.label !== 'string' || !h.label) {
-      bad(`harness \`${name}\`: label must be a non-empty string`);
-    }
-    if (typeof h.root !== 'string' || !h.root) {
-      bad(`harness \`${name}\`: root must be a non-empty string`);
-    }
-
-    // ---- identities: the mode, and the owner a single-configuration harness names --
-    const mode = h.identities?.mode;
-    if (!MODES.has(mode)) {
-      bad(`harness \`${name}\`: identities.mode \`${mode}\` is neither \`each\` nor \`single\``);
-    } else if (mode === 'single') {
-      const owner = h.identities.owner;
-      if (!owner) bad(`harness \`${name}\`: identities.mode \`single\` needs an \`owner\``);
-      else if (!(owner in ids)) {
-        bad(`harness \`${name}\`: owner \`${owner}\` is not a declared identity (declared: ${declared})`);
-      }
-    }
-    // ---- process self-report: either both fields make sense, or the capability is absent ----
-    if (h.identity !== undefined) {
-      if (!isObject(h.identity)
-          || !['value', 'root'].includes(h.identity.from)
-          || typeof h.identity.env !== 'string'
-          || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(h.identity.env)) {
-        bad(`harness \`${name}\`: identity.from must be \`value\` or \`root\` and identity.env must name an environment variable`);
-      }
-    }
-
-    // ---- probe: presence is exclusive, and the selected value has a usable type ----
-    const probe = isObject(h.probe) ? h.probe : {};
-    const file = probe.file;
-    const bin = probe.bin;
-    const hasFile = Object.hasOwn(probe, 'file');
-    const hasBin = Object.hasOwn(probe, 'bin');
-    const chosen = hasFile ? file : bin;
-    if (hasFile === hasBin || typeof chosen !== 'string' || !chosen) {
-      bad(`harness \`${name}\`: probe needs exactly one non-empty string \`file\` or \`bin\``);
-    }
-
-    // ---- declared capabilities: presence means one real, usable shape ----
-    for (const leaf of ['skills', 'agents']) {
-      const cap = h[leaf];
-      if (cap === undefined) continue;
-      if (!isObject(cap)) {
-        bad(`harness \`${name}\`: ${leaf} must be an object`);
-        continue;
-      }
-      const native = cap.native === true;
-      const hasDir = typeof cap.dir === 'string' && cap.dir.length > 0;
-      if (leaf === 'agents' && native) {
-        bad(`harness \`${name}\`: agents cannot be native`);
-      } else if (native === hasDir) {
-        bad(`harness \`${name}\`: ${leaf} needs exactly one of native: true or a non-empty dir`);
-      }
-      if (cap.native !== undefined && cap.native !== true) {
-        bad(`harness \`${name}\`: ${leaf}.native, when present, must be true`);
-      }
-    }
-
-    if (h.sessions !== undefined) {
-      if (!isObject(h.sessions)) {
-        bad(`harness \`${name}\`: sessions must be an object`);
-      } else {
-        for (const field of ['launcher', 'comm']) {
-          if (typeof h.sessions[field] !== 'string' || !h.sessions[field]) {
-            bad(`harness \`${name}\`: sessions.${field} must be a non-empty string`);
-          }
-        }
-        // events is one of the two optional fields, and null is the only accepted
-        // absence — a harness may hold a tmux pane and speak no event vocabulary, which
-        // is what the tabs-only shape declares. Both readers stop on a dropped key, so
-        // this stops too: "no vocabulary" is a fact worth writing, and a typo is not
-        // that fact.
-        if (!('events' in h.sessions)) {
-          bad(`harness \`${name}\`: sessions.events is missing — declare null for no event vocabulary`);
-        } else if (h.sessions.events !== null
-                   && (typeof h.sessions.events !== 'string' || !h.sessions.events)) {
-          bad(`harness \`${name}\`: sessions.events must be a non-empty string or null`);
-        }
-        // producer is the other one: the file that actually calls agent-notify — omp's
-        // extension, opencode's plugin — or null where the harness has no file to
-        // install. Same rule, same reason. It is what catches the quietest failure in
-        // this setup: a harness declaring a vocabulary whose producer was never
-        // installed launches, draws its pane, and reads 💤 forever.
-        if (!('producer' in h.sessions)) {
-          bad(`harness \`${name}\`: sessions.producer is missing — declare null for no producer file`);
-        } else if (h.sessions.producer !== null
-                   && (typeof h.sessions.producer !== 'string' || !h.sessions.producer)) {
-          bad(`harness \`${name}\`: sessions.producer must be a non-empty string or null`);
-        } else if (h.sessions.producer !== null
-                   && (h.sessions.events === null || !('events' in h.sessions))) {
-          // Coherence between the two, checked here and in neither reader: a producer
-          // reports INTO a vocabulary, so a file declared with no vocabulary to report
-          // into is read by nothing. The reverse is legal and live — claude-code
-          // declares events `claude` with a null producer, because its hook entries
-          // lived inside settings.json and there was never a second file to look for.
-          bad(`harness \`${name}\`: sessions.producer \`${h.sessions.producer}\` reports into no event vocabulary (sessions.events is null) — a producer nothing listens for is dead code`);
-        }
-      }
-    }
-
-    // ---- templates: ~ at position 0, {identity}, {root}, nothing else (§3.2) ----
-    // A surviving `{` is fatal at resolution time in both readers, so it is a lint
-    // failure here. `omp-{profile}` — tmux-agent's spelling before the port — is the
-    // collision this catches first.
-    for (const [where, template] of [
-      ['root', h.root],
-      ['probe.file', file],
-      ['skills.dir', h.skills?.dir],
-      ['agents.dir', h.agents?.dir],
-      ['mcp.file', h.mcp?.file],
-      ['sessions.launcher', h.sessions?.launcher],
-      ['sessions.comm', h.sessions?.comm],
-      ['sessions.events', h.sessions?.events],
-      ['sessions.producer', h.sessions?.producer],
-    ]) {
-      if (typeof template !== 'string') continue;
-      const stray = template.replaceAll('{identity}', '').replaceAll('{root}', '').match(/\{[^}]*\}?/);
-      if (stray) {
-        bad(`harness \`${name}\`: ${where} \`${template}\` contains \`${stray[0]}\` — the only substitutions are \`~\` at position 0, \`{identity}\` and \`{root}\``);
-      }
-      if (template.lastIndexOf('~') > 0) {
-        bad(`harness \`${name}\`: ${where} \`${template}\` has a \`~\` past position 0, where it does not expand`);
-      }
-      if (where === 'root' && template.includes('{root}')) {
-        bad(`harness \`${name}\`: root \`${template}\` uses {root} — substitution is never recursive`);
-      }
-    }
-
-    // ---- mcp: a real adapter, and a key exactly when the adapter writes one ----
-    if (h.mcp !== undefined) {
-      if (!isObject(h.mcp)) {
-        bad(`harness \`${name}\`: mcp must be an object`);
-        continue;
-      }
-      if (typeof h.mcp.file !== 'string' || !h.mcp.file) {
-        bad(`harness \`${name}\`: mcp.file must be a non-empty string`);
-      }
-      if (typeof h.mcp.adapter !== 'string' || !h.mcp.adapter) {
-        bad(`harness \`${name}\`: mcp.adapter must be a non-empty string`);
-        continue;
-      }
-      const adapter = known.get(h.mcp.adapter);
-      if (!adapter) {
-        bad(`harness \`${name}\`: mcp.adapter \`${h.mcp.adapter}\` names no adapter in install-mcp.mjs (known: ${[...known.keys()].join(', ')})`);
-      } else {
-        claimed.add(adapter.id);
-        if (adapter.keyed && (typeof h.mcp.key !== 'string' || !h.mcp.key)) {
-          bad(`harness \`${name}\`: adapter \`${adapter.id}\` writes a keyed JSON object — mcp.key is required`);
-        }
-        if (!adapter.keyed && h.mcp.key !== undefined) {
-          bad(`harness \`${name}\`: adapter \`${adapter.id}\` writes no keyed JSON object — mcp.key \`${h.mcp.key}\` would be ignored`);
-        }
-      }
-    }
-  }
-
-  for (const a of ADAPTERS) {
-    if (!claimed.has(a.id)) {
-      bad(`adapter \`${a.id}\` is named by no harness — an adapter with no registry entry renders nothing; declare the harness or delete the adapter from install-mcp.mjs`);
-    }
-  }
-
-  // ---- selection: every name resolves to something that exists ----
-  // selection() itself raises RegistryError for a non-object entry — the same rule
-  // load() applies to harnesses, and the same class both readers agree on (parity
-  // with agent_registry.py). Caught here rather than left to crash the process, so
-  // one malformed identity is a lint line, not the whole run.
-  let sel;
-  try {
-    sel = await selection(HOME);
-  } catch (e) {
-    if (!(e instanceof RegistryError)) throw e;
-    const m = /: (\S+) is not an object$/.exec(e.message);
-    badSelection(m ? `${m[1]}: must be an object` : e.message);
-    sel = {};
-  }
-  const store = join(HOME, '.agents', 'skills');
-  let stored = new Set();
-  try {
-    stored = new Set(
-      (await readdir(store, { withFileTypes: true }))
-        .filter((e) => e.isDirectory() || e.isSymbolicLink())
-        .map((e) => e.name),
-    );
-  } catch {
-    // No store at all: every selected name is reported below, which is the right
-    // answer — bootstrap.sh builds the store before replaying selection into links.
-  }
-
-  for (const [identity, want] of Object.entries(sel)) {
-    if (!(identity in ids)) {
-      badSelection(`\`${identity}\` is not a declared identity (declared: ${declared})`);
-      continue;
-    }
-    if (!isObject(want)) {
-      badSelection(`${identity}: must be an object`);
-      continue;
-    }
-    for (const [leaf, source, kind] of [
-      ['skills', want.skills, 'skill'],
-      ['agents', want.agents, 'agent'],
-    ]) {
-      if (!Array.isArray(source)
-          || new Set(source).size !== source.length
-          || source.some((name) => typeof name !== 'string' || !IDENTIFIER.test(name))) {
-        badSelection(`${identity}: ${leaf} must be an array of unique identifiers`);
-        continue;
-      }
-      for (const name of source) {
-        if (leaf === 'skills') {
-          if (!stored.has(name)) {
-            badSelection(`${identity}: skill \`${name}\` is not in the store (${join(store, name)})`);
-          }
-          continue;
-        }
-        // Agents are this repo's files rather than store entries, and the linter is the
-        // one consumer that can see them.
-        const file = join(ROOT, 'agents', `${name}.md`);
-        try {
-          const info = await stat(file);
-          if (!info.isFile()) throw new Error('not a file');
-        } catch {
-          badSelection(`${identity}: ${kind} \`${name}\` has no file in this repo (${relative(ROOT, file)})`);
-        }
-      }
-    }
-  }
-
-  return { harnesses: Object.keys(hs).length, identities: Object.keys(ids).length };
-}
-
 async function main() {
   const categories = (await readdir(SKILLS, { withFileTypes: true }))
     .filter((e) => e.isDirectory())
@@ -638,9 +303,6 @@ async function main() {
     for (const slug of slugs) await checkSkill(category, slug);
   }
 
-  const mcp = await checkMcpManifest();
-  const reg = NO_REGISTRY ? null : await checkRegistry();
-
   for (const w of warnings) console.warn(`  ! ${w}`);
   if (errors.length) {
     console.error(`\n✗ ${errors.length} problem(s):\n`);
@@ -648,11 +310,7 @@ async function main() {
     process.exit(1);
   }
   if (!QUIET) {
-    const off = mcp.off ? ` (${mcp.off} disabled)` : '';
-    const registry = NO_REGISTRY
-      ? ', registry lint skipped (--no-registry)'
-      : `, ${reg.harnesses} harnesses × ${reg.identities} identities`;
-    console.log(`✓ ${found.size} skills across ${categories.length} categories, ${mcp.total} MCP servers${off}${registry}, no problems`);
+    console.log(`✓ ${found.size} skills across ${categories.length} categories, no problems`);
   }
 }
 

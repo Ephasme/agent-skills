@@ -9,28 +9,26 @@
 # ~/.omp/profiles/{perso,work}/agent/skills/<name> and
 # ~/.opencode/profiles/{perso,work}/config/opencode/skills/<name>; codex reads
 # ~/.agents/skills natively and is posted no link at all. For omp those
-# links are the only user-level skill source it reads (~/.agents/omp/config.shared.yml
+# links are the only user-level skill source it reads (~/.config/tack/harness/omp/config.shared.yml
 # turns the foreign ones off). The CLI produces the store on its own — every
 # "universal" agent's skills dir *is* ~/.agents/skills — and it links the agents it
 # detects. It detects none of those four directories, so installing a skill activates
 # it nowhere. That is deliberate: each identity links only the skills that belong in
 # it, and work and perso do not get the same set.
 #
-# So this script rebuilds the store, then replays activation. Which identity gets
-# which skill is not in the lock and never was: it is declared in
-# ~/.agents/selection.json — yadm content, like the two locks — and
-# ~/.local/bin/skills is the only thing that turns that declaration into symlinks.
-# The symlinks themselves are not tracked: ~/.gitignore excludes each harness's
-# activation directory, because an output that can disagree with its source has no
-# business being carried. So a fresh machine clones the declaration and none of the
-# links, and closing that gap is this script's second half: it calls `skills
-# reconcile` for it and links nothing itself.
+# So this script rebuilds the store, then hands activation to tack. Which identity
+# gets which skill is not in the lock and never was: it is declared in
+# ~/.config/tack/config.yaml — yadm content, like the lock — and `tack apply` is the
+# only thing that turns that declaration into symlinks. The symlinks themselves are
+# not tracked: ~/.gitignore excludes each harness's activation directory, because an
+# output that can disagree with its source has no business being carried. So a fresh
+# machine clones the declaration and none of the links, and closing that gap is this
+# script's second half.
 #
-# The install pass below still calls npx directly and deliberately NOT that wrapper,
-# for the reason it always did: `skills add` activates whatever the run adds, which
-# on a fresh machine is everything, in every identity. Reconciliation is a separate
-# subcommand precisely so this script can ask for the second half without the first
-# — it posts the links selection.json names, and no others.
+# The install pass below calls npx directly and deliberately not ~/.local/bin/skills,
+# for a reason that has outlived its original one: that wrapper injects the same
+# flags, but it also prints a per-skill "now add this to selection" nudge that is
+# noise when the selection is already declared and this is replaying it wholesale.
 #
 # The install list is derived from the lock rather than hardcoded, so a package
 # added to it is reinstalled without this script also being edited by hand. The
@@ -147,49 +145,35 @@ else
   done 3<<<"$groups"
 fi
 
-# MCP servers. Deliberately after the skills and independent of them: this renders
-# mcp/servers.json into each agent's own config format. It needs no credentials —
-# what it writes are references to environment variables, not their values — so it
-# runs correctly before `yadm decrypt` has restored ~/.config/secrets.zsh.
-echo "==> MCP servers"
-node "$(dirname "$0")/install-mcp.mjs"
-
-# Activation. The store is content; which profile gets which skill is a separate
-# declared fact, and `tack apply` is the one code path that turns it into symlinks.
-# It is called rather than reimplemented here because it knows the three things this
-# script does not: which harnesses are installed, which read ~/.agents/skills
-# natively and get no link at all, and which are residue and must never be written
-# into.
+# Activation, and the MCP servers with it. Both are one command now: the store is
+# content, and which profile gets which skill — and which harness gets which MCP
+# server, extension and shell shortcut — is declared in ~/.config/tack/config.yaml.
+# `tack apply` is the one code path that turns that declaration into symlinks and
+# rendered files, and it is called rather than reimplemented here because it knows
+# the three things this script does not: which harnesses are installed, which read
+# ~/.agents/skills natively and get no link at all, and which are residue and must
+# never be written into.
 #
-# This replaces the "in the store but linked by no profile" report that used to sit
-# here. That report hard-coded `for p in perso work` over
-# ~/.omp/profiles/$p/agent/skills — one of the harness lists the registry exists to
-# delete — and agents-doctor answers the same question against selection.json,
-# precisely, in the very command the last line of this script points at.
-SELECTION=$HOME/.agents/selection.json
+# The MCP render used to be a separate `node install-mcp.mjs` pass over
+# mcp/servers.json. That manifest and that renderer were deleted on 2026-08-16 when
+# config.yaml became the only record; apply writes those files now, and like the old
+# pass it needs no credentials — what it writes are references to environment
+# variables, not their values — so it is correct before `yadm decrypt` has restored
+# ~/.config/secrets.zsh.
 echo
-if [ ! -s "$SELECTION" ]; then
-  # Nothing to replay, and — since the links stopped being tracked — nothing that
-  # `yadm clone` restored either: such a machine ends with the store built and every
-  # skill activated nowhere. Not an error here, and not silent either.
-  echo "==> Activation: no $SELECTION — nothing to replay"
-elif ! command -v skills >/dev/null 2>&1; then
-  # Loud on purpose. A selection that exists and cannot be replayed leaves the store
-  # populated and every skill activated nowhere: this script's worst outcome and its
-  # least visible one. ~/.local/bin is yadm content, restored by `yadm clone`.
-  echo "error: $SELECTION exists but the \`skills\` wrapper is not on PATH — ~/.local/bin is yadm content; check 'yadm status'." >&2
+if ! command -v tack >/dev/null 2>&1; then
+  # Loud on purpose. A store that cannot be activated leaves every skill installed
+  # and visible nowhere: this script's worst outcome and its least visible one.
+  echo "error: tack is not on PATH — install it with \`uv tool install ~/code/perso/tack\`, then re-run." >&2
   exit 1
-else
-  echo "==> Activation (via tack)"
-  # `skills reconcile` was deprecated by the 2026-08-15 tack cutover: tack owns the
-  # activation links now, and two writers over one set of links diverge silently.
-  #
-  # No redirection or fd juggling needed: this is outside the fd-3 loop above, and
-  # `tack apply` reads no stdin with --yes. A non-zero exit aborts the script under
-  # `set -e` (line 51), which is the intent — a failed reconciliation is not a
-  # cosmetic problem.
-  tack apply --yes
 fi
+echo "==> Activation, MCP and shortcuts (tack apply)"
+# No redirection or fd juggling needed: this is outside the fd-3 loop above, and
+# `tack apply` reads no stdin with --yes. A non-zero exit aborts the script under
+# `set -e` (line 51), which is the intent — a failed reconciliation is not a
+# cosmetic problem. It is idempotent: on a converged machine it prints "nothing to
+# do", which is why it is not gated on any file existing.
+tack apply --yes
 
 echo
-echo "Done. Verify with: agents-doctor"
+echo "Done. Verify with: tack doctor"

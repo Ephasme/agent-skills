@@ -92,15 +92,15 @@ catalog.
 
 Step 1 also links the agents the CLI *detects*. It does not detect
 `~/.omp/profiles/{perso,work}/agent`, so an install activates a skill in neither profile — hence
-step 2. That tree is also the whole of activation: `~/.agents/omp/config.shared.yml` sets
+step 2. That tree is also the whole of activation: `~/.config/tack/harness/omp/config.shared.yml` sets
 `skills.enableClaudeUser`, `enableCodexUser` and `enableAgentsUser` to `false`, so a profile's own
 `agent/skills` directory is the only user-level source omp reads. A skill in the store that no
 profile links is installed and offered to nothing, silently. The link is absolute, like every
 other link in that directory.
 
-The step-2 symlinks are derived output, not yadm content: `~/.agents/selection.json` records
-which profile gets which skill, and `skills reconcile` rebuilds every activation link from it —
-the same operation `scripts/bootstrap.sh` runs on a fresh machine.
+The step-2 symlinks are derived output, not yadm content: `~/.config/tack/config.yaml` records
+which profile gets which skill, under its `selection:` block, and `tack apply` rebuilds every
+activation link from it — the same operation `scripts/bootstrap.sh` runs on a fresh machine.
 
 Other agents are named the same way — the CLI's own names (`gemini-cli`, not `gemini`);
 `npx skills add . -a bogus` prints the full list of the ~75 it accepts.
@@ -114,30 +114,30 @@ npx skills add "$SRC" -s spec-to-pr                          # one skill, projec
 
 ## MCP servers
 
-`mcp/servers.json` is the canonical set. No agent reads it —
-`node scripts/install-mcp.mjs` renders it into each installed agent's own config.
+They are no longer in this repo. `mcp/servers.json` and `scripts/install-mcp.mjs` were deleted on
+2026-08-16: the servers are declared in the `mcp:` block of `~/.config/tack/config.yaml` and
+rendered into each installed harness's own config by `tack apply`, which is also what posts the
+activation symlinks above. One record, one command, one place to look when a server is missing
+somewhere.
 
 ```sh
-node scripts/install-mcp.mjs --list       # targets, and what each can express
-node scripts/install-mcp.mjs --dry-run    # what would change
-node scripts/install-mcp.mjs              # write every detected target
-node scripts/install-mcp.mjs -a codex     # one agent
-node scripts/install-mcp.mjs --prune      # remove everything it wrote
+tack plan                # what would change, including every MCP file
+tack apply               # write it
+tack doctor              # every {env: NAME} exported, every stdio command on PATH
 ```
 
 ### Turning one off
 
-`"enabled": false` on a server parks it — rendered nowhere, and removed from every agent that
-already has it the next time the renderer runs.
+`enabled: false` on a server parks it — rendered nowhere, and removed from every harness that
+already has it the next time `tack apply` runs.
 
-```json
-"bank": {
-  "enabled": false,
-  "note": "2026-07-31: bank.loup-peluso.com has no A record — the host is gone, not just down. Re-enable once it resolves.",
-  "transport": "http",
-  "url": "https://bank.loup-peluso.com/mcp",
-  …
-}
+```yaml
+  bank:
+    enabled: false
+    note: "2026-07-31: bank.loup-peluso.com has no A record — the host is gone, not
+      just down. Re-enable once it resolves."
+    transport: http
+    url: https://bank.loup-peluso.com/mcp
 ```
 
 Deleting the entry uninstalls it too, and the difference is the definition: most reasons to switch
@@ -145,7 +145,7 @@ a server off are temporary (the origin is down, the upstream package is broken, 
 season of work), and re-adding it later means reconstructing the URL and the header names from
 nothing. Parked is the recoverable version of the same act.
 
-`note` is required on a disabled server, and the validator enforces it. A parked entry with no
+`note` is required on a disabled server, and tack refuses to load a config without it. A parked entry with no
 stated reason is the one that never gets switched back on, because nobody is left knowing what
 would have to be true first — so the note says what that is, with the date it stopped being true.
 `--list` prints them.
@@ -327,8 +327,9 @@ that used to carry these skills, removed from the dotfiles on 2026-07-31 in yadm
 (still restorable with `yadm checkout debe473 -- .agents/plugins`). They are not stored in that
 shape any more, because a plugin's `.mcp.json` is loaded only by the agent whose plugin system
 ships it — and it was carrying the servers for exactly one of them. The manifest plus the
-renderer is the agent-neutral replacement: every harness's MCP file is rendered rather than
-hand-maintained, and where each one lives is declared in `~/.agents/harnesses.json`.
+renderer was the agent-neutral replacement: every harness's MCP file rendered rather than
+hand-maintained, from one declaration. Both moved into `~/.config/tack/config.yaml` on
+2026-08-16 — same design, one record fewer.
 
 **Third-party skills.** One is installed: `gnhf`, from `kunchenguid/gnhf`, tracked by name in
 `~/.agents/.skill-lock.json` rather than vendored here — a copy in this repo would fork it off

@@ -14,11 +14,7 @@ jobs:
           node-version: '22'
 
       - name: Validate the catalog
-        # --no-registry: the harness registry is machine state in $HOME (yadm
-        # content), not repo content, so there is nothing here to lint — the standing
-        # check is agents-doctor, on the machine. Spelled out rather than defaulted,
-        # so that the same command run locally stays strict.
-        run: node scripts/validate.mjs --no-registry
+        run: node scripts/validate.mjs
 
       # Guards against a layout change the validator cannot see: the CLI must
       # still discover every skill from the repo root, and skip none of them.
@@ -36,116 +32,6 @@ jobs:
             echo "::error::expected $expected skills, CLI reported otherwise"
             exit 1
           fi
-
-      # The MCP renderer's failure mode is silent: a config that parses but carries
-      # the literal string `${TOKEN}` as a credential. Render into a throwaway HOME
-      # with every agent "installed", then assert each file parses and that no
-      # placeholder survived into a target that cannot expand it.
-      - name: MCP render
-        run: |
-          set -euo pipefail
-          fake=$(mktemp -d)
-          mkdir -p "$fake"/.omp/profiles/{perso,work}/agent "$fake"/.codex \
-                   "$fake"/.cursor "$fake"/.gemini "$fake"/.agents \
-                   "$fake"/.config/{opencode,Code/User}
-          # Each file below is the probe the fixture registry names: root presence alone is
-          # no longer enough to claim a target (design decision 9), which is the whole point
-          # of the port this step guards.
-          : > "$fake"/.omp/profiles/perso/agent/config.yml
-          : > "$fake"/.omp/profiles/work/agent/config.yml
-          : > "$fake"/.codex/installation_id
-          : > "$fake"/.config/opencode/.probe
-          : > "$fake"/.config/Code/User/settings.json
-          : > "$fake"/.cursor/settings.json
-          : > "$fake"/.gemini/.probe
-          cp mcp/ci-registry.json "$fake"/.agents/harnesses.json
-          # PI_CONFIG_DIR no longer reaches the renderer at all: targets come from the
-          # fixture registry copied above, never from the ambient environment. Unset
-          # anyway, so a runner that exported it cannot make this step differ from a
-          # local run.
-          env -u PI_CONFIG_DIR HOME="$fake" node scripts/install-mcp.mjs
-          python3 - "$fake" <<'PY'
-          import json, re, sys, tomllib, pathlib
-          home = pathlib.Path(sys.argv[1])
-          tomllib.loads((home / '.codex/config.toml').read_text())
-
-          # One exact pattern per agent, not a substring test. `ok in value` was
-          # vacuous for gemini-cli ('$' is implied by every dialect) and could not
-          # tell omp's ${NAME} from Cursor's ${env:NAME} — so the one
-          # regression this step exists to catch, an adapter given the wrong
-          # dialect, passed. Anything matching ANY dialect must match THIS one.
-          DIALECTS = {
-              'omp':         re.compile(r'\$\{(?!env:)[A-Za-z_][A-Za-z0-9_]*\}'),
-              'opencode':    re.compile(r'\{env:[A-Za-z_][A-Za-z0-9_]*\}'),
-              'vscode':      re.compile(r'\$\{env:[A-Za-z_][A-Za-z0-9_]*\}'),
-              'cursor':      re.compile(r'\$\{env:[A-Za-z_][A-Za-z0-9_]*\}'),
-              'gemini-cli':  re.compile(r'\$[A-Za-z_][A-Za-z0-9_]*$'),
-          }
-          # A value holding a credential must reference it, never carry it: if none
-          # of the known forms appears at all, the renderer materialised a secret.
-          ANY = re.compile(r'\$\{[^}]*\}|\{env:[^}]*\}|\$[A-Za-z_][A-Za-z0-9_]*')
-          SECRETISH = re.compile(r'key|token|secret|password|session|client[-_]?id|auth', re.I)
-
-          for rel, key, agent in [
-              ('.omp/profiles/perso/agent/mcp.json', 'mcpServers', 'omp'),
-              ('.omp/profiles/work/agent/mcp.json', 'mcpServers', 'omp'),
-              ('.config/opencode/opencode.json', 'mcp', 'opencode'),
-              ('.config/Code/User/mcp.json', 'servers', 'vscode'),
-              ('.cursor/mcp.json', 'mcpServers', 'cursor'),
-              ('.gemini/settings.json', 'mcpServers', 'gemini-cli'),
-          ]:
-              want = DIALECTS[agent]
-              servers = json.loads((home / rel).read_text())[key]
-              assert servers, f'{rel}: no servers written'
-              seen = 0
-              for name, s in servers.items():
-                  for slot in ('headers', 'env', 'environment'):
-                      for k, v in (s.get(slot) or {}).items():
-                          v = str(v)
-                          if ANY.search(v):
-                              assert want.search(v), f'{rel}/{name}/{slot}.{k}: not {agent} dialect: {v!r}'
-                              seen += 1
-                          elif SECRETISH.search(k):
-                              raise AssertionError(f'{rel}/{name}/{slot}.{k}: literal credential, no reference')
-              assert seen, f'{rel}: no {agent} placeholder found at all — dialect untested'
-          print('MCP render OK')
-          PY
-
-          # Disabling a server must also uninstall it. That path runs off the lock
-          # file rather than off the manifest, so nothing about the first render
-          # exercises it — and its failure is invisible until a parked server is
-          # still answering somewhere weeks later.
-          python3 -c "
-          import json
-          m = json.load(open('mcp/servers.json'))
-          # Not next(iter(...)): that takes whichever server happens to come first in the
-          # file, and the first few are parked today — disabling an already-disabled
-          # server makes every assertion below pass vacuously, which is the invisible
-          # failure this step exists to prevent. Sorted, so manifest order cannot change
-          # what is tested, and restricted to a server with no 'identities' of its own:
-          # an identity-scoped server never reaches the perso files asserted below.
-          candidates = sorted(n for n, s in m['servers'].items()
-                              if s.get('enabled', True) and not s.get('identities'))
-          assert candidates, 'no enabled, unrestricted server to exercise the removal path'
-          name = candidates[0]
-          m['servers'][name]['enabled'] = False
-          m['servers'][name]['note'] = 'parked by CI to exercise the removal path'
-          json.dump({'name': name, **m}, open('/tmp/off.json', 'w'))
-          "
-          off=$(python3 -c "import json; print(json.load(open('/tmp/off.json'))['name'])")
-          env -u PI_CONFIG_DIR HOME="$fake" node scripts/install-mcp.mjs --manifest /tmp/off.json
-          python3 - "$fake" "$off" <<'PY'
-          import json, sys, pathlib
-          home, off = pathlib.Path(sys.argv[1]), sys.argv[2]
-          for rel, key in [('.omp/profiles/perso/agent/mcp.json', 'mcpServers'),
-                           ('.config/opencode/opencode.json', 'mcp'),
-                           ('.config/Code/User/mcp.json', 'servers')]:
-              servers = json.loads((home / rel).read_text())[key]
-              assert off not in servers, f'{rel}: disabled server {off} was not removed'
-              assert servers, f'{rel}: everything was removed, not just {off}'
-          assert off not in json.loads((home / '.agents/.mcp-lock.json').read_text())['targets']['omp:perso']['servers']
-          print(f'MCP disable OK ({off} removed)')
-          PY
 
       # Proves the portability claim rather than asserting it: the whole catalog must
       # install for every one of these agents, none of which it is written against.
