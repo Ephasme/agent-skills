@@ -4,20 +4,27 @@
 # tracked there by name — plus the MCP servers rendered into every agent that is
 # installed.
 #
-# Layout: content in ~/.agents/skills/<name>, and one symlink per skill per profile
-# — ~/.omp/profiles/{perso,work}/agent/skills/<name>, which is the only user-level
-# skill source omp reads (~/.agents/omp/config.shared.yml turns the foreign ones
-# off). The CLI produces the store on its own — every "universal" agent's skills
-# dir *is* ~/.agents/skills — and it links the agents it detects. It detects
-# neither of those two directories, so installing a skill activates it nowhere.
-# That is deliberate: each profile links only the skills that belong in it, and
-# work and perso do not get the same set.
+# Layout: content in ~/.agents/skills/<name>, and one symlink per skill per instance
+# — one harness × one identity. Today that is
+# ~/.omp/profiles/{perso,work}/agent/skills/<name> and
+# ~/.opencode/profiles/{perso,work}/config/opencode/skills/<name>; codex reads
+# ~/.agents/skills natively and is posted no link at all. For omp those
+# links are the only user-level skill source it reads (~/.agents/omp/config.shared.yml
+# turns the foreign ones off). The CLI produces the store on its own — every
+# "universal" agent's skills dir *is* ~/.agents/skills — and it links the agents it
+# detects. It detects none of those four directories, so installing a skill activates
+# it nowhere. That is deliberate: each identity links only the skills that belong in
+# it, and work and perso do not get the same set.
 #
 # So this script rebuilds the store, then replays activation. Which identity gets
 # which skill is not in the lock and never was: it is declared in
 # ~/.agents/selection.json — yadm content, like the two locks — and
 # ~/.local/bin/skills is the only thing that turns that declaration into symlinks.
-# This script calls `skills reconcile` for that and links nothing itself.
+# The symlinks themselves are not tracked: ~/.gitignore excludes each harness's
+# activation directory, because an output that can disagree with its source has no
+# business being carried. So a fresh machine clones the declaration and none of the
+# links, and closing that gap is this script's second half: it calls `skills
+# reconcile` for it and links nothing itself.
 #
 # The install pass below still calls npx directly and deliberately NOT that wrapper,
 # for the reason it always did: `skills add` activates whatever the run adds, which
@@ -32,7 +39,7 @@
 # file's top level instead of its "skills" key walks the wrong thing entirely.
 # Each entry's "source" field is already in the exact form `skills add` expects
 # for its "sourceType" (the SSH URL for this repo's own git-type entries, the bare
-# "owner/repo" shorthand for github-type ones like gnhf and brainstorming) — jq
+# "owner/repo" shorthand for github-type ones, which today is obra/superpowers) — jq
 # groups entries by that field and one `add` call per group covers every skill
 # that shares it, in one pass over whatever the lock currently records. Deriving
 # the list this way is the actual fix here: `brainstorming` (from obra/superpowers)
@@ -162,8 +169,9 @@ node "$(dirname "$0")/install-mcp.mjs"
 SELECTION=$HOME/.agents/selection.json
 echo
 if [ ! -s "$SELECTION" ]; then
-  # A machine predating selection.json has its links from `yadm clone` and nothing
-  # to replay. Not an error — and not silent either.
+  # Nothing to replay, and — since the links stopped being tracked — nothing that
+  # `yadm clone` restored either: such a machine ends with the store built and every
+  # skill activated nowhere. Not an error here, and not silent either.
   echo "==> Activation: no $SELECTION — nothing to replay"
 elif ! command -v skills >/dev/null 2>&1; then
   # Loud on purpose. A selection that exists and cannot be replayed leaves the store
@@ -172,12 +180,15 @@ elif ! command -v skills >/dev/null 2>&1; then
   echo "error: $SELECTION exists but the \`skills\` wrapper is not on PATH — ~/.local/bin is yadm content; check 'yadm status'." >&2
   exit 1
 else
-  echo "==> Activation (from $SELECTION)"
+  echo "==> Activation (via tack)"
+  # `skills reconcile` was deprecated by the 2026-08-15 tack cutover: tack owns the
+  # activation links now, and two writers over one set of links diverge silently.
+  #
   # No redirection or fd juggling needed: this is outside the fd-3 loop above, and
-  # `skills reconcile` reads no stdin. A non-zero exit aborts the script under
-  # `set -e` (line 43), which is the intent — a failed reconciliation is not a
+  # `tack apply` reads no stdin with --yes. A non-zero exit aborts the script under
+  # `set -e` (line 51), which is the intent — a failed reconciliation is not a
   # cosmetic problem.
-  skills reconcile
+  tack apply --yes
 fi
 
 echo

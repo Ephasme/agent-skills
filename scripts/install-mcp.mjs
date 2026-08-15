@@ -7,9 +7,10 @@
 // so the only way to stay agent-neutral is to keep one manifest and *write* the
 // dialects. That is all this script is.
 //
-// The hard constraint is credentials. Fifteen of the seventeen servers are HTTP with
-// a secret in a request header, and the agents disagree sharply about whether a
-// header value may reference an environment variable:
+// The hard constraint is credentials. Nearly every server carries one — fourteen of the
+// nineteen are HTTP with a secret in a request header, and every stdio server has one in
+// its environment — and the agents disagree sharply about whether a header value may
+// reference an environment variable:
 //
 //   Oh My Pi      ${NAME}          in env and headers          (verified, 17.2.9)
 //   opencode      {env:NAME}       in env and headers
@@ -628,8 +629,8 @@ function renderServer(adapter, name, def, opts) {
 // the same reason: the installed artefacts are disposable, the record of them is not.
 
 // Paths are stored relative to $HOME. The lock is yadm-tracked, and an absolute
-// /home/debian/... in it makes every other machine's first health check report three
-// targets "gone" when nothing is wrong.
+// /home/debian/... in it makes every other machine's first health check report all five
+// of this machine's targets "gone" when nothing is wrong.
 const packPath = (p) => (isAbsolute(p) && !relative(HOME, p).startsWith('..') ? relative(HOME, p) : p);
 const unpackPath = (p) => (isAbsolute(p) ? p : resolvePath(HOME, p));
 
@@ -729,12 +730,15 @@ function describeAdapter(adapter, declared) {
 }
 
 // A lock key that names no detected target but records the file a detected target now
-// resolves to is a rename, not a stale entry: `codex` and `opencode` predate §3.1.5's
-// `<harness>:<identity>` ids. Left alone it is invisible to the write path, so
-// `previous` is empty, so a server parked between two runs is never dropped from a file
-// this script is still writing; and `--prune` would later reach the same file under two
-// keys. Adopting it re-keys the lock as a side effect of rendering, which is otherwise a
-// hand edit somebody has to remember to make first.
+// resolves to is a rename, not a stale entry: `codex` and `opencode` were once keyed by
+// bare adapter id, before §3.1.5's `<harness>:<identity>` ids — the lock carries none of
+// those spellings any more, because this ran. Left alone such a key is invisible to the
+// write path, so `previous` is empty; and `previous` is both the drop list and `owned`,
+// so a server parked between two runs is never dropped from a file this script is still
+// writing, while every entry the renderer itself wrote last time reads as hand-written
+// and is loudly reported as overwritten. `--prune` would later reach the same file under
+// two keys. Adopting it re-keys the lock as a side effect of rendering, which is
+// otherwise a hand edit somebody has to remember to make first.
 function adoptRenamedLockKeys(lock, detected) {
   const superseded = new Map();
   for (const [id, entry] of Object.entries(lock.targets)) {
@@ -879,9 +883,10 @@ async function main() {
           // The key can be missing: every lock entry written before this task carries only
           // { file, servers }, and a stale target has no registry instance to read it from.
           // Fall back to the *declared* key for this adapter — `declared` is built with
-          // state: null, so it still contains residue instances like opencode:perso, which is
-          // exactly the case Task 9 Step 7 prunes. Without this, writeJsonKey's new
-          // no-key-to-write-under guard turns that prune into `✗ opencode:perso`, exit 1, and
+          // state: null, so it still holds the instances that are not installed: vscode:perso
+          // is absent today, and opencode:perso was residue back when Task 9 Step 7 pruned
+          // it (it is installed for both identities now). Without this, writeJsonKey's
+          // no-key-to-write-under guard turns such a prune into `✗ <instance>`, exit 1, and
           // the file keeps its servers.
           .map(([id, v]) => ({ id, identity: '', file: v.file,
                                key: v.key ?? declared.find((d) => d.adapter === adapter.id)?.key }))
@@ -894,9 +899,10 @@ async function main() {
     }
 
     const rendered = {};
-    // Skips are grouped by reason rather than listed per server: an agent that
-    // cannot do secret headers fails the same way fifteen times, and fifteen
-    // identical lines bury the two that are actually different.
+    // Skips are grouped by reason rather than listed per server: an agent that cannot do
+    // secret headers fails the same way once per HTTP server carrying one — nine of the
+    // thirteen enabled today — and nine identical lines bury the two that are actually
+    // different.
     const skipped = new Map();
     const unexpressible = [];
     for (const [name, def] of servers) {

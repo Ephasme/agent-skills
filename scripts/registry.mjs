@@ -12,7 +12,7 @@
 // the registry before it can decide anything, `stateOf()` is a stat and a $PATH walk
 // rather than real I/O, and a sync reader spells the same contract as the Python one —
 // both are `load(home)`, not one of them `await load(home)`. install-mcp.mjs already
-// imports existsSync/realpathSync (:48) for the same reason.
+// imports existsSync/realpathSync (:57) for the same reason.
 //
 // Nothing here writes. ~/.agents/selection.json is written by `skills` alone; this module
 // only reads it. mkdtempSync/mkdirSync/writeFileSync/chmodSync below belong to the
@@ -44,9 +44,9 @@ const HOME_OF = Symbol('home');
 const homeOf = (reg) => reg[HOME_OF] ?? homedir();
 
 // Message texts are terse and pinned, because validate.mjs's fixtures assert them
-// byte-for-byte. The loud shape belongs to whoever prints — `✗ ${e.message}` and two
+// byte-for-byte. The loud shape belongs to whoever prints — `✗ ${e.message}` and three
 // indented remedy lines, then exit 1, which is readLock's shape at
-// install-mcp.mjs:642-646. The registry is the same class of file: one that nothing
+// install-mcp.mjs:646-650. The registry is the same class of file: one that nothing
 // downstream can proceed without, and that must never degrade to an empty answer.
 export class RegistryError extends Error {
   constructor(message) {
@@ -426,7 +426,14 @@ export function dump(home) {
         }
         return resolve(v, { harness: inst.harness, identity: inst.identity, reg });
       };
-      lines.push(`sessions ${inst.id} launcher=${s('launcher')} comm=${s('comm')} events=${s('events')}`);
+      // events is the one optional field, and absence is meaningful rather than lax: the
+      // harness holds a pane and gets an identity, but no producer sends it lifecycle
+      // events, so no glyph moves for it. Absent renders `-`, matching mcp's spelling for
+      // a field it does not carry; present goes through s() so a malformed value still
+      // stops both readers at the same place. `in` rather than a truthiness test, so
+      // `events: ""` is a refusal on both sides instead of a silent `-` here.
+      const events = 'events' in h.sessions ? s('events') : '-';
+      lines.push(`sessions ${inst.id} launcher=${s('launcher')} comm=${s('comm')} events=${events}`);
     }
   }
 
@@ -743,9 +750,9 @@ function main(argv) {
   return 2;
 }
 
-// Importable by scripts/validate.mjs exactly the way install-mcp.mjs is (validate.mjs:21),
+// Importable by scripts/validate.mjs exactly the way install-mcp.mjs is (validate.mjs:22),
 // so the CLI runs only when this file is the entry point. Compared through realpath for
-// the reason install-mcp.mjs:853-855 gives: a checkout reached through a symlinked path
+// the reason install-mcp.mjs:996-1001 gives: a checkout reached through a symlinked path
 // makes the raw string comparison false, and main() would then silently never run.
 const invokedDirectly = process.argv[1]
   && realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url));

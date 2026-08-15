@@ -1,8 +1,10 @@
 #!/usr/bin/env node
 // Validate the skill catalog against the Agent Skills specification, plus the
-// portability rules this repo adds on top of it.
+// portability rules this repo adds on top of it — and, next to the catalog, the two
+// things nothing else lints: the MCP manifest (checkMcpManifest) and the harness
+// registry (checkRegistry), each argued where its own function is defined.
 //
-// Two failure modes motivate every check here. The first is silent: an agent that
+// Two failure modes motivate the catalog checks. The first is silent: an agent that
 // cannot parse a skill's frontmatter skips it with a one-line warning, and a broken
 // relative path only surfaces when an agent tries to run it, halfway through a task.
 // The second is portability rot: a skill picks up a habit that only works in the
@@ -334,17 +336,31 @@ async function checkMcpManifest() {
 
 // One harness list, in ~/.agents/harnesses.json, read by five tools that each used
 // to carry a list of their own. None of them can check it — they consume it — so it
-// is checked here. Two of these rules are not shape validation and carry more weight
-// than the rest:
+// is checked here, along with ~/.agents/selection.json, whose every named skill must
+// exist in the store and whose every named agent must be a file in this repo.
+// Two of these rules are not shape validation and carry more weight than the rest:
 //   * an adapter named by no entry renders nothing (design decision 4). Without this
 //     check ADAPTERS drifts back into being a second harness list, which is the
 //     duplication the registry exists to remove.
 //   * mcp.key is required for exactly the adapters whose writer is writeJsonKey and
 //     forbidden for the others (§3.1.6), so codex's omission — it owns a delimited
 //     TOML block, not a JSON key — is verified rather than merely tolerated.
-// Errors are pushed with a fixed prefix rather than through fail(), whose
+// sessions.events is optional, and when present it must name a vocabulary
+// agent_state.py actually implements. That set is Python's to own — code decides
+// what an event means — so naming it here is a second copy, and a second copy is
+// only safe when something fails on drift. This machine already has exactly one
+// other sanctioned duplication of the same shape: ~/.tmux.conf's glyph table,
+// which a tmux format cannot import from Python either, kept honest by
+// agent_state.py's titles_test(). This follows that precedent — registry_test()
+// asserts VOCABULARIES below equals agent_state.py's, so adding a vocabulary in
+// one place and not the other fails a selftest rather than shipping a lint that
+// silently accepts a value no code implements.
+// Errors are pushed with a fixed per-file prefix rather than through fail(), whose
 // relative(ROOT, file) would render a $HOME path as ../../../.agents/harnesses.json.
 const MODES = new Set(['each', 'single']);
+// The vocabularies agent_state.py implements, mirrored per the paragraph above.
+// Exported so its selftest can compare the two lists instead of trusting them.
+export const VOCABULARIES = new Set(['claude', 'omp']);
 const IDENTIFIER = /^[a-z][a-z0-9-]*$/;
 // Not imported from registry.mjs: that module's own isObject is a private helper,
 // unexported by design (§7's boundary — checkRegistry owns shape validation, the
@@ -453,9 +469,27 @@ async function checkRegistry() {
       if (!isObject(h.sessions)) {
         bad(`harness \`${name}\`: sessions must be an object`);
       } else {
-        for (const field of ['launcher', 'comm', 'events']) {
+        // launcher and comm are what a session needs to exist at all: something to
+        // run, and a process name to recognise it by afterwards. Both are required.
+        for (const field of ['launcher', 'comm']) {
           if (typeof h.sessions[field] !== 'string' || !h.sessions[field]) {
             bad(`harness \`${name}\`: sessions.${field} must be a non-empty string`);
+          }
+        }
+        // events is optional, and its absence is a real state rather than an
+        // oversight: it says the harness can hold a session and be attributed to an
+        // identity, but has no producer sending lifecycle events, so no glyph will
+        // ever move for it. opencode is that case — it ships no equivalent of
+        // omp's agent-tabs.ts extension. Requiring the field forced the choice
+        // between declaring a vocabulary with no code behind it and declaring no
+        // session at all, and the second cost identity attribution for a harness
+        // that is installed twice over.
+        if (h.sessions.events !== undefined) {
+          if (typeof h.sessions.events !== 'string' || !h.sessions.events) {
+            bad(`harness \`${name}\`: sessions.events, when present, must be a non-empty string`);
+          } else if (!VOCABULARIES.has(h.sessions.events)) {
+            bad(`harness \`${name}\`: sessions.events \`${h.sessions.events}\` is not a vocabulary ` +
+                `agent_state.py implements (${[...VOCABULARIES].sort().join(', ')})`);
           }
         }
       }
