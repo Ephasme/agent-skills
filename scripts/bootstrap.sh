@@ -154,12 +154,12 @@ fi
 echo "==> MCP servers"
 node "$(dirname "$0")/install-mcp.mjs"
 
-# Activation. The store is content; which identity gets which skill is a separate
-# declared fact, and `skills reconcile` is the one code path that turns it into
-# symlinks. It is called rather than reimplemented here because it knows the three
-# things this script does not: which harnesses are installed, which read
-# ~/.agents/skills natively and get no link at all, and which are residue and must
-# never be written into.
+# Activation. The store is content; which profile gets which skill is a separate
+# declared fact, and `tack apply` is the one code path that turns it into symlinks.
+# It is called rather than reimplemented here because it knows the three things this
+# script does not: which harnesses are installed, which read ~/.agents/skills
+# natively and get no link at all, and which are residue and must never be written
+# into.
 #
 # This replaces the "in the store but linked by no profile" report that used to sit
 # here. That report hard-coded `for p in perso work` over

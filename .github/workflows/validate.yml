@@ -59,9 +59,10 @@ jobs:
           : > "$fake"/.cursor/settings.json
           : > "$fake"/.gemini/.probe
           cp mcp/ci-registry.json "$fake"/.agents/harnesses.json
-          # PI_CONFIG_DIR is a *candidate* target in the omp adapter, not an override,
-          # so a runner that happened to export it would add a target nothing here
-          # asserts on.
+          # PI_CONFIG_DIR no longer reaches the renderer at all: targets come from the
+          # fixture registry copied above, never from the ambient environment. Unset
+          # anyway, so a runner that exported it cannot make this step differ from a
+          # local run.
           env -u PI_CONFIG_DIR HOME="$fake" node scripts/install-mcp.mjs
           python3 - "$fake" <<'PY'
           import json, re, sys, tomllib, pathlib
@@ -117,7 +118,16 @@ jobs:
           python3 -c "
           import json
           m = json.load(open('mcp/servers.json'))
-          name = next(n for n, s in m['servers'].items() if s.get('enabled', True))
+          # Not next(iter(...)): that takes whichever server happens to come first in the
+          # file, and the first few are parked today — disabling an already-disabled
+          # server makes every assertion below pass vacuously, which is the invisible
+          # failure this step exists to prevent. Sorted, so manifest order cannot change
+          # what is tested, and restricted to a server with no 'identities' of its own:
+          # an identity-scoped server never reaches the perso files asserted below.
+          candidates = sorted(n for n, s in m['servers'].items()
+                              if s.get('enabled', True) and not s.get('identities'))
+          assert candidates, 'no enabled, unrestricted server to exercise the removal path'
+          name = candidates[0]
           m['servers'][name]['enabled'] = False
           m['servers'][name]['note'] = 'parked by CI to exercise the removal path'
           json.dump({'name': name, **m}, open('/tmp/off.json', 'w'))
