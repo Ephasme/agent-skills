@@ -39,15 +39,14 @@ time.
 **Degrade, don't fail.** Most of these skills fan work out across sub-agents. Where they do, they
 say what to run instead when the agent has none — the same units, in series, with results written
 to files between them. Parallelism is an optimisation; the isolation it buys is the thing that
-matters, and it can be bought with files and ordering. The two exceptions are stated outright:
-`spec-to-pr` stops rather than let one context implement and review its own work, and
+matters, and it can be bought with files and ordering. The exception is stated outright:
 `code-quality-scan` refuses to merge its find and check passes.
 
 **Declare hard requirements in `compatibility`.** The spec's optional `compatibility` field is
 where an external binary, a credential, a network dependency, or a specific target product
-belongs. `linear-project-sync` needs a Linear integration and a git checkout — that's a hard
-requirement, declared in the field, and it still runs from any agent because it drives whatever
-Linear channel the host offers rather than assuming one.
+belongs. `handoff` needs a Unix-like local and remote host with `tar`, `ssh`, and `rsync`/`scp` —
+that's a hard requirement, declared in the field, and it still runs from any agent because it
+drives whatever transfer tools the host's shell offers rather than assuming one.
 
 **Frontmatter stays inside the standard.** `name` and `description` are required;
 `license`, `compatibility`, `metadata` and `allowed-tools` are the rest of the field set. One
@@ -69,10 +68,10 @@ it — two steps, because work and perso do not get the same set.
 ```sh
 SRC=git@github.com:Ephasme/agent-skills.git
 
-npx -y skills add "$SRC" --skill spec-to-pr -g --yes    # 1. into the store
-ln -s ~/.agents/skills/spec-to-pr \
+npx -y skills add "$SRC" --skill code-quality-scan -g --yes    # 1. into the store
+ln -s ~/.agents/skills/code-quality-scan \
       ~/.omp/profiles/perso/agent/skills/               # 2. activate, per profile
-ln -s ~/.agents/skills/spec-to-pr \
+ln -s ~/.agents/skills/code-quality-scan \
       ~/.omp/profiles/work/agent/skills/
 
 npx -y skills list                       # what is installed
@@ -80,7 +79,7 @@ npx -y skills update                     # pull newer versions into the store
 ```
 
 On Loup's machines `~/.local/bin/skills` wraps those three commands — `skills add "$SRC"
---skill spec-to-pr [-t perso|-t work]`, both profiles by default — and links only what the run
+--skill code-quality-scan [-t perso|-t work]`, both profiles by default — and links only what the run
 introduced, so a `--skill '*'` refresh does not flatten existing per-profile choices. Anything
 that is not `add` passes straight through.
 
@@ -107,7 +106,7 @@ Other agents are named the same way — the CLI's own names (`gemini-cli`, not `
 
 ```sh
 npx skills add "$SRC" -g -a cursor -a gemini-cli -s '*' -y   # extra non-universal agents
-npx skills add "$SRC" -s spec-to-pr                          # one skill, project scope
+npx skills add "$SRC" -s code-quality-scan                          # one skill, project scope
 ```
 
 `scripts/bootstrap.sh` runs the whole set for a fresh machine.
@@ -273,24 +272,24 @@ Portability — the contract above:
 Hygiene:
 
 11. No absolute home paths (`/home/you/…`, `/Users/you/…`), no `__pycache__`, nothing over 1 MiB.
-12. Only the six categories below.
+12. Only the eight categories below.
 
 A skill must be **self-contained**: anything it runs lives in its own `scripts/`. Where two skills
 need the same helper, both ship a copy rather than sharing one — they install independently and
-cannot reach each other. `spec-to-pr` carries `review-package`, `build-workspace` and `task-brief`
-for exactly that reason.
+cannot reach each other.
 
 ## Catalog
 
 | Category | Skills |
 | --- | --- |
-| `engineering` | code-quality-scan, greenfield, linear-project-sync, plan-hardening, prune-branches, spec-to-pr, workspace-attachments |
+| `engineering` | code-quality-scan, greenfield, plan-hardening, prune-branches |
 | `finance` | payment-qr |
 | `research` | cite-or-refuse, fact-check-document, harden-case |
-| `setup` | free-disk-space |
+| `toolbox` | free-disk-space |
 | `meta` | executing-autonomously, handoff, no-verbose |
 | `health` | tcc |
 | `legal` | assurance-fr |
+| `helpers` | workspace-attachments |
 
 `skills/<category>/<skill>/SKILL.md` is discovered natively — the CLI walks one extra level inside
 `skills/` for exactly this catalog layout. No manifest file is needed. Categories organise the
@@ -305,6 +304,9 @@ Git history is the archive — nothing is vendored into an `archive/` directory,
 CLI discovers any `SKILL.md` two levels down from the repo root and would reinstall them. Restore
 one with `git checkout 9c9c809 -- skills/<category>/<skill>`. Their departure emptied the
 `ops` and `security` categories, which went with them.
+
+**Two more retired skills.** `linear-project-sync` and `spec-to-pr` were removed on 2026-08-17.
+Restore either with `git checkout 65cd4c3 -- skills/engineering/<skill>`.
 
 **The `trackers` category and its CLI.** `track-case` was the only thing that ever shelled out to
 `~/.agents/plugins/trackers/scripts/trackers`, so retiring it left the plugin with no caller — no

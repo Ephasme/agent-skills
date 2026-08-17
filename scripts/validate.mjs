@@ -34,10 +34,11 @@ const CATEGORIES = [
   'engineering',
   'finance',
   'health',
+  'helpers',
   'legal',
   'meta',
   'research',
-  'setup',
+  'toolbox',
 ];
 
 // Spec: `name` and `description` are required; `license`, `compatibility`,
