@@ -7,8 +7,8 @@ Use one flat task list. Express grouping with `parent` and sequencing with `depe
 This contract defines the **task model**, not the storage. Before writing anything, read the
 repository's and the case's own instructions for a declared **task authority**:
 
-- **An external tracker is declared** (a Plane / Linear / Jira project, reached through its MCP
-  server): that project is the authority. One work item per task. Carry the fields below into the
+- **An external tracker is declared** (a Notion task database, or a Jira project, reached through
+  its MCP server): it is the authority. One row per task. Carry the fields below into the
   tracker's own concepts — `title` → name, `status` → state, `priority` → priority, `due` →
   target date, `parent` → parent item, `depends_on` → the tracker's relations — and put whatever
   has no native field (`id`, `due_source`, `evidence`, `file`, `waiting_on`, `notes`) in the item
