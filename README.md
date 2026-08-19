@@ -8,21 +8,16 @@ Copilot, Goose and dozens of others read. Installed with the
 [`skills`](https://github.com/vercel-labs/skills) CLI, which discovers this repo's
 `skills/<category>/<skill>/` layout natively.
 
-Self-hosted and private, on the Forgejo at `git.loup-peluso.com` — several skills carry personal
-detail (a medical research corpus, a hardening workflow over private case records, response-style
-rules written for one person), and none of it needs to sit on someone else's server. Managed with
-[`tea`](https://gitea.com/gitea/tea), not `gh`.
+Public on GitHub, at [`Ephasme/agent-skills`](https://github.com/Ephasme/agent-skills). Managed with
+`gh`, not `tea` — the private, self-hosted Forgejo this repo used to live on has been
+decommissioned.
 
 ```
-ssh://git@git-ssh.loup-peluso.com:2222/loup/agent-skills.git
+git@github.com:Ephasme/agent-skills.git
 ```
 
-The `skills` CLI has no shorthand for a self-hosted host, so that full URL is the source string
-everywhere below. It falls through to the CLI's generic git path and is cloned with plain
-`git clone` — no forge API, no token. Access is the `git-ssh.loup-peluso.com` block already in
-`~/.ssh/config`, which names the perso key and the `:2222` port; without it a clone from a temp
-directory fails *Permission denied (publickey)* even though pushing from a checkout works, because
-`~/.gitconfig`'s `includeIf gitdir:~/code/perso/` never fires outside the checkout.
+That SSH URL is the source string everywhere below. GitHub's own SSH auth (already set up for
+this account) is all a clone needs — no separate `~/.ssh/config` block or `includeIf` rule.
 
 ## The portability contract
 
@@ -321,8 +316,9 @@ one general reviewer that answers both questions — per task in Phase 4, and on
 branch in Phase 7. The independence that mattered was the reviewer not being the implementer, which
 one agent in a fresh context provides just as well as two.
 
-**A GitHub mirror.** This lived briefly at `Ephasme/agent-skills` before moving here. There is no
-mirror and no sync — Forgejo is the only remote.
+**Forgejo.** This repo briefly moved to a private, self-hosted Forgejo instance
+(`git-ssh.loup-peluso.com`), managed with `tea`. That instance has been decommissioned; GitHub
+(`Ephasme/agent-skills`, public) is the only remote now.
 
 **`.mcp.json` files.** The nineteen servers in `mcp/servers.json` came from the purpose-plugins
 that used to carry these skills, removed from the dotfiles on 2026-07-31 in yadm commit `1803e8c`

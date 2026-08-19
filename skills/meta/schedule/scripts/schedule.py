@@ -38,7 +38,7 @@ from pathlib import Path
 
 SKILL_NAME = "schedule"
 LABEL_PREFIX = "com.agent-skills.schedule"
-DEFAULT_NTFY_TOPIC = "scheduled-prompts"
+DEFAULT_NTFY_TOPIC = "sched"
 DEFAULT_RUN_TIMEOUT = 900  # seconds a single run may take before it's reported as a timeout
 POLL_INTERVAL = 3  # seconds between agent-status polls in run-job
 MAX_CRON_COMBINATIONS = 500  # guard against accidental "every minute all day" cron jobs
@@ -401,8 +401,10 @@ def execute_once(job: dict, herdr_bin: str) -> None:
 # --------------------------------------------------------------------------
 
 def slugify(text: str) -> str:
+    """Capped at 26, not some rounder number: herdr rejects agent names over 32 chars,
+    and the default target prefixes this slug with "sched-" (6 chars)."""
     slug = re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")
-    return (slug[:40] or "prompt").strip("-")
+    return (slug[:26] or "prompt").strip("-")
 
 
 def cmd_schedule(args: argparse.Namespace) -> None:
