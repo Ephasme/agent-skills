@@ -286,7 +286,7 @@ cannot reach each other.
 | `finance` | payment-qr |
 | `research` | cite-or-refuse, fact-check-document, harden-case |
 | `toolbox` | free-disk-space |
-| `meta` | executing-autonomously, handoff, no-verbose |
+| `meta` | executing-autonomously, handoff, herdr-schedule-prompt, no-verbose |
 | `health` | tcc |
 | `legal` | assurance-fr |
 | `helpers` | workspace-attachments |
