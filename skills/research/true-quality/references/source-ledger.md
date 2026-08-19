@@ -34,7 +34,7 @@ vocabulary `evidence-tiers.md` §1 defines: `peer-reviewed` · `preprint` · `re
 | PetaPixel, MKBHD DXOMARK investigation writeup | 2017-10-13 | industry-report | DXOMARK conflict, corroborating | primary |
 | corp.dxomark.com/about-us | current | company-self-reported | DXOMARK's own non-denial | primary |
 | Bankrate SEC 8-K exhibit (Red Ventures acquisition close) | 2017-11-08 | company-self-reported | Red Ventures/Bankrate closing date | primary |
-| Ziff Davis press release, businesswire.com/news/home/20241001349422 | 2024 Q3 | company-self-reported | CNET's current owner | primary |
+| Ziff Davis press release via BusinessWire, ID 20241001349422 | 2024 Q3 | company-self-reported | CNET's current owner | primary |
 | Future plc, futureplc.com/brands/ | current | company-self-reported | TechRadar/Tom's Guide/Tom's Hardware ownership | primary |
 | Valnet, valnetinc.com brand grid + valnetinc.com/xda | current | company-self-reported | ScreenRant/CBR/Collider/XDA ownership | primary |
 | CNN Business, CNET AI-article scandal | 2023-01-25 | industry-report | Tier 3, CNET incident | primary |

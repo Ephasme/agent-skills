@@ -112,7 +112,7 @@ capture is the site's core function. Treat any specific ranking here as presumpt
 until proven otherwise.**
 
 - **vpnMentor / Wizcase** — owned by Kape Technologies since its $149.1 million acquisition of
-  Webselenese, announced 2021-03-08 (businesswire.com/news/home/20210308005178/en/). Kape also owns
+  Webselenese, announced 2021-03-08 (BusinessWire press release, ID 20210308005178). Kape also owns
   the VPN brands CyberGhost (since 2017-03), Private Internet Access (since 2019-11) and ExpressVPN
   (since 2021-12) — the same category of product these two "independent" review sites rank.
 - **LendEDU** — FTC alleged it told consumers its financial-product rankings were "objective,"
@@ -137,10 +137,10 @@ illustration, not a standing fact.
 | Property | Owner | Since | Source |
 | --- | --- | --- | --- |
 | Bankrate, The Points Guy | Red Ventures | closed 2017-11-08 | Bankrate's own SEC 8-K exhibit |
-| CNET | Ziff Davis | completed Q3 2024 (previously Red Ventures 2020-10-30–2024, ~$500M) | Ziff Davis press release, businesswire.com/news/home/20241001349422/en/ |
+| CNET | Ziff Davis | completed Q3 2024 (previously Red Ventures 2020-10-30–2024, ~$500M) | Ziff Davis press release via BusinessWire, ID 20241001349422 |
 | TechRadar, Tom's Guide, Tom's Hardware | Future plc | current | futureplc.com/brands/ |
 | ScreenRant, CBR, Collider, XDA Developers | Valnet | XDA since 2022-02; others current | valnetinc.com brand grid |
-| vpnMentor, Wizcase | Kape Technologies | since 2021-03-08 ($149.1M) | businesswire.com/news/home/20210308005178/en/ |
+| vpnMentor, Wizcase | Kape Technologies | since 2021-03-08 ($149.1M) | BusinessWire press release, ID 20210308005178 |
 | CyberGhost / PIA / ExpressVPN | Kape Technologies | 2017-03 / 2019-11 / 2021-12 | Kape's own investor materials |
 | Bluehost, HostGator | Newfold Digital (formerly EIG) | current | Newfold's own newsroom |
 
