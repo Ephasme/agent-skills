@@ -1,5 +1,5 @@
 ---
-name: herdr-schedule-prompt
+name: schedule
 description: >-
   Use when a user wants a prompt sent to an agent on a recurring schedule or once at
   a later time — phrasings like "run this every hour", "check on this every 30
@@ -15,7 +15,7 @@ compatibility: >-
 disable-model-invocation: true
 ---
 
-# herdr-schedule-prompt
+# schedule
 
 **Explicit invocation only.** This creates a persistent, unattended background job
 that repeatedly consumes an agent's quota and pushes notifications — never set one up
@@ -23,7 +23,7 @@ because scheduling came up in conversation, only because the user asked for it. 
 agents honour the `disable-model-invocation` key above; where that's ignored, this
 paragraph is the rule.
 
-Drives `$SKILL_DIR/scripts/herdr_schedule.py` (`$SKILL_DIR` is notation for this
+Drives `$SKILL_DIR/scripts/schedule.py` (`$SKILL_DIR` is notation for this
 skill's own directory — resolve it from wherever the skill was loaded from). Stdlib
 Python plus `croniter`, installed on demand the same way the payment-qr skill
 bootstraps `segno`: already-importable → `pip install` across the PEP 668 variants →
@@ -62,7 +62,7 @@ that pattern actually means.
    rather than silently scheduling a job nobody gets told about.
 3. **Run it**:
    ```bash
-   python3 $SKILL_DIR/scripts/herdr_schedule.py schedule \
+   python3 $SKILL_DIR/scripts/schedule.py schedule \
      --repeat="0 7-22 * * 1-5" \
      "Check the inbox for anything urgent and summarize"
    ```
@@ -74,7 +74,7 @@ that pattern actually means.
 4. **Report back** the job name, the resolved schedule, and the log path the script
    prints — don't just say "scheduled it".
 5. To test a job without waiting for its real trigger:
-   `python3 $SKILL_DIR/scripts/herdr_schedule.py run-job <name>`.
+   `python3 $SKILL_DIR/scripts/schedule.py run-job <name>`.
 
 ## Other subcommands
 
@@ -100,9 +100,9 @@ fire-and-forget and polls itself instead, which doesn't have that race.
 
 ## State and credentials
 
-Job definitions: `${XDG_CONFIG_HOME:-$HOME/.config}/herdr-schedule-prompt/jobs/<name>.json`.
-Logs: `.../herdr-schedule-prompt/logs/<name>.log`. launchd plists:
-`~/Library/LaunchAgents/com.agent-skills.herdr-schedule-prompt.<name>.plist`. Both the
+Job definitions: `${XDG_CONFIG_HOME:-$HOME/.config}/schedule/jobs/<name>.json`.
+Logs: `.../schedule/logs/<name>.log`. launchd plists:
+`~/Library/LaunchAgents/com.agent-skills.schedule.<name>.plist`. Both the
 job file and the plist embed `NTFY_TOKEN` (so a scheduled firing needs no ambient
 shell environment) and are written `0600`.
 

@@ -36,9 +36,9 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-SKILL_NAME = "herdr-schedule-prompt"
-LABEL_PREFIX = "com.agent-skills.herdr-schedule-prompt"
-DEFAULT_NTFY_TOPIC = "herdr-scheduled-prompts"
+SKILL_NAME = "schedule"
+LABEL_PREFIX = "com.agent-skills.schedule"
+DEFAULT_NTFY_TOPIC = "scheduled-prompts"
 DEFAULT_RUN_TIMEOUT = 900  # seconds a single run may take before it's reported as a timeout
 POLL_INTERVAL = 3  # seconds between agent-status polls in run-job
 MAX_CRON_COMBINATIONS = 500  # guard against accidental "every minute all day" cron jobs
@@ -183,7 +183,7 @@ def _ensure_croniter():
     try:
         import tempfile
         import venv
-        vdir = tempfile.mkdtemp(prefix="herdr-schedule-venv-")
+        vdir = tempfile.mkdtemp(prefix="schedule-venv-")
         venv.create(vdir, with_pip=True)
         bindir = "Scripts" if os.name == "nt" else "bin"
         vpy = os.path.join(vdir, bindir, "python.exe" if os.name == "nt" else "python")
@@ -480,7 +480,7 @@ def cmd_run_job(args: argparse.Namespace) -> None:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(prog="herdr_schedule.py", description=__doc__)
+    parser = argparse.ArgumentParser(prog="schedule.py", description=__doc__)
     sub = parser.add_subparsers(dest="cmd", required=True)
 
     p_sched = sub.add_parser("schedule", help="schedule (or immediately run) a prompt")
