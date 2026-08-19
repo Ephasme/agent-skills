@@ -1,6 +1,6 @@
 ---
 name: true-quality
-description: Use when the real quality of something has to be established from internet evidence and the obvious sources are compromised — choosing between products, models, brands, tools, services, lodgings, contractors or suppliers; judging whether a rating, a review pool, a "best X" ranking, a benchmark or a vendor spec can be trusted. Triggers: "is X actually any good", "which X should I buy", "best X", "is X worth it", "are these reviews fake", "why is this rated so highly", "quel est le meilleur", "est-ce que ça vaut le coup", "faux avis". Also when a previous answer leaned on a listicle, an affiliate round-up, a star average or a manufacturer claim.
+description: Use when the real quality of something has to be established from internet evidence and the obvious sources are compromised — choosing between products, models, brands, tools, services, lodgings, contractors or suppliers; judging whether a rating, a review pool, a "best X" ranking, a benchmark or a vendor spec can be trusted. Trigger phrases — "is X actually any good", "which X should I buy", "best X", "is X worth it", "are these reviews fake", "why is this rated so highly", "quel est le meilleur", "est-ce que ça vaut le coup", "faux avis". Also when a previous answer leaned on a listicle, an affiliate round-up, a star average or a manufacturer claim.
 ---
 
 # True Quality
