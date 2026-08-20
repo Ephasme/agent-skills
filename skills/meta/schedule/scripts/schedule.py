@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Schedule, list, remove, and run recurring or one-time prompts against a
+"""Schedule, list, kill, and run recurring or one-time prompts against a
 herdr-managed agent pane, with an ntfy status push on each run.
 
 Stdlib plus `croniter` for cron-field parsing (auto-installed on first cron use,
@@ -7,9 +7,9 @@ mirroring the payment-qr skill's segno bootstrap). macOS/launchd only (see SKILL
 
 Subcommands:
   schedule --repeat=<VALUE> [--target NAME] [--name NAME] [--ntfy-topic TOPIC]
-           [--timeout SECONDS] [--no-ntfy] [--cwd PATH] "<prompt text>"
+           [--timeout SECONDS] [--no-ntfy] [--until COND] [--cwd PATH] "<prompt text>"
   list
-  remove <name>
+  kill <id>
   run-job <name>      (invoked by launchd; also runnable manually to test a job)
 
 --repeat grammar (exactly one form):
@@ -310,8 +310,13 @@ def install_launchd(name: str, kind: str, payload, herdr_bin: str, ntfy_env: dic
 
 def remove_launchd(name: str) -> None:
     label = launchd_label(name)
-    subprocess.run(["launchctl", "bootout", f"{gui_domain()}/{label}"], capture_output=True)
+    # Delete the plist BEFORE bootout: bootout terminates the job's own running
+    # instance, which can be this very process (see execute_once) -- if it dies
+    # here, whatever hasn't run yet, including a unlink() placed after it, never
+    # does. File removal doesn't need the job unloaded first, so this order costs
+    # nothing and closes the leak regardless of which process calls this.
     plist_path(name).unlink(missing_ok=True)
+    subprocess.run(["launchctl", "bootout", f"{gui_domain()}/{label}"], capture_output=True)
 
 
 def is_loaded(name: str) -> bool:
@@ -353,12 +358,24 @@ def send_ntfy(url: str, token: str, topic: str, title: str, message: str, priori
 def execute_once(job: dict, herdr_bin: str) -> None:
     name, target, prompt = job["name"], job["target"], job["prompt"]
     timeout = job.get("timeout", DEFAULT_RUN_TIMEOUT)
+    until = job.get("until")
+    send_prompt = prompt
+    if until:
+        send_prompt += (
+            f"\n\n[Recurring scheduled job -- stop condition: {until}. After completing the task "
+            "above, decide whether this condition is now true. If it is, end this reply with a "
+            "final line containing exactly `SCHEDULE_DONE: <brief reason>` -- that stops future "
+            "recurrences of this job. If it is not yet true, omit that line; the job runs again "
+            "next time it's due.]"
+        )
+
+    stopped, stop_reason = False, ""
     try:
         existed = ensure_target(herdr_bin, target, job.get("cwd", str(Path.home())))
         log(f"target {target} {'reused' if existed else 'created'}")
         before = herdr_agent_get(herdr_bin, target)
         baseline_seq = before["state_change_seq"] if before else -1
-        herdr_json(herdr_bin, "agent", "prompt", target, prompt)
+        herdr_json(herdr_bin, "agent", "prompt", target, send_prompt)
         log("prompt submitted, polling for settle")
 
         status = "timeout"
@@ -369,7 +386,21 @@ def execute_once(job: dict, herdr_bin: str) -> None:
             if cur and cur["state_change_seq"] != baseline_seq and cur["agent_status"] in ("idle", "done", "blocked"):
                 status = cur["agent_status"]
                 break
-        snippet = herdr_read(herdr_bin, target).strip()[-NTFY_SNIPPET_CHARS:]
+        full_text = herdr_read(herdr_bin, target).strip()
+        snippet = full_text[-NTFY_SNIPPET_CHARS:]
+
+        if until and status in ("idle", "done"):
+            m = re.search(r"^SCHEDULE_DONE\s*:?\s*(.*)$", full_text, re.MULTILINE)
+            if m:
+                stopped, stop_reason = True, m.group(1).strip()
+                # Delete the job file now, but NOT the launchd job yet: `launchctl bootout`
+                # terminates the running instances of a job, including this very process
+                # (it's currently executing as an instance of the job it would unload). Doing
+                # that now would kill this run before it logs, notifies, or returns -- confirmed
+                # live: the plist survived and no further log line was ever written. Deferred to
+                # the true last statement below, after everything that matters has happened.
+                job_path(name).unlink(missing_ok=True)
+                log(f"stop condition met, unscheduling after this notification: {stop_reason or '(no reason given)'}")
     except Exception as e:  # noqa: BLE001 -- report every failure via ntfy, never crash silently
         log(f"run failed: {e}")
         status, snippet = "error", str(e)
@@ -384,16 +415,26 @@ def execute_once(job: dict, herdr_bin: str) -> None:
     priority, tags, verb = outcome
     log(f"outcome: {status}")
 
+    title = f"{name}: {verb}"
+    if stopped:
+        title += " -- condition met, recurrence stopped"
+    message = f"Prompt: {prompt}\n\n{snippet}" if snippet else f"Prompt: {prompt}"
+    if stopped and stop_reason:
+        message = f"Stop reason: {stop_reason}\n\n{message}"
+
     ntfy = job.get("ntfy", {})
     send_ntfy(
         url=os.environ.get("NTFY_URL", ntfy.get("url", "")),
         token=os.environ.get("NTFY_TOKEN", ntfy.get("token", "")),
         topic=ntfy.get("topic", DEFAULT_NTFY_TOPIC),
-        title=f"{name}: {verb}",
-        message=f"Prompt: {prompt}\n\n{snippet}" if snippet else f"Prompt: {prompt}",
+        title=title,
+        message=message,
         priority=priority,
         tags=tags,
     )
+
+    if stopped:
+        remove_launchd(name)  # may terminate this process -- nothing may follow this line
 
 
 # --------------------------------------------------------------------------
@@ -414,6 +455,8 @@ def cmd_schedule(args: argparse.Namespace) -> None:
         raise SystemExit("prompt text is required")
 
     kind, payload = classify_repeat(args.repeat)
+    if args.until and kind == "once":
+        raise SystemExit("--until only applies to a recurring job (a --repeat value other than 'no')")
     name = args.name or slugify(prompt)
     target = args.target or f"sched-{name}"
     cwd = args.cwd or str(Path.home())
@@ -432,6 +475,7 @@ def cmd_schedule(args: argparse.Namespace) -> None:
         "prompt": prompt,
         "cwd": cwd,
         "repeat": args.repeat,
+        "until": args.until,
         "timeout": args.timeout,
         "ntfy": {} if args.no_ntfy else {"url": ntfy_url, "token": ntfy_token, "topic": args.ntfy_topic},
     }
@@ -443,7 +487,7 @@ def cmd_schedule(args: argparse.Namespace) -> None:
         return
 
     if job_path(name).exists():
-        raise SystemExit(f"job {name!r} already exists -- pick --name explicitly or `remove {name}` first")
+        raise SystemExit(f"job {name!r} already exists -- pick --name explicitly or `kill {name}` first")
 
     job_path(name).write_text(json.dumps(job, indent=2))
     job_path(name).chmod(0o600)  # embeds NTFY_TOKEN
@@ -461,16 +505,17 @@ def cmd_list(_args: argparse.Namespace) -> None:
     for p in paths:
         job = json.loads(p.read_text())
         loaded = "loaded" if is_loaded(job["name"]) else "NOT LOADED"
-        print(f"{job['name']:24} repeat={job['repeat']!r:28} target={job['target']:20} [{loaded}]")
+        until = job.get("until") or "-"
+        print(f"id={job['name']:20} repeat={job['repeat']!r:28} target={job['target']:20} until={until!r:30} [{loaded}]")
         print(f"    prompt: {job['prompt'][:100]}")
 
 
-def cmd_remove(args: argparse.Namespace) -> None:
+def cmd_kill(args: argparse.Namespace) -> None:
     if not job_path(args.name).exists():
-        raise SystemExit(f"no such job: {args.name}")
+        raise SystemExit(f"no such job id: {args.name}")
     remove_launchd(args.name)
     job_path(args.name).unlink(missing_ok=True)
-    print(f"removed {args.name!r}")
+    print(f"killed {args.name!r}")
 
 
 def cmd_run_job(args: argparse.Namespace) -> None:
@@ -493,15 +538,16 @@ def main() -> None:
     p_sched.add_argument("--ntfy-topic", default=os.environ.get("NTFY_TOPIC", DEFAULT_NTFY_TOPIC))
     p_sched.add_argument("--timeout", type=int, default=DEFAULT_RUN_TIMEOUT, help="seconds to wait for a run to settle")
     p_sched.add_argument("--no-ntfy", action="store_true")
+    p_sched.add_argument("--until", help="plain-English condition; when satisfied the job kills itself after that run")
     p_sched.add_argument("prompt", nargs="+")
     p_sched.set_defaults(func=cmd_schedule)
 
     p_list = sub.add_parser("list", help="list scheduled jobs")
     p_list.set_defaults(func=cmd_list)
 
-    p_remove = sub.add_parser("remove", help="unschedule and delete a job")
-    p_remove.add_argument("name")
-    p_remove.set_defaults(func=cmd_remove)
+    p_kill = sub.add_parser("kill", help="stop and delete a recurring job")
+    p_kill.add_argument("name", metavar="id", help="job id, as shown by `list`")
+    p_kill.set_defaults(func=cmd_kill)
 
     p_run = sub.add_parser("run-job", help="run one job immediately (used by launchd, and for manual testing)")
     p_run.add_argument("name")

@@ -78,11 +78,29 @@ that pattern actually means.
 
 ## Other subcommands
 
-- `list` — every scheduled job, its repeat spec, target, and whether launchd still
-  has it loaded.
-- `remove <name>` — unloads the launchd job and deletes its state. It does **not**
+- `list` — every scheduled job by id (its `name`), repeat spec, target, `until`
+  condition (if any), and whether launchd still has it loaded.
+- `kill <id>` — unschedules and deletes a job by the id `list` shows. Does **not**
   close the target pane (it may be shared, or the user may still want it) — close it
   separately with `herdr workspace close <id>` if it should go too.
+
+## Stopping automatically (`--until`)
+
+`--until "<plain-English condition>"` on `schedule` turns a recurring job into one
+that stops itself once the condition holds — e.g. `--until "the venue has replied"`
+or `--until "the invoice has been paid"`. Only valid alongside a real `--repeat`
+(not `--repeat=no`, which has nothing to stop).
+
+Mechanism: every firing's prompt gets the condition appended, with instructions to
+end the reply with a literal `SCHEDULE_DONE: <brief reason>` line if, and only if,
+the condition is now true. The script — not the model — greps the run's terminal
+output for that exact line after a run settles as `idle`/`done`; when found, it
+kills the job itself, same effect as `kill <id>`, done automatically. A `blocked`,
+`timeout`, or `error` run is never treated as a stop signal, even with `until` set,
+since the model didn't get a clean chance to judge the condition.
+
+Report the `until` condition back to the user when scheduling one, same as the
+repeat spec — it's a second thing that could be silently wrong.
 
 ## How a run is judged (for reading logs / explaining outcomes)
 
