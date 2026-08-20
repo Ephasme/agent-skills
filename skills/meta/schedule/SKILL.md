@@ -75,10 +75,11 @@ that pattern actually means.
      "Check the inbox for anything urgent and summarize"
    ```
    Omit `--name`/`--target` and the script derives a job name from the prompt and
-   creates a **dedicated herdr pane** for it (`sched-<name>`) — new work never lands
-   in a pane the user is actively using. Pass `--target <existing-agent-name>` only
-   if the user explicitly wants to reuse a specific pane; two jobs sharing one target
-   will contend for it.
+   creates a **dedicated herdr pane** for it (`sched-<name>`) in the isolated
+   `scheduler` herdr session — see "Herdr session isolation" below; new work never
+   lands in a pane the user is actively using. Pass `--target <existing-agent-name>`
+   only if the user explicitly wants to reuse a specific pane (also resolved inside
+   the `scheduler` session); two jobs sharing one target will contend for it.
 5. **Report back** the job name, the resolved schedule, the ntfy topic, and the log
    path the script prints — don't just say "scheduled it".
 6. To test a job without waiting for its real trigger:
@@ -90,7 +91,31 @@ that pattern actually means.
   `until` condition (if any), and whether launchd still has it loaded.
 - `kill <id>` — unschedules and deletes a job by the id `list` shows. Does **not**
   close the target pane (it may be shared, or the user may still want it) — close it
-  separately with `herdr workspace close <id>` if it should go too.
+  separately with `herdr --session scheduler workspace close <id>` if it should go
+  too (the target lives in the `scheduler` session, not `default`).
+
+## Herdr session isolation
+
+Every scheduled-job herdr call (`workspace create`, `agent start`/`prompt`/`get`/
+`read`) runs against a dedicated named herdr session, `scheduler`
+(`herdr --session scheduler ...`), never the user's interactive `default` session.
+A named session has its own panes, tabs, workspaces, and socket — a job's target
+pane never shows up in the sidebar the user is actively looking at.
+
+The `scheduler` session's headless server is started lazily: the first time any
+job needs it (`schedule --repeat=no`, or a job's first `run-job` firing),
+`ensure_herdr_session` checks `herdr session list --json` and, if it isn't running,
+launches `herdr --session scheduler server` detached and waits for it to come up
+(logged to `.../schedule/logs/herdr-session.log`). It's then left running — a herdr
+server is a normal long-lived background process, and stopping it between firings
+would mean losing every target pane's state and re-paying startup cost on every
+single run. If it crashes or the machine reboots, the next firing detects it's down
+and transparently restarts it; nothing supervises it between firings.
+
+To inspect or clean up scheduled-job panes directly, target that session
+explicitly: `herdr --session scheduler workspace list`,
+`herdr --session scheduler workspace close <id>`. They will not appear in plain
+`herdr workspace list` (that's the `default` session).
 
 ## Stopping automatically (`--until`)
 

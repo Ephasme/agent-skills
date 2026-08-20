@@ -44,6 +44,10 @@ POLL_INTERVAL = 3  # seconds between agent-status polls in run-job
 MAX_CRON_COMBINATIONS = 500  # guard against accidental "every minute all day" cron jobs
 READ_SNIPPET_LINES = 40
 NTFY_SNIPPET_CHARS = 800
+HERDR_SESSION = "scheduler"  # dedicated named herdr session -- keeps every scheduled-job
+                              # pane out of the user's interactive (default) session; see
+                              # SKILL.md "Herdr session isolation"
+SESSION_READY_TIMEOUT = 20  # seconds to wait for a lazily-started herdr session server
 
 CRON_FIELDS = [("Minute", 0, 59), ("Hour", 0, 23), ("Day", 1, 31), ("Month", 1, 12), ("Weekday", 0, 7)]
 
@@ -117,7 +121,9 @@ def resolve_herdr() -> str:
 
 
 def herdr_json(bin_path: str, *args: str) -> dict:
-    proc = subprocess.run([bin_path, *args], capture_output=True, text=True, timeout=30)
+    proc = subprocess.run(
+        [bin_path, "--session", HERDR_SESSION, *args], capture_output=True, text=True, timeout=30
+    )
     out = proc.stdout.strip()
     if proc.returncode != 0 and not out:
         raise RuntimeError(f"herdr {' '.join(args)} failed (exit {proc.returncode}): {proc.stderr.strip()}")
@@ -140,10 +146,50 @@ def herdr_agent_get(bin_path: str, target: str) -> dict | None:
 
 def herdr_read(bin_path: str, target: str, lines: int = READ_SNIPPET_LINES) -> str:
     proc = subprocess.run(
-        [bin_path, "agent", "read", target, "--lines", str(lines), "--format", "text"],
+        [bin_path, "--session", HERDR_SESSION, "agent", "read", target, "--lines", str(lines), "--format", "text"],
         capture_output=True, text=True, timeout=30,
     )
     return proc.stdout
+
+
+def herdr_session_running(bin_path: str) -> bool:
+    """`session list` is itself session-agnostic (no `--session` flag) -- it always
+    enumerates every session known to this herdr install, which is exactly what's
+    needed to check whether HERDR_SESSION's server is up yet."""
+    proc = subprocess.run([bin_path, "session", "list", "--json"], capture_output=True, text=True, timeout=15)
+    try:
+        data = json.loads(proc.stdout.strip())
+    except json.JSONDecodeError:
+        return False
+    return any(s.get("name") == HERDR_SESSION and s.get("running") for s in data.get("sessions", []))
+
+
+def ensure_herdr_session(bin_path: str) -> None:
+    """Lazily start the dedicated `scheduler` herdr session's headless server, so
+    every scheduled-job pane lives in its own session -- its own panes, tabs,
+    workspaces, and socket -- and never appears in the user's interactive (default)
+    session. Left running afterward rather than stopped after each firing: a herdr
+    server is a normal long-lived background process, and stopping it between
+    firings would mean losing the target panes' state (and re-paying startup cost)
+    every single run. If it crashes or the machine reboots, the next firing detects
+    it's down here and transparently restarts it -- no supervisor/LaunchAgent
+    needed for it specifically."""
+    if herdr_session_running(bin_path):
+        return
+    log_file = logs_dir() / "herdr-session.log"
+    with open(log_file, "ab") as fp:
+        subprocess.Popen(
+            [bin_path, "--session", HERDR_SESSION, "server"],
+            stdout=fp, stderr=fp, stdin=subprocess.DEVNULL, start_new_session=True,
+        )
+    deadline = time.time() + SESSION_READY_TIMEOUT
+    while time.time() < deadline:
+        if herdr_session_running(bin_path):
+            return
+        time.sleep(0.5)
+    raise RuntimeError(
+        f"herdr session {HERDR_SESSION!r} did not come up within {SESSION_READY_TIMEOUT}s -- see {log_file}"
+    )
 
 
 def ensure_target(bin_path: str, target: str, cwd: str) -> bool:
@@ -371,6 +417,7 @@ def execute_once(job: dict, herdr_bin: str) -> None:
 
     stopped, stop_reason = False, ""
     try:
+        ensure_herdr_session(herdr_bin)
         existed = ensure_target(herdr_bin, target, job.get("cwd", str(Path.home())))
         log(f"target {target} {'reused' if existed else 'created'}")
         before = herdr_agent_get(herdr_bin, target)
