@@ -59,7 +59,11 @@ that pattern actually means.
    environment (a bearer-token-auth ntfy or ntfy-compatible server). Without them the
    script refuses to schedule unless `--no-ntfy` is passed explicitly — status
    notifications are the point of this skill, so missing credentials fail loudly
-   rather than silently scheduling a job nobody gets told about.
+   rather than silently scheduling a job nobody gets told about. The **topic** is a
+   separate thing from the URL, and nothing prompts you for it: the script resolves
+   `--ntfy-topic`, else `$NTFY_TOPIC`, else the literal default `sched`. A `NTFY_URL`
+   with no path is normal, so name the resolved topic when you report back — a job
+   quietly publishing to `sched` is otherwise invisible.
 3. **Run it**:
    ```bash
    python3 $SKILL_DIR/scripts/schedule.py schedule \
@@ -67,14 +71,35 @@ that pattern actually means.
      "Check the inbox for anything urgent and summarize"
    ```
    Omit `--name`/`--target` and the script derives a job name from the prompt and
-   creates a **dedicated herdr pane** for it (`sched-<name>`) — new work never lands
-   in a pane the user is actively using. Pass `--target <existing-agent-name>` only
-   if the user explicitly wants to reuse a specific pane; two jobs sharing one target
-   will contend for it.
+   creates a **dedicated herdr pane** for it (`sched-<name>`). Pass
+   `--target <existing-agent-name>` only if the user explicitly wants to reuse a
+   specific pane; two jobs sharing one target will contend for it.
+
+   **Do not pass `--cwd` to aim a job at a checkout.** `herdr workspace create --cwd
+   <path>` in a directory herdr already tracks *adopts that workspace's agent session*
+   instead of starting a fresh one, so the "dedicated pane" becomes the session the
+   user is talking to: every firing injects the job's prompt into that conversation,
+   and each notification reports that pane's screen rather than the job's result.
+   Observed live. The script now refuses this at schedule time, naming the workspace it
+   clashed with, before any job file or plist is written. Put absolute paths in the
+   prompt instead — a monitoring job needs no cwd at all — and keep `--cwd` for a
+   directory herdr does not already own.
 4. **Report back** the job name, the resolved schedule, and the log path the script
    prints — don't just say "scheduled it".
-5. To test a job without waiting for its real trigger:
-   `python3 $SKILL_DIR/scripts/schedule.py run-job <name>`.
+5. **Test-fire it once before telling the user it is set up**:
+   `python3 $SKILL_DIR/scripts/schedule.py run-job <name>`. That is the only thing
+   proving the pane, the prompt and ntfy delivery all work together, and it prints
+   `ntfy: <status>` — a `200` is the receipt. Two expected surprises: the `logs:` path
+   the script printed stays **absent or empty** until a real launchd firing, because it
+   is the plist's `StandardOutPath`/`StandardErrorPath` and a manual `run-job` prints to
+   your console instead; and a firing immediately after pane creation can hit
+   `agent_pane_busy` ("not an available shell") — a pane exists before its shell is
+   ready, so the script retries `agent start` 8 times, 3s apart, rather than losing the
+   run.
+6. **Read back what the firing replied**:
+   `herdr agent read sched-<name> --lines 40 --format text` — the same snippet the
+   notification carries. Worth doing once per new job, to confirm the reply has the
+   shape you asked for instead of a wall of prose that will be useless on a phone.
 
 ## Other subcommands
 

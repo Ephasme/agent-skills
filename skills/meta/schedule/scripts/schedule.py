@@ -41,6 +41,8 @@ LABEL_PREFIX = "com.agent-skills.schedule"
 DEFAULT_NTFY_TOPIC = "sched"
 DEFAULT_RUN_TIMEOUT = 900  # seconds a single run may take before it's reported as a timeout
 POLL_INTERVAL = 3  # seconds between agent-status polls in run-job
+AGENT_START_ATTEMPTS = 8  # a just-created pane is not a shell yet -- see ensure_target
+AGENT_START_BACKOFF = 3  # seconds between agent-start attempts
 MAX_CRON_COMBINATIONS = 500  # guard against accidental "every minute all day" cron jobs
 READ_SNIPPET_LINES = 40
 NTFY_SNIPPET_CHARS = 800
@@ -146,14 +148,61 @@ def herdr_read(bin_path: str, target: str, lines: int = READ_SNIPPET_LINES) -> s
     return proc.stdout
 
 
+def herdr_workspace_for_cwd(bin_path: str, cwd: str) -> str | None:
+    """The label of an existing workspace rooted exactly at `cwd`, if there is one.
+
+    `herdr workspace create --cwd <path>` in a directory herdr already tracks adopts that
+    workspace's agent session instead of starting a fresh one. Observed live: a job created
+    with --cwd pointing at a checkout landed in the session its author was talking to, so
+    every firing would have injected the job's prompt into that conversation and reported
+    that pane's screen in the notification.
+    """
+    try:
+        data = herdr_json(bin_path, "workspace", "list")
+    except RuntimeError:
+        return None
+    try:
+        wanted = Path(cwd).resolve()
+    except OSError:
+        return None
+    for workspace in data.get("result", {}).get("workspaces") or []:
+        tree = workspace.get("worktree") or {}
+        for key in ("checkout_path", "repo_root"):
+            raw = tree.get(key)
+            if not raw:
+                continue
+            try:
+                if Path(raw).resolve() == wanted:
+                    return workspace.get("label") or workspace.get("workspace_id")
+            except OSError:
+                continue
+    return None
+
+
 def ensure_target(bin_path: str, target: str, cwd: str) -> bool:
     """Return True if `target` already had a live agent, False if one was just created."""
     if herdr_agent_get(bin_path, target) is not None:
         return True
     result = herdr_json(bin_path, "workspace", "create", "--cwd", cwd, "--label", target, "--no-focus")
     pane_id = result["result"]["root_pane"]["pane_id"]
-    herdr_json(bin_path, "agent", "start", target, "--kind", "omp", "--pane", pane_id, "--timeout", "60000")
-    return False
+    # The pane exists before its shell is ready, and `agent start` on it then fails with
+    # `agent_pane_busy` ("not an available shell"). Observed live: a firing died there and
+    # the identical call succeeded 50s later. A scheduled firing has nobody to re-run it,
+    # so retry here instead of losing the run.
+    last = ""
+    for _ in range(AGENT_START_ATTEMPTS):
+        try:
+            herdr_json(bin_path, "agent", "start", target, "--kind", "omp",
+                       "--pane", pane_id, "--timeout", "60000")
+            return False
+        except RuntimeError as exc:
+            last = str(exc)
+            if "busy" not in last and "available shell" not in last:
+                raise
+            time.sleep(AGENT_START_BACKOFF)
+    raise RuntimeError(
+        f"agent start on {pane_id} still refused after {AGENT_START_ATTEMPTS} attempts: {last}"
+    )
 
 
 # --------------------------------------------------------------------------
@@ -460,6 +509,16 @@ def cmd_schedule(args: argparse.Namespace) -> None:
     name = args.name or slugify(prompt)
     target = args.target or f"sched-{name}"
     cwd = args.cwd or str(Path.home())
+    if args.cwd and not args.target:
+        clash = herdr_workspace_for_cwd(herdr_bin, cwd)
+        if clash:
+            raise SystemExit(
+                f"--cwd {cwd} is already a herdr workspace ({clash}). A pane created there adopts "
+                "that workspace's existing agent session, so every firing would land in a session "
+                "you are already using, and the notification would report that pane instead of the "
+                "job. Omit --cwd and use absolute paths inside the prompt, or pass --target <agent> "
+                "to reuse a pane deliberately."
+            )
 
     ntfy_url = os.environ.get("NTFY_URL", "")
     ntfy_token = os.environ.get("NTFY_TOKEN", "")
@@ -534,8 +593,11 @@ def main() -> None:
     p_sched.add_argument("--repeat", required=True)
     p_sched.add_argument("--target", help="existing herdr agent name/pane; default sched-<name>")
     p_sched.add_argument("--name", help="job name; default derived from the prompt")
-    p_sched.add_argument("--cwd", help="cwd for an auto-created target pane; default $HOME")
-    p_sched.add_argument("--ntfy-topic", default=os.environ.get("NTFY_TOPIC", DEFAULT_NTFY_TOPIC))
+    p_sched.add_argument("--cwd", help="cwd for an auto-created target pane; default $HOME. "
+                                       "Refused if herdr already has a workspace there -- such a pane "
+                                       "adopts that workspace's agent session instead of a fresh one")
+    p_sched.add_argument("--ntfy-topic", default=os.environ.get("NTFY_TOPIC", DEFAULT_NTFY_TOPIC),
+                         help=f"ntfy topic to publish to; default $NTFY_TOPIC, else {DEFAULT_NTFY_TOPIC!r}")
     p_sched.add_argument("--timeout", type=int, default=DEFAULT_RUN_TIMEOUT, help="seconds to wait for a run to settle")
     p_sched.add_argument("--no-ntfy", action="store_true")
     p_sched.add_argument("--until", help="plain-English condition; when satisfied the job kills itself after that run")
