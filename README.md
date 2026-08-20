@@ -277,7 +277,7 @@ cannot reach each other.
 
 | Category | Skills |
 | --- | --- |
-| `engineering` | code-quality-scan, greenfield, plan-hardening, prune-branches |
+| `engineering` | code-quality-scan, git-cleanup, greenfield, plan-hardening |
 | `finance` | payment-qr |
 | `research` | cite-or-refuse, fact-check-document, harden-case |
 | `toolbox` | free-disk-space |
