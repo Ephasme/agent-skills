@@ -60,10 +60,18 @@ that pattern actually means.
    script refuses to schedule unless `--no-ntfy` is passed explicitly — status
    notifications are the point of this skill, so missing credentials fail loudly
    rather than silently scheduling a job nobody gets told about.
-3. **Run it**:
+3. **Pick the ntfy topic**: `--ntfy-topic TOPIC` sets which topic the job's status
+   pushes go to. Ask the user if they want a specific topic (e.g. to route this job
+   to a phone/channel already subscribed to something other than the default) —
+   don't just assume the default is fine for a job the user cares about being
+   notified on. Precedence: `--ntfy-topic` flag > `$NTFY_TOPIC` env var > `"sched"`.
+   The topic is per-job (stored in that job's own definition), so different jobs can
+   push to different topics.
+4. **Run it**:
    ```bash
    python3 $SKILL_DIR/scripts/schedule.py schedule \
      --repeat="0 7-22 * * 1-5" \
+     --ntfy-topic="my-custom-topic" \
      "Check the inbox for anything urgent and summarize"
    ```
    Omit `--name`/`--target` and the script derives a job name from the prompt and
@@ -71,15 +79,15 @@ that pattern actually means.
    in a pane the user is actively using. Pass `--target <existing-agent-name>` only
    if the user explicitly wants to reuse a specific pane; two jobs sharing one target
    will contend for it.
-4. **Report back** the job name, the resolved schedule, and the log path the script
-   prints — don't just say "scheduled it".
-5. To test a job without waiting for its real trigger:
+5. **Report back** the job name, the resolved schedule, the ntfy topic, and the log
+   path the script prints — don't just say "scheduled it".
+6. To test a job without waiting for its real trigger:
    `python3 $SKILL_DIR/scripts/schedule.py run-job <name>`.
 
 ## Other subcommands
 
-- `list` — every scheduled job by id (its `name`), repeat spec, target, `until`
-  condition (if any), and whether launchd still has it loaded.
+- `list` — every scheduled job by id (its `name`), repeat spec, target, ntfy topic,
+  `until` condition (if any), and whether launchd still has it loaded.
 - `kill <id>` — unschedules and deletes a job by the id `list` shows. Does **not**
   close the target pane (it may be shared, or the user may still want it) — close it
   separately with `herdr workspace close <id>` if it should go too.
@@ -126,7 +134,11 @@ shell environment) and are written `0600`.
 
 `NTFY_URL`/`NTFY_TOKEN` are read from the environment at `schedule` time — export
 them from wherever this machine keeps credentials (never hard-code a token in a
-prompt, a job name, or anything that ends up in this repo).
+prompt, a job name, or anything that ends up in this repo). The topic is not a
+credential: `--ntfy-topic` on the `schedule` command wins, else `$NTFY_TOPIC` from
+the environment, else the built-in default `"sched"`. Once set at `schedule` time
+it's frozen into that job's definition — changing it later means re-scheduling
+(`kill` then `schedule` again), not editing the environment.
 
 ## Known gotcha: Cloudflare-fronted ntfy origins
 

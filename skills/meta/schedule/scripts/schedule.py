@@ -506,7 +506,11 @@ def cmd_list(_args: argparse.Namespace) -> None:
         job = json.loads(p.read_text())
         loaded = "loaded" if is_loaded(job["name"]) else "NOT LOADED"
         until = job.get("until") or "-"
-        print(f"id={job['name']:20} repeat={job['repeat']!r:28} target={job['target']:20} until={until!r:30} [{loaded}]")
+        topic = job.get("ntfy", {}).get("topic") or "-"
+        print(
+            f"id={job['name']:20} repeat={job['repeat']!r:28} target={job['target']:20} "
+            f"ntfy-topic={topic:15} until={until!r:30} [{loaded}]"
+        )
         print(f"    prompt: {job['prompt'][:100]}")
 
 
