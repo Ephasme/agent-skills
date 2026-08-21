@@ -94,7 +94,7 @@ other link in that directory.
 
 The step-2 symlinks are derived output, not yadm content: `~/.config/tack/config.yaml` records
 which profile gets which skill, under its `selection:` block, and `tack apply` rebuilds every
-activation link from it — the same operation `scripts/bootstrap.sh` runs on a fresh machine.
+activation link from it. On a fresh machine the skill *content* is chezmoi-tracked and arrives via `chezmoi apply` — `scripts/bootstrap.sh`, which used to install it, no longer exists.
 
 Other agents are named the same way — the CLI's own names (`gemini-cli`, not `gemini`);
 `npx skills add . -a bogus` prints the full list of the ~75 it accepts.
@@ -104,7 +104,7 @@ npx skills add "$SRC" -g -a cursor -a gemini-cli -s '*' -y   # extra non-univers
 npx skills add "$SRC" -s code-quality-scan                          # one skill, project scope
 ```
 
-`scripts/bootstrap.sh` runs the whole set for a fresh machine.
+A fresh machine's whole set arrives via `chezmoi apply` — the store is chezmoi-tracked content, installed nowhere by a script.
 
 ## MCP servers
 
@@ -333,7 +333,7 @@ hand-maintained, from one declaration. Both moved into `~/.config/tack/config.ya
 `~/.agents/.skill-lock.json` rather than vendored here — a copy in this repo would fork it off
 upstream updates. `tamagui`, `find-skills` and `web-design-guidelines` were dropped on 2026-07-31;
 they were recorded in the lock but present nowhere on disk, so the record was removed and
-`scripts/bootstrap.sh` no longer reinstalls them. Copies sit in `~/code/perso/ai-backups/skills.bkp/`.
+they are absent from the chezmoi-tracked skill store rather than reinstalled by a script. Copies sit in `~/code/perso/ai-backups/skills.bkp/`.
 
 **The `agents/` directory.** `tcc-expert.md` and `assurance-fr.md` are the two files here that the
 portability contract does not reach: a subagent definition is a per-product format, and these are
