@@ -1,29 +1,20 @@
 #!/usr/bin/env bash
 # Reinstall the full skill set on a fresh machine: every skill recorded in
 # ~/.agents/.skill-lock.json — this repo's own skills and every third-party one,
-# tracked there by name — plus the MCP servers rendered into every agent that is
-# installed.
+# tracked there by name.
 #
-# Layout: content in ~/.agents/skills/<name>, and one symlink per skill per instance
-# — one harness × one identity. Today that is
-# ~/.omp/profiles/{perso,work}/agent/skills/<name> and
-# ~/.opencode/profiles/{perso,work}/config/opencode/skills/<name>; codex reads
-# ~/.agents/skills natively and is posted no link at all. For omp those
-# links are the only user-level skill source it reads (~/.config/tack/harness/omp/config.shared.yml
-# turns the foreign ones off). The CLI produces the store on its own — every
-# "universal" agent's skills dir *is* ~/.agents/skills — and it links the agents it
-# detects. It detects none of those four directories, so installing a skill activates
-# it nowhere. That is deliberate: each identity links only the skills that belong in
-# it, and work and perso do not get the same set.
+# Layout: content in ~/.agents/skills/<name>, read directly by omp via
+# skills.enableAgentsUser: true — so installing a skill *is* activating it and
+# there is no activation step. The per-instance skill links are gone: the
+# ~/.omp/profiles/{perso,work} and ~/.opencode/profiles/{perso,work} symlink farms,
+# the ~/.config/tack/harness/omp/config.shared.yml source and ~/.config/tack/config.yaml
+# as the activation declaration were all retired with tack (2026-08-18). The
+# directory that remains unshipped is ~/.omp/agent/agents/ — the subagent
+# definitions this script links below — and its exclusion (~/.gitignore) is still
+# right, because that output legitimately differs per machine until this runs.
 #
-# So this script rebuilds the store, then hands activation to tack. Which identity
-# gets which skill is not in the lock and never was: it is declared in
-# ~/.config/tack/config.yaml — yadm content, like the lock — and `tack apply` is the
-# only thing that turns that declaration into symlinks. The symlinks themselves are
-# not tracked: ~/.gitignore excludes each harness's activation directory, because an
-# output that can disagree with its source has no business being carried. So a fresh
-# machine clones the declaration and none of the links, and closing that gap is this
-# script's second half.
+# So this script rebuilds the store, then links the subagent definitions and the
+# herdr-tags plugin: the two machine-level outputs the store no longer stands in for.
 #
 # The install pass below calls npx directly and deliberately not ~/.local/bin/skills,
 # for a reason that has outlived its original one: that wrapper injects the same
@@ -145,35 +136,50 @@ else
   done 3<<<"$groups"
 fi
 
-# Activation, and the MCP servers with it. Both are one command now: the store is
-# content, and which profile gets which skill — and which harness gets which MCP
-# server, extension and shell shortcut — is declared in ~/.config/tack/config.yaml.
-# `tack apply` is the one code path that turns that declaration into symlinks and
-# rendered files, and it is called rather than reimplemented here because it knows
-# the three things this script does not: which harnesses are installed, which read
-# ~/.agents/skills natively and get no link at all, and which are residue and must
-# never be written into.
-#
-# The MCP render used to be a separate `node install-mcp.mjs` pass over
-# mcp/servers.json. That manifest and that renderer were deleted on 2026-08-16 when
-# config.yaml became the only record; apply writes those files now, and like the old
-# pass it needs no credentials — what it writes are references to environment
-# variables, not their values — so it is correct before `yadm decrypt` has restored
-# ~/.config/secrets.zsh.
-echo
-if ! command -v tack >/dev/null 2>&1; then
-  # Loud on purpose. A store that cannot be activated leaves every skill installed
-  # and visible nowhere: this script's worst outcome and its least visible one.
-  echo "error: tack is not on PATH — install it with \`uv tool install ~/code/perso/tack\`, then re-run." >&2
-  exit 1
+# Subagent definitions. ~/.omp/agent/agents/*.md are symlinks into this repo's
+# agents/ directory: the definition lives with the skills, and omp reads the link.
+# Every *.md in the source is linked — the set is the directory, not a hand list.
+# Not tracked by yadm (~/.gitignore ignores /.omp/agent/agents/), which is why a
+# fresh machine has none until this runs.
+agents_src=$HOME/code/perso/agent-skills/agents
+agents_dst=${PI_CODING_AGENT_DIR:-$HOME/.omp/agent}/agents
+if [ -d "$agents_src" ]; then
+  mkdir -p "$agents_dst"
+  for f in "$agents_src"/*.md; do
+    [ -e "$f" ] || continue
+    ln -sfn "$f" "$agents_dst/$(basename "$f")"
+  done
+  echo "==> Subagents linked into $agents_dst"
+else
+  echo "warning: $agents_src missing — no subagent definitions linked" >&2
 fi
-echo "==> Activation, MCP and shortcuts (tack apply)"
-# No redirection or fd juggling needed: this is outside the fd-3 loop above, and
-# `tack apply` reads no stdin with --yes. A non-zero exit aborts the script under
-# `set -e` (line 51), which is the intent — a failed reconciliation is not a
-# cosmetic problem. It is idempotent: on a converged machine it prints "nothing to
-# do", which is why it is not gated on any file existing.
-tack apply --yes
+
+# herdr-tags: a LINKED herdr plugin, owning the tag_*/tags pane metadata tokens
+# and the herd's single agent.view.set projection. `herdr plugin link` runs no
+# [[build]], so the tree must be built by hand first or the link points at no
+# binary.
+tags_dir=$HOME/code/perso/herdr-tags
+if command -v herdr >/dev/null 2>&1; then
+  # Same stale-checkout guard as `clone_if_missing` in ~/.config/yadm/bootstrap:
+  # a previous failed clone leaves a directory that is not a git repo, and
+  # `[ -d ]` alone would then hand an unbuildable tree to cargo.
+  if [ -d "$tags_dir" ] && ! git -C "$tags_dir" rev-parse HEAD >/dev/null 2>&1; then
+    rm -rf "$tags_dir"
+  fi
+  if [ ! -d "$tags_dir" ]; then
+    git clone git@github.com:Ephasme/herdr-tags.git "$tags_dir" \
+      || echo "warning: herdr-tags clone failed" >&2
+  fi
+  if [ -d "$tags_dir" ]; then
+    ( cd "$tags_dir" && cargo build --release ) \
+      || echo "warning: herdr-tags build failed — plugin left unlinked" >&2
+    if ! herdr plugin list | grep -q 'tags'; then
+      herdr plugin link "$tags_dir" || echo "warning: herdr plugin link failed" >&2
+    fi
+  fi
+else
+  echo "warning: herdr missing — skipping herdr-tags" >&2
+fi
 
 echo
-echo "Done. Verify with: tack doctor"
+echo "Done."
