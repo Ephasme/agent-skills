@@ -279,7 +279,7 @@ cannot reach each other.
 | --- | --- |
 | `engineering` | code-quality-scan, git-cleanup, greenfield, plan-hardening, refine-document |
 | `finance` | payment-qr |
-| `research` | cite-or-refuse, fact-check-document, harden-case |
+| `research` | cite-or-refuse, fact-check-document, harden-case, true-quality |
 | `toolbox` | free-disk-space |
 | `meta` | executing-autonomously, handoff, no-verbose, schedule |
 | `health` | tcc |
