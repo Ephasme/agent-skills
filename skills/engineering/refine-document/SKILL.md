@@ -142,8 +142,9 @@ Compress:
 document that lost a fact is a regression, not a win. Word count is a symptom of the work,
 never its target.
 
-**The one sanctioned duplication** is the agent target's head-and-tail restatement of the
-critical block (pass 4). Every other repetition goes.
+**The one conditionally sanctioned duplication** is the agent target's head-and-tail
+restatement of the critical block, past the length threshold set in Pass 4. Below that
+threshold it is a repetition like any other, and goes.
 
 ## Pass 4 — organize for the declared reader
 
@@ -169,11 +170,17 @@ lists the facts a reader needs before they can do anything, not a précis of the
 The reader is a model that loads the document as context, often after grepping for one term
 and reading only the matched slice. Produce a document with this shape:
 
-1. **A critical block first, and the same block verbatim last.** Prerequisites, destructive
-   operations, and hard constraints. Attention to a long context is strongest at its two
-   ends and weakest in the middle (Liu et al., TACL 2024) — the middle is where a rule goes
-   to be ignored. Head the first copy `## Critical constraints` and the last
-   `## Critical constraints (repeat)`: two unique anchors, one identical body. This pair is
+1. **A critical block first, always; the same block verbatim last only past ~100 lines.**
+   Prerequisites, destructive operations, and hard constraints go first regardless of length.
+   Lost-in-the-middle degradation (Liu et al., TACL 2024) is measured on multi-document
+   contexts in the thousands-to-tens-of-thousands-of-token range — a document short enough to
+   read in one pass has no "middle" in that sense, and a tail copy there is pure duplication
+   with no retrieval benefit. Duplicate only once the document passes the same ~100-line
+   threshold that earns it a contents list (#9 below), where a grep-and-slice reader can
+   plausibly land mid-document and miss the block. Below the threshold, state it once, at the
+   top, and stop — a second copy there is a regression pass 3 should have caught, not a
+   feature of this target. When it is warranted: head the first copy `## Critical constraints`
+   and the last `## Critical constraints (repeat)` — two unique anchors, one identical body,
    the only near-duplicate heading the document may contain.
 2. **Positive phrasing.** State the action to take. Where a prohibition is genuinely needed,
    put the positive alternative in the same sentence: "write to `state/`, not to `/tmp`".
@@ -231,7 +238,7 @@ document.
 
 | Decision | `--target=human` | `--target=agent` |
 |---|---|---|
-| Critical constraints | once, on the first screen, marked | first **and** repeated verbatim last |
+| Critical constraints | once, on the first screen, marked | once at top under ~100 lines; first **and** repeated verbatim last beyond it |
 | Section independence | sections may build on earlier ones | every section self-contained |
 | Cross-references | "see above" is fine | name the exact heading |
 | Headings | descriptive and readable | unique, literal, grep-shaped |
@@ -256,11 +263,12 @@ Re-read the file you wrote. Not the draft, not your intent — the bytes on disk
    not is a false report.
 3. Every marked `[unverified]` claim appears in the report, and every marker in the document
    sits on a claim whose failure the reader cannot undo.
-4. No heading is duplicated. Under `--target=agent` no heading is a near-duplicate either,
-   except the `## Critical constraints` / `## Critical constraints (repeat)` pair.
+4. No heading is duplicated. Under `--target=agent`, a near-duplicate heading exists only
+   when the critical block was duplicated per the length rule in Pass 4 — the
+   `## Critical constraints` / `## Critical constraints (repeat)` pair, and nothing else.
 5. Every internal pointer resolves to a heading that still exists.
-6. The critical block is where the target requires, and its two copies match verbatim
-   (`--target=agent`).
+6. The critical block is where the target requires: once at the top under ~100 lines, or
+   twice — verbatim — above that length (`--target=agent`).
 7. Nothing in the document asserts something you did not find in the source or verify
    yourself.
 
@@ -289,6 +297,7 @@ Re-read the file you wrote. Not the draft, not your intent — the bytes on disk
 | "I'll note in the report that I added a summary" | The report is checked against the file, not against your intent. Re-read what you wrote. |
 | "Compression means shorter" | Compression means fewer words for the same facts. A lost fact is a regression. |
 | "The record is bureaucracy, the diff is in git" | The record says what was removed and why, grouped, verbatim. A diff of a full rewrite says nothing. |
+| "It's `--target=agent`, so duplicate the critical block" | Only past ~100 lines. Lost-in-the-middle is a long-context effect; a short document has no middle for it to bite, and the second copy is a straight duplication. |
 
 ## Red flags — stop and re-read the pass
 
