@@ -95,7 +95,7 @@ def render_qr(payload, out_path):
     # 3) venv isolé jetable : site-packages courant verrouillé mais réseau OK.
     try:
         import venv
-        vdir = tempfile.mkdtemp(prefix="payment-qr-venv-")
+        vdir = tempfile.mkdtemp(prefix="payment-qr-code-venv-")
         venv.create(vdir, with_pip=True)
         bindir = "Scripts" if os.name == "nt" else "bin"
         vpy = os.path.join(vdir, bindir, "python.exe" if os.name == "nt" else "python")
