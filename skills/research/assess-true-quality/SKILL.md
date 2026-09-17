@@ -1,5 +1,5 @@
 ---
-name: true-quality
+name: assess-true-quality
 description: Use when the real quality of something has to be established from internet evidence and the obvious sources are compromised — choosing between products, models, brands, tools, services, lodgings, contractors or suppliers; judging whether a rating, a review pool, a "best X" ranking, a benchmark or a vendor spec can be trusted. Trigger phrases — "is X actually any good", "which X should I buy", "best X", "is X worth it", "are these reviews fake", "why is this rated so highly", "quel est le meilleur", "est-ce que ça vaut le coup", "faux avis". Also when a previous answer leaned on a listicle, an affiliate round-up, a star average or a manufacturer claim.
 ---
 
@@ -146,8 +146,8 @@ test.
 | Comparing two libraries/APIs on engineering merit | ordinary engineering judgement — this skill answers only the *supply-side* half (is it maintained, is the vendor solvent) |
 | Whether claims in a document the user supplied are true | `fact-check-document` |
 | Pure sourcing discipline on any topic | `cite-or-refuse` |
-| French insurance cover, a refused claim, a policy | `assurance-fr` |
-| Whether a therapy or mental-health product works | `tcc` |
+| French insurance cover, a refused claim, a policy | `french-insurance-law` |
+| Whether a therapy or mental-health product works | `cbt` |
 | Medical, legal or financial advice for a specific person | no skill here — state the evidence and say the decision belongs with a professional |
 
 ## Domain map

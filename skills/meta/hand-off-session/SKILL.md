@@ -1,5 +1,5 @@
 ---
-name: handoff
+name: hand-off-session
 description: >-
   Compacts the current conversation into a handoff document a fresh agent can pick the
   work up from, optionally bundling everything it depends on into a self-contained

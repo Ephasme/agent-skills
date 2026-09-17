@@ -1,5 +1,5 @@
 ---
-name: assurance-fr
+name: french-insurance-law
 description: >-
   Conseil de niveau senior en droit français des assurances, adossé aux sources
   primaires (Code des assurances, Code civil, Code de la mutualité, Code de la sécurité

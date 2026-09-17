@@ -2,7 +2,7 @@
 name: refine-document
 description: >-
   Rewrites one document — README, AGENTS.md, design note, runbook, spec — so it is
-  greenfield (no history, no legacy), factual (every claim verified against a primary source
+  free of legacy (no history, no backstory), factual (every claim verified against a primary source
   or marked, nothing invented), concise (one fact in one place), organized (critical
   information first), and tuned to a declared reader. Takes --target=agent (default), for an
   LLM that reads the document as context, or --target=human; the two produce deliberately
@@ -18,7 +18,7 @@ description: >-
 # Refine Document
 
 Take one document and produce a version that a reader who has no history with the project
-can act on: **greenfield, factual, concise, organized, and shaped for the declared reader.**
+can act on: **legacy-free, factual, concise, organized, and shaped for the declared reader.**
 
 Four passes, fixed order, then a verification gate. Everything removed is written to a
 record file, so a wrong call is recoverable.
@@ -59,14 +59,14 @@ Run the passes in this order, as four separate reads of the document. Each one s
 input to the next, and out of order they undo each other — compressing prose that pass 1
 was going to delete wastes the work, and organizing before compressing organizes filler.
 
-1. **Greenfield** — remove everything that only makes sense as a reference to the past.
+1. **Strip legacy** — remove everything that only makes sense as a reference to the past.
 2. **Factual** — every surviving claim is verified, cited, or marked.
 3. **Concise** — one fact, one place, shortest form that keeps the fact.
 4. **Organize** — critical first, then the target's shape.
 
-## Pass 1 — greenfield
+## Pass 1 — strip legacy
 
-**REQUIRED SUB-SKILL:** use `greenfield` for this pass. It owns the legacy taxonomy, the
+**REQUIRED SUB-SKILL:** use `strip-legacy-content` for this pass. It owns the legacy taxonomy, the
 excise-don't-rewrite rule, and the `{name}.changelog.md` format this skill also writes into.
 Map `--no-record` to its `--no-changelog`.
 

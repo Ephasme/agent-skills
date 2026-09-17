@@ -1,5 +1,5 @@
 ---
-name: workspace-attachments
+name: move-workspace-files
 description: >-
   Moves real file bytes in and out of the self-hosted Google Workspace MCP servers
   (Gmail, Drive, Chat), which do all their file I/O on the server rather than on

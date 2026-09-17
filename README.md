@@ -35,11 +35,11 @@ time.
 say what to run instead when the agent has none — the same units, in series, with results written
 to files between them. Parallelism is an optimisation; the isolation it buys is the thing that
 matters, and it can be bought with files and ordering. The exception is stated outright:
-`code-quality-scan` refuses to merge its find and check passes.
+`scan-code-quality` refuses to merge its find and check passes.
 
 **Declare hard requirements in `compatibility`.** The spec's optional `compatibility` field is
 where an external binary, a credential, a network dependency, or a specific target product
-belongs. `handoff` needs a Unix-like local and remote host with `tar`, `ssh`, and `rsync`/`scp` —
+belongs. `hand-off-session` needs a Unix-like local and remote host with `tar`, `ssh`, and `rsync`/`scp` —
 that's a hard requirement, declared in the field, and it still runs from any agent because it
 drives whatever transfer tools the host's shell offers rather than assuming one.
 
@@ -277,14 +277,14 @@ cannot reach each other.
 
 | Category | Skills |
 | --- | --- |
-| `engineering` | code-quality-scan, git-cleanup, greenfield, plan-hardening, refine-document |
-| `finance` | payment-qr |
-| `research` | cite-or-refuse, fact-check-document, harden-case, true-quality |
+| `engineering` | clean-git-repo, harden-plan, refine-document, scan-code-quality, strip-legacy-content |
+| `finance` | generate-payment-qr-code |
+| `research` | assess-true-quality, cite-or-refuse, fact-check-document, harden-case |
 | `toolbox` | free-disk-space |
-| `meta` | executing-autonomously, handoff, no-verbose, schedule |
-| `health` | tcc |
-| `legal` | assurance-fr |
-| `helpers` | workspace-attachments |
+| `meta` | execute-autonomously, hand-off-session, schedule-prompt, tighten-responses |
+| `health` | cbt |
+| `legal` | french-insurance-law |
+| `helpers` | move-workspace-files |
 
 `skills/<category>/<skill>/SKILL.md` is discovered natively — the CLI walks one extra level inside
 `skills/` for exactly this catalog layout. No manifest file is needed. Categories organise the
@@ -335,7 +335,7 @@ upstream updates. `tamagui`, `find-skills` and `web-design-guidelines` were drop
 they were recorded in the lock but present nowhere on disk, so the record was removed and
 they are absent from the chezmoi-tracked skill store rather than reinstalled by a script. Copies sit in `~/code/perso/ai-backups/skills.bkp/`.
 
-**The `agents/` directory.** `tcc-expert.md` and `assurance-fr.md` are the two files here that the
+**The `agents/` directory.** `cbt-expert.md` and `french-insurance-law-expert.md` are the two files here that the
 portability contract does not reach: a subagent definition is a per-product format, and these are
 written to omp's task-agent contract — `autoloadSkills`, a full `model` selector, `thinking-level`,
 `read-summarize`. Each is kept beside the skill it drives and autoloads that skill rather than
@@ -344,6 +344,6 @@ installs skills only, so activation is a symlink made by hand, per profile that 
 agent:
 
 ```sh
-ln -s ~/code/perso/agent-skills/agents/tcc-expert.md \
+ln -s ~/code/perso/agent-skills/agents/cbt-expert.md \
       ~/.omp/profiles/perso/agent/agents/
 ```

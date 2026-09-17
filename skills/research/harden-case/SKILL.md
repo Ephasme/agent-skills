@@ -91,7 +91,7 @@ identity and working-copy state have not changed unexpectedly.
 - Never send sensitive case data to web search, outbound messages, or unrelated services.
 - Treat zones defined as hand-owned or untouchable by `cases/RUNBOOK.md` as read-only. Raise
   findings there to the user, including front matter, journal or log entries, and Notes.
-- Never greenfield or compress `journal.md`, curated history, `documents/`, or `archive/`.
+- Never strip legacy from or compress `journal.md`, curated history, `documents/`, or `archive/`.
 - Move circulated wrong facts to the repository-defined wrong-facts record; never silently delete.
 - Before deletion, confirm the path is tracked, inside case scope, not a protected/generated
   authority, and preserved elsewhere when it carries facts. For Git, use
@@ -156,7 +156,7 @@ Select every applicable role and state omissions:
 | `blindspots` | Find missing obligations, risks, and dependencies. | Never |
 | `maths` | Recompute totals, dates, rates, counts, and derived values. | No derived values |
 | `language` | Enforce declared language by file and audience. | Never |
-| `greenfield` | Keep canonical files current and history properly confined. | Pure append-only log |
+| `strip-legacy` | Keep canonical files current and history properly confined. | Pure append-only log |
 | `tasker` | Propose complete structured tasks; never write them. | Never |
 
 A claim is material when acting on it could change money, timing, legal/contractual duties,

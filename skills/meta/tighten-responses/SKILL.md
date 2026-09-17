@@ -1,5 +1,5 @@
 ---
-name: no-verbose
+name: tighten-responses
 description: Reinjects Loup's response-style rules — maximum concision, numbered lists, no narration or process storytelling. Use when the user invokes it by name, when they say responses are getting verbose, bloated, chatty, or "too much bla-bla", or when they ask to tighten up or reset how you write — including after a context summarization, when the always-on copy of these rules in the agent instructions file may have decayed. Invoke only on an explicit request — never load it on your own initiative, since it restyles the whole session.
 disable-model-invocation: true
 ---

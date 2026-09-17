@@ -1,22 +1,22 @@
 ---
-name: greenfield
+name: strip-legacy-content
 description: >-
-  Converts one or more documents into a "greenfield" version describing only the
-  current state — as if the system were freshly designed with no past — by stripping
+  Rewrites one or more documents so they describe only the current state — as if the
+  system were freshly designed with no past — by stripping
   every kind of legacy content: history narratives, ADRs and decision records,
   deprecation and migration notes, embedded changelogs, rejected alternatives,
   back-compat sections, and dated commentary. Nothing is deleted by default: each
   removed passage is preserved verbatim, with its original location, in a sibling
   {name}.changelog.md; --no-changelog makes the trim destructive instead. Use when the
-  user says "greenfield this", "make this doc read fresh", "strip the history / legacy /
-  ADRs / decision records", "clean this up for handoff", or "I want only the current
-  state, no baggage". Handles one document or many — a list, a glob, or a directory — in
+  user says "strip the history / legacy / ADRs / decision records", "make this doc read
+  fresh", "remove the backstory", "greenfield this", "clean this up for handoff", or "I
+  want only the current state, no baggage". Handles one document or many — a list, a glob, or a directory — in
   parallel where possible. Invoke only on an explicit request — never load it on your own
   initiative, since it rewrites the user's documents in place.
 disable-model-invocation: true
 ---
 
-# Greenfield
+# Strip legacy content
 
 **Explicit invocation only.** It rewrites the user's documents in place, which must never happen
 on a guess. Some agents honour the `disable-model-invocation` frontmatter above; where that key is
@@ -25,12 +25,12 @@ carries history, only because the user asked.
 
 Take a document that has accumulated cruft over time — design docs, specs, READMEs,
 architecture notes carrying history, decisions, deprecations, migrations — and
-produce a **greenfield** version that reads as if written today by someone who never
+produce a **current-state** version that reads as if written today by someone who never
 knew the old system, describing only how things currently work.
 
 **The core invariant: nothing is lost.** This is not deletion. It is *separation*.
 Every passage that doesn't belong in a fresh document is moved, verbatim, into a
-changelog file. The greenfield doc holds the present; the changelog holds everything
+changelog file. The current-state doc holds the present; the changelog holds everything
 that was trimmed.
 
 ## Mode: `--no-changelog`
@@ -43,7 +43,7 @@ test, excise-don't-rewrite, and seam-healing are identical in both modes.
 |  | **Default** | **`--no-changelog`** |
 |---|---|---|
 | Trimmed spans | moved verbatim into `{name}.changelog.md` | **discarded** — written nowhere |
-| Outputs per document | greenfield doc + changelog | greenfield doc only |
+| Outputs per document | current-state doc + changelog | current-state doc only |
 | Flags (dangling refs, ambiguous calls) | the changelog's `### Flags` section | the final report — the only record that survives |
 | Report closes with | trimmed content lives in the `.changelog.md` files; originals reconstructable | trimmed content was discarded; this run cannot reconstruct it |
 | Recoverable | yes, from the changelog | only from version control |
@@ -62,30 +62,30 @@ Two things the flag adds rather than removes:
   `--no-changelog`: trimmed content will not be saved". Since the in-place default leaves
   version control as the only recovery path, confirm the targets are tracked and clean in
   git first; if they aren't, say so and get an explicit go-ahead. (`--no-changelog`
-  writing to `{name}.greenfield.md` is the milder pairing — the source survives intact.)
+  writing to `{name}.current.md` is the milder pairing — the source survives intact.)
 
 The mode applies to the whole run: every document, every sub-agent, the same mode.
 
 ## Operating principles (these are the whole point)
 
-- **Two outputs, never destruction.** Each input yields a greenfield document
+- **Two outputs, never destruction.** Each input yields a current-state document
   (current state only) **and** a `{name}.changelog.md` (everything removed, verbatim,
   located). If you would delete something, you move it instead.
-- **Excise, don't rewrite.** Produce the greenfield doc by *deleting the legacy
+- **Excise, don't rewrite.** Produce the current-state doc by *deleting the legacy
   spans* from the original — not by regenerating it from understanding. Surviving
   prose must stay byte-for-byte identical. Rewriting risks paraphrasing away correct
   current content and silently altering meaning; excision cannot.
 - **Preserve verbatim.** Removed passages are copied into the changelog exactly as
-  written, with enough location context to put them back. The pair (greenfield +
+  written, with enough location context to put them back. The pair (current-state +
   changelog) should let a reader reconstruct the original.
-- **Present tense is the test.** A greenfield doc states what *is* and how things
+- **Present tense is the test.** A current-state doc states what *is* and how things
   *currently* work (including present-tense rationale: "uses event sourcing to
   enable audit replay"). Anything that only makes sense as a reference to the *past*,
   a *removed* thing, a *future removal*, or a *comparison to what came before* is
   legacy and gets trimmed.
-- **Correctness beats thoroughness.** The greenfield doc must remain a complete and
+- **Correctness beats thoroughness.** The current-state doc must remain a complete and
   correct description of the current system. When unsure whether a passage is "legacy
-  framing" or "load-bearing current detail," keep it in the greenfield doc and add a
+  framing" or "load-bearing current detail," keep it in the current-state doc and add a
   flag — under-trimming leaves mild cruft, over-trimming makes the doc wrong. (By default
   the trimmed content is recoverable from the changelog regardless.)
 - **One sub-agent per document.** Multiple documents are processed in parallel, one
@@ -113,7 +113,7 @@ Then branch on the count: **1 → run the per-document procedure directly. N →
 |---|---|---|
 | **History / evolution** | "originally", "previously", "used to", "in the past", "formerly known as", version-evolution narratives | the historical narrative; keep only the resulting present-tense fact |
 | **Decision records / ADRs** | "Decision:", Context/Decision/Consequences blocks, "we chose X over Y", "options considered", "trade-off analysis" framed as a past choice | the whole record; if it carries rationale still true today, restate that rationale in present tense and keep *that* one line |
-| **Deprecation** | "deprecated", "do not use", "will be removed", "use X instead" | the deprecated item itself and its notice — in a greenfield system it simply doesn't exist (watch for surviving references to it) |
+| **Deprecation** | "deprecated", "do not use", "will be removed", "use X instead" | the deprecated item itself and its notice — in a fresh system it simply doesn't exist (watch for surviving references to it) |
 | **Migration / upgrade** | "upgrading from", "migration guide", "breaking changes", "if you're on v1" | entirely |
 | **Embedded changelog / release notes** | "## Changelog", "## Release Notes", version-dated entries | entirely |
 | **Legacy / back-compat** | "legacy", "backwards compatibility", "for compatibility with older", "transitional" | entirely |
@@ -140,7 +140,7 @@ Apply to every passage:
 > - **Yes** → keep it (untouched).
 > - **No — it only makes sense as a reference to the past, a removed thing, a future
 >   removal, or a comparison to what was** → trim it to the changelog.
-> - **Unsure** → keep it in the greenfield doc and add a flag for review.
+> - **Unsure** → keep it in the current-state doc and add a flag for review.
 
 ## Per-document procedure
 
@@ -152,7 +152,7 @@ it directly.)
 2. **Classify every passage** as keep or trim, tagging each trim with a category from
    the taxonomy.
 3. **Excise the trim-spans** from a working copy of the file. Do not touch surviving
-   content. The greenfield doc is the original *minus* the legacy spans — not a rewrite.
+   content. The current-state doc is the original *minus* the legacy spans — not a rewrite.
 4. **Heal the seams.** Only these edits are permitted beyond deletion:
    - remove a heading/section left empty by its content's removal;
    - **fix or flag** cross-references now dangling (e.g. "see the migration section"
@@ -161,18 +161,18 @@ it directly.)
    - collapse runs of >1 consecutive blank line introduced by deletions;
    - repair list numbering / markdown structure broken by a removal.
    No rewriting, condensing, or "improving" of surviving prose.
-5. **Stand-alone pass.** Confirm the greenfield doc reads as a fresh document: no
+5. **Stand-alone pass.** Confirm the current-state doc reads as a fresh document: no
    orphaned "as mentioned above", "as we'll see", or "unlike the old…" pointing at
    content that's no longer there.
-6. **Write the greenfield doc to the original path** (in place — see Output contract for
+6. **Write the current-state doc to the original path** (in place — see Output contract for
    the non-destructive option).
 7. **Write / append the changelog** (format below).
 8. **If nothing was trimmed:** leave the source file unchanged, do **not** create a
-   changelog, and report `already greenfield`.
+   changelog, and report `already current-state`.
 
 ## Output contract
 
-**Greenfield document** — written to the original path, in place. Preserve the original
+**Current-state document** — written to the original path, in place. Preserve the original
 format and heading style. Put **no** editorial annotations inside it (flags go in the
 changelog, not the doc).
 
@@ -190,11 +190,11 @@ README                 →  README.changelog.md
 ```markdown
 # {name} — trimmed legacy content
 
-Content removed from `{original path}` during greenfielding. The greenfield document
+Content removed from `{original path}` during the strip. The current-state document
 holds the current state; this file holds everything trimmed from it, verbatim, so the
 original can be reconstructed.
 
-## Greenfielded YYYY-MM-DD
+## Stripped YYYY-MM-DD
 
 ### History / evolution
 
@@ -213,7 +213,7 @@ _Why:_ <one line, optional>
 ### Flags
 
 - <dangling reference removed at `<heading>`: "<text>">
-- <ambiguous keep/trim kept in greenfield at `<heading>`: "<text>">
+- <ambiguous keep/trim kept in the current-state doc at `<heading>`: "<text>">
 ```
 
 Rules for the changelog:
@@ -222,9 +222,9 @@ Rules for the changelog:
   is itself markdown/code), each with its **original location** (nearest heading plus a
   short locator) so re-insertion is possible.
 - **Append, never overwrite.** On a re-run that trims new content, add a new
-  `## Greenfielded <date>` section above or below prior ones — do not rewrite history.
+  `## Stripped <date>` section above or below prior ones — do not rewrite history.
 - End each run section with **Flags**: dangling references that were removed, and any
-  ambiguous calls left in the greenfield doc for review.
+  ambiguous calls left in the current-state doc for review.
 
 ## Orchestration: single vs many
 
@@ -238,11 +238,11 @@ Rules for the changelog:
   mode to every sub-agent** — a sub-agent cannot infer it, and one that assumes the
   default either writes a changelog the user asked not to have or, the other way, discards
   content irrecoverably. Each returns a **structured result** so you can aggregate:
-  - greenfield path,
+  - current-state path,
   - changelog path (or `none`),
   - count of items trimmed **by category**,
   - flags (dangling refs, ambiguous calls),
-  - `already greenfield` if applicable.
+  - `already current-state` if applicable.
 
   If a sub-agent fails or reports an oversized/ambiguous document, re-dispatch or
   surface it — do not let one failure silently drop a document from the batch.
@@ -253,7 +253,7 @@ Fill `<MODE>` with `default` or `--no-changelog`, matching the run. Every sub-ag
 batch gets the same one.
 
 ```
-You are converting ONE document to a greenfield version as part of a batch.
+You are converting ONE document to a current-state version as part of a batch.
 
 Read the skill at <SKILL_PATH> and follow its "Mode", "Per-document procedure" and
 "Output contract" sections for EXACTLY this one file — do not touch any other file:
@@ -263,10 +263,10 @@ Read the skill at <SKILL_PATH> and follow its "Mode", "Per-document procedure" a
 Run mode: <MODE>
 
 Non-negotiables (restated so you don't need to re-derive them):
-- The greenfield doc holds the current state only. What happens to the spans you trim is
+- The current-state doc holds the current state only. What happens to the spans you trim is
   decided solely by the run mode above, as defined in the skill's "Mode" section — read
   it and follow it exactly. Never substitute the default for a mode that says otherwise.
-- EXCISE, don't rewrite: the greenfield doc is the original minus the legacy spans;
+- EXCISE, don't rewrite: the current-state doc is the original minus the legacy spans;
   surviving prose stays byte-for-byte. The only edits beyond deletion are healing
   seams (drop emptied headings, fix/flag dangling refs, collapse blank lines, repair
   broken lists).
@@ -274,37 +274,37 @@ Non-negotiables (restated so you don't need to re-derive them):
   embedded changelogs/release notes, legacy/back-compat, rejected alternatives, dated
   commentary, superseded sections. Keep: current architecture/behavior/APIs/data
   models/constraints, present-tense rationale, current usage/ops, still-valid
-  limitations. When unsure, KEEP in the greenfield doc and flag it.
-- Write the greenfield doc in place at <FILE>.
+  limitations. When unsure, KEEP in the current-state doc and flag it.
+- Write the current-state doc in place at <FILE>.
 - If nothing was trimmed: leave <FILE> unchanged, create no changelog.
 
 Report back ONLY this structured result:
-- greenfield_path
+- current_state_path
 - changelog_path (or "none")
 - trimmed_by_category: {category: count, ...}
 - flags: [ ... ]
-- status: "done" | "already_greenfield"
+- status: "done" | "already_current"
 ```
 
 ## Final report
 
 After the single run or the fan-out, report to the user, per document:
-- greenfield path and changelog path,
+- current-state path and changelog path,
 - items trimmed by category,
 - any flags,
-- documents that were `already greenfield`.
+- documents that were `already current-state`.
 
 Close with a one-line batch summary and the mode's closing line (see Mode).
 
 ## Guardrails & edge cases
 
 - **In-place is the default; offer the non-destructive variant.** By default the
-  greenfield doc replaces the original (the changelog naming is symmetric to it, and
+  current-state doc replaces the original (the changelog naming is symmetric to it, and
   excision-not-rewrite plus the verbatim changelog make the edit recoverable). If the
-  user wants originals untouched, write the greenfield version to `{name}.greenfield.md`
+  user wants originals untouched, write the current-state version to `{name}.current.md`
   instead and leave the source alone — keep the same changelog rules.
-- **Idempotent.** Re-running the skill on an already-greenfield doc trims nothing,
-  changes nothing, and reports `already greenfield`. `*.changelog.md` files are always
+- **Idempotent.** Re-running the skill on an already-current-state doc trims nothing,
+  changes nothing, and reports `already current-state`. `*.changelog.md` files are always
   excluded from inputs.
 - **Don't process binary/non-text** files; skip and note them.
 - **Large documents** still get exactly one sub-agent — that agent owns the whole file
@@ -312,4 +312,4 @@ Close with a one-line batch summary and the mode's closing line (see Mode).
   classification context).
 - **Watch surviving references to removed things.** Removing a deprecated API or a
   superseded section can orphan references elsewhere; the heal/stand-alone passes exist
-  to catch these — repoint or flag, never leave a dangling pointer in the greenfield doc.
+  to catch these — repoint or flag, never leave a dangling pointer in the current-state doc.

@@ -1,5 +1,5 @@
 ---
-name: tcc
+name: cbt
 description: >-
   Sourced, adversarially verified research corpus on TCC (thérapie
   cognitivo-comportementale / cognitive behavioural therapy), compiled 2026-07-28 from

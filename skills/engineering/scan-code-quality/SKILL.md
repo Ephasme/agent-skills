@@ -1,5 +1,5 @@
 ---
-name: code-quality-scan
+name: scan-code-quality
 description: >-
   Scans a codebase for structural quality issues (architecture incoherence,
   design-principle violations, dead code, excessive complexity, unclear naming, hidden

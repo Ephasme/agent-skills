@@ -1,5 +1,5 @@
 ---
-name: git-cleanup
+name: clean-git-repo
 description: Safely cleans up git branches and worktrees — removes merged and squash-merged branches, prunes stale worktree registrations, removes obsolete clean worktrees, cleans up remote tracking refs, and protects unmerged commits and dirty worktrees. Use when the user asks to clean up git, prune/purge branches, remove stale worktrees, tidy a repo, wipe merged branches, or reset to default. Destructive — classifies first, confirms scope, rescues unsaved work, then cleans. Explicit invocation only.
 disable-model-invocation: true
 ---

@@ -27,7 +27,7 @@ Corpus compiled **2026-07-28**. Read [§5 Decay schedule](#5-decay-schedule--wha
 
 ### 1.1 What exists
 
-The corpus is the `tcc` skill, in the `health` category of the `agent-skills` repo. Its home is `$SKILL_DIR/` — this skill's own directory, the absolute path printed when the skill is loaded — and every path below is relative to `$SKILL_DIR/references/`.
+The corpus is the `cbt` skill, in the `health` category of the `agent-skills` repo. Its home is `$SKILL_DIR/` — this skill's own directory, the absolute path printed when the skill is loaded — and every path below is relative to `$SKILL_DIR/references/`.
 
 | File | Role | Size |
 |---|---|---|

@@ -1,5 +1,5 @@
 ---
-name: payment-qr
+name: generate-payment-qr-code
 description: Génère un QR code de paiement SEPA (EPC069-12) scannable par les apps bancaires FR/EU pour pré-remplir un virement (bénéficiaire, IBAN, montant, libellé). À utiliser dès qu'on demande un « QR de paiement / de virement », « un QR pour que X me paie N € », ou tout virement SEPA en euros. Pas pour PayPal/Lydia/carte. À n'invoquer que sur demande explicite — ne jamais la charger de sa propre initiative, car elle produit un instrument de paiement portant un IBAN.
 disable-model-invocation: true
 ---

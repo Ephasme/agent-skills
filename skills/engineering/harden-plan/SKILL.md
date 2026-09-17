@@ -1,5 +1,5 @@
 ---
-name: plan-hardening
+name: harden-plan
 description: >-
   Hardens an engineering plan against reality — verifies every claim it makes against the
   codebase and the docs, surfaces the collateral damage it doesn't handle, and closes with

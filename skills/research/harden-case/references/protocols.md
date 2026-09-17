@@ -7,7 +7,7 @@ writer report afterward.
 ## Checker
 
 ```yaml
-role: facts # facts | consistency | conventions | blindspots | maths | language | greenfield | tasker
+role: facts # facts | consistency | conventions | blindspots | maths | language | strip-legacy | tasker
 status: completed # completed | failed
 coverage:
   files_read: []
