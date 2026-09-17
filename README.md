@@ -277,7 +277,7 @@ cannot reach each other.
 
 | Category | Skills |
 | --- | --- |
-| `engineering` | clean-git-repo, harden-plan, refine-document, scan-code-quality, strip-legacy-content |
+| `engineering` | brainstorm-design, clean-git-repo, debug-systematically, execute-plan, harden-plan, refine-document, scan-code-quality, strip-legacy-content, write-plan, write-skill |
 | `finance` | generate-payment-qr-code |
 | `research` | assess-true-quality, cite-or-refuse, fact-check-document, harden-case |
 | `toolbox` | assume-aws-admin, free-disk-space |
