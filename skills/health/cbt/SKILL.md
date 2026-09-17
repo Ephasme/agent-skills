@@ -15,7 +15,7 @@ description: >-
   therapy, and phrasings like "does CBT actually work", "combien de séances".
 ---
 
-# TCC research corpus
+# CBT research corpus
 
 A standing evidence base on TCC (*thérapie cognitivo-comportementale* = cognitive behavioural therapy), compiled **2026-07-28** from a nine-angle research effort, adversarially re-verified against primary sources. It is your starting point for every TCC question. It is **not** automatically current — see [Decay](#decay--check-this-before-quoting).
 

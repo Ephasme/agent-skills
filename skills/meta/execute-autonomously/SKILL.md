@@ -3,7 +3,7 @@ name: execute-autonomously
 description: Runs a queue of plans or phases to completion without check-ins, re-hardening each plan before executing it and stopping only on a hard physical block. Use when Loup hands off work to finish unattended and tells you to run in complete autonomy — "don't stop", "don't ask", "do it until it's done", "use your judgment", "don't wait for me", "just keep going", "do all of this on your own", to work through the remaining plans/phases yourself, or otherwise signals they won't be available to answer until the work is complete.
 ---
 
-# Executing autonomously
+# Execute autonomously
 
 Loup has handed off a multi-step build — often a queue of plans or phases — to complete on your own. They won't be answering questions; they will follow your recommendations. Run it to completion.
 

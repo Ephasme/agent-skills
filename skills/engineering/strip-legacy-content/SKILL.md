@@ -283,7 +283,7 @@ Report back ONLY this structured result:
 - changelog_path (or "none")
 - trimmed_by_category: {category: count, ...}
 - flags: [ ... ]
-- status: "done" | "already_current"
+- status: "done" | "already_current_state"
 ```
 
 ## Final report

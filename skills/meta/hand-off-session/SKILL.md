@@ -12,7 +12,7 @@ compatibility: Packing and sending need a Unix-like local and remote host with t
 disable-model-invocation: true
 ---
 
-# Handoff
+# Hand off session
 
 > **`$SKILL_DIR` in the commands below is notation, not a variable that is already set.** It stands
 > for this skill's own directory — the absolute path printed when the skill is loaded, or the

@@ -63,10 +63,10 @@ it — two steps, because work and perso do not get the same set.
 ```sh
 SRC=git@github.com:Ephasme/agent-skills.git
 
-npx -y skills add "$SRC" --skill code-quality-scan -g --yes    # 1. into the store
-ln -s ~/.agents/skills/code-quality-scan \
+npx -y skills add "$SRC" --skill scan-code-quality -g --yes    # 1. into the store
+ln -s ~/.agents/skills/scan-code-quality \
       ~/.omp/profiles/perso/agent/skills/               # 2. activate, per profile
-ln -s ~/.agents/skills/code-quality-scan \
+ln -s ~/.agents/skills/scan-code-quality \
       ~/.omp/profiles/work/agent/skills/
 
 npx -y skills list                       # what is installed
@@ -74,7 +74,7 @@ npx -y skills update                     # pull newer versions into the store
 ```
 
 On Loup's machines `~/.local/bin/skills` wraps those three commands — `skills add "$SRC"
---skill code-quality-scan [-t perso|-t work]`, both profiles by default — and links only what the run
+--skill scan-code-quality [-t perso|-t work]`, both profiles by default — and links only what the run
 introduced, so a `--skill '*'` refresh does not flatten existing per-profile choices. Anything
 that is not `add` passes straight through.
 
@@ -101,7 +101,7 @@ Other agents are named the same way — the CLI's own names (`gemini-cli`, not `
 
 ```sh
 npx skills add "$SRC" -g -a cursor -a gemini-cli -s '*' -y   # extra non-universal agents
-npx skills add "$SRC" -s code-quality-scan                          # one skill, project scope
+npx skills add "$SRC" -s scan-code-quality                          # one skill, project scope
 ```
 
 A fresh machine's whole set arrives via `chezmoi apply` — the store is chezmoi-tracked content, installed nowhere by a script.
@@ -280,7 +280,7 @@ cannot reach each other.
 | `engineering` | clean-git-repo, harden-plan, refine-document, scan-code-quality, strip-legacy-content |
 | `finance` | generate-payment-qr-code |
 | `research` | assess-true-quality, cite-or-refuse, fact-check-document, harden-case |
-| `toolbox` | free-disk-space |
+| `toolbox` | assume-aws-admin, free-disk-space |
 | `meta` | execute-autonomously, hand-off-session, schedule-prompt, tighten-responses |
 | `health` | cbt |
 | `legal` | french-insurance-law |
@@ -335,11 +335,11 @@ upstream updates. `tamagui`, `find-skills` and `web-design-guidelines` were drop
 they were recorded in the lock but present nowhere on disk, so the record was removed and
 they are absent from the chezmoi-tracked skill store rather than reinstalled by a script. Copies sit in `~/code/perso/ai-backups/skills.bkp/`.
 
-**The `agents/` directory.** `cbt-expert.md` and `french-insurance-law-expert.md` are the two files here that the
+**The `agents/` directory.** `cbt-expert.md`, `french-insurance-law-expert.md` and `quality-scout.md` are the three files here that the
 portability contract does not reach: a subagent definition is a per-product format, and these are
 written to omp's task-agent contract — `autoloadSkills`, a full `model` selector, `thinking-level`,
 `read-summarize`. Each is kept beside the skill it drives and autoloads that skill rather than
-restating it, which is why the pair lives here instead of in the omp config. The `skills` CLI
+restating it, which is why they live here instead of in the omp config. The `skills` CLI
 installs skills only, so activation is a symlink made by hand, per profile that should see the
 agent:
 

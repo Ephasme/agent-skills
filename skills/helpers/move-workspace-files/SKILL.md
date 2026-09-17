@@ -21,7 +21,7 @@ compatibility: >-
   this. Verified end-to-end 2026-08-14.
 ---
 
-# Google Workspace attachments
+# Move workspace files
 
 **The one fact that explains every failure here: these tools' "local disk" is the
 server's disk, not yours.** Every download writes into the server's own filesystem

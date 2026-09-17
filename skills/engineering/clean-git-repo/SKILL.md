@@ -4,7 +4,7 @@ description: Safely cleans up git branches and worktrees — removes merged and 
 disable-model-invocation: true
 ---
 
-# git-cleanup
+# Clean git repo
 
 **Explicit invocation only.** It cleans up branches and worktrees, which must never happen on a guess. Some agents honour the `disable-model-invocation` frontmatter above; where that key is ignored, this paragraph is the rule — do not load this skill because a repo looks cluttered, only because the user explicitly asked.
 
@@ -101,13 +101,13 @@ Present the scope as a graduated choice with a clear recommendation:
 For any dirty worktree, detached-HEAD experiment, or `UNIQUE` branch authorized for removal, save a backup copy first:
 
 ```bash
-mkdir -p ../git-cleanup-rescue
+mkdir -p ../clean-git-repo-rescue
 # Uncommitted modifications and staged changes:
-git -C <worktree-path> diff HEAD > ../git-cleanup-rescue/<name>.patch
+git -C <worktree-path> diff HEAD > ../clean-git-repo-rescue/<name>.patch
 # Untracked files:
 git -C <worktree-path> status --porcelain | grep '^??' | cut -c4- | while read -r f; do
-  mkdir -p "../git-cleanup-rescue/untracked/$(dirname "$f")"
-  cp -r "<worktree-path>/$f" "../git-cleanup-rescue/untracked/$f"
+  mkdir -p "../clean-git-repo-rescue/untracked/$(dirname "$f")"
+  cp -r "<worktree-path>/$f" "../clean-git-repo-rescue/untracked/$f"
 done
 ```
 

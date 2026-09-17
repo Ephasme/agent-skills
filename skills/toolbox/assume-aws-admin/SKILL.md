@@ -12,7 +12,7 @@ description: >-
   are ready to fire the command.
 ---
 
-# AWS admin session (1h, MFA)
+# Assume AWS admin (1h, MFA)
 
 Target: `arn:aws:iam::226016658082:role/AdminAccessRole`, assumed from the
 `loup-iam` profile, MFA serial `arn:aws:iam::226016658082:mfa/1password`
@@ -31,14 +31,17 @@ Ask exactly one thing: the current 6-digit code from the 1Password AWS MFA entry
 ## 1. Reuse before asking
 
 An unexpired session may already be on disk. Costs one call, saves the user a
-prompt:
+prompt. Probe it in a **subshell** — an expired file sourced into the persistent
+shell exports stale `AWS_*` variables that outrank `~/.aws/config` and poison
+every later command, including step 2:
 
 ```bash
-[ -f /tmp/.admin.env ] && . /tmp/.admin.env && aws sts get-caller-identity --query Arn --output text
+( . "$TMPDIR/admin.env" && aws sts get-caller-identity --query Arn --output text ) 2>/dev/null
 ```
 
-Prints `.../AdminAccessRole/...` → already admin, stop here, do the work.
-Fails or prints the plain IAM user → continue.
+Prints `.../AdminAccessRole/...` → the file is good. Run `. "$TMPDIR/admin.env"`
+in the persistent shell and do the work.
+Fails or prints the plain IAM user → `rm -f "$TMPDIR/admin.env"` and continue.
 
 ## 2. Mint the session
 
@@ -46,25 +49,44 @@ Only now ask for the code, then run with `MFA` set to what the user gave:
 
 ```bash
 MFA=123456
-cd /tmp && read -r AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN < <(
-  AWS_PROFILE=loup-iam aws sts assume-role \
-    --role-arn arn:aws:iam::226016658082:role/AdminAccessRole \
-    --role-session-name agent-session \
-    --serial-number arn:aws:iam::226016658082:mfa/1password \
-    --token-code "$MFA" --duration-seconds 3600 \
-    --query 'Credentials.[AccessKeyId,SecretAccessKey,SessionToken]' --output text
-) && export AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN \
-  && printf 'export AWS_ACCESS_KEY_ID=%s\nexport AWS_SECRET_ACCESS_KEY=%s\nexport AWS_SESSION_TOKEN=%s\n' \
-     "$AWS_ACCESS_KEY_ID" "$AWS_SECRET_ACCESS_KEY" "$AWS_SESSION_TOKEN" > /tmp/.admin.env \
-  && chmod 600 /tmp/.admin.env && aws sts get-caller-identity --query Arn --output text
+read -r AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN < <(
+  env -u AWS_ACCESS_KEY_ID -u AWS_SECRET_ACCESS_KEY -u AWS_SESSION_TOKEN \
+    aws --profile loup-iam sts assume-role \
+      --role-arn arn:aws:iam::226016658082:role/AdminAccessRole \
+      --role-session-name agent-session \
+      --serial-number arn:aws:iam::226016658082:mfa/1password \
+      --token-code "$MFA" --duration-seconds 3600 \
+      --query 'Credentials.[AccessKeyId,SecretAccessKey,SessionToken]' --output text
+) && [ -n "$AWS_SESSION_TOKEN" ] \
+  && export AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN \
+  && (umask 077; printf 'export AWS_ACCESS_KEY_ID=%s\nexport AWS_SECRET_ACCESS_KEY=%s\nexport AWS_SESSION_TOKEN=%s\n' \
+       "$AWS_ACCESS_KEY_ID" "$AWS_SECRET_ACCESS_KEY" "$AWS_SESSION_TOKEN" > "$TMPDIR/admin.env.$$") \
+  && mv -f "$TMPDIR/admin.env.$$" "$TMPDIR/admin.env" \
+  && aws sts get-caller-identity --query Arn --output text
 ```
 
 Success = the printed ARN contains `assumed-role/AdminAccessRole`. Anything else,
 treat as failure.
 
-`cd /tmp` avoids `read` from a process substitution in a directory the shell
-can't handle; the exports land in the persistent shell, so subsequent `bash`
-calls in this session are already admin.
+Three details carry weight, none of them cosmetic:
+
+- **`--profile`, never `AWS_PROFILE`.** Only the CLI flag removes the environment
+  credential provider from the chain (`botocore/credentials.py`: `disable_env_vars
+  = session.instance_variables().get('profile') is not None`, and
+  `instance_variables()` is populated by the flag alone). With `AWS_PROFILE` and
+  stale `AWS_*` exported, the AssumeRole authenticates as those dead credentials
+  and never reads the `loup-iam` key — a valid MFA code then fails, misleadingly.
+  `env -u` strips them regardless, for that one call.
+- **`umask 077` before the write, not `chmod` after.** A plain `>` creates the
+  file at 0644 under the default umask, leaving live admin credentials
+  world-readable until the `chmod` lands.
+- **Write to `$TMPDIR`, not `/tmp`.** `$TMPDIR` is per-user, mode 700. `/tmp` is
+  shared and world-writable: anyone can pre-create `.admin.env` there, and the
+  redirection would then write real credentials into their file. Writing to
+  `admin.env.$$` and renaming keeps a good session intact if the mint fails.
+
+The exports land in the persistent shell, so subsequent `bash` calls in this
+session are already admin.
 
 ## 3. Use it elsewhere
 
@@ -72,7 +94,7 @@ A fresh shell, a subagent, or a shell that lost its environment picks the
 session up with:
 
 ```bash
-. /tmp/.admin.env
+. "$TMPDIR/admin.env"
 ```
 
 Never `cat` the file or echo the variables into the transcript — they are live
@@ -83,7 +105,7 @@ credentials until they expire.
 - `MultiFactorAuthentication failed ... invalid MFA one time pass code` — the
   code expired between the ask and the run, or was mistyped. Ask again,
   immediately, and run in the same turn.
-- `AccessDenied` on the AssumeRole itself — the `loup-iam` key, not the code.
-  Check with `aws sts get-caller-identity --profile loup-iam`.
-- `ExpiredToken` on a later command — the hour is up. Delete `/tmp/.admin.env`
+- `AccessDenied` on the AssumeRole itself — the `loup-iam` key or the role trust
+  policy, not the code. Check with `aws --profile loup-iam sts get-caller-identity`.
+- `ExpiredToken` on a later command — the hour is up. Delete `"$TMPDIR/admin.env"`
   and redo step 2.

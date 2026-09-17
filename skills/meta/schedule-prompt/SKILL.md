@@ -15,7 +15,7 @@ compatibility: >-
 disable-model-invocation: true
 ---
 
-# schedule
+# Schedule prompt
 
 **Explicit invocation only.** This creates a persistent, unattended background job
 that repeatedly consumes an agent's quota and pushes notifications — never set one up
@@ -91,7 +91,7 @@ scheduling if the phrasing was ambiguous (e.g. "every couple of hours").
 7. **Test-fire it once before telling the user it's set up**: `cronward run-job
    <name>`. That's the only thing proving the pane, the prompt, and ntfy delivery
    all work together, and it prints `ntfy: <status>` — a `200` is the receipt. Two
-   expected surprises: the `logs:` path `schedule-prompt` printed stays **absent or empty**
+   expected surprises: the `logs:` path `cronward schedule` printed stays **absent or empty**
    until a real launchd firing, because it's the plist's `StandardOutPath`/
    `StandardErrorPath` and a manual `run-job` prints to your console instead; and the
    first firing right after a fresh pane's creation can retry once or twice
@@ -126,7 +126,7 @@ explicitly: `herdr --session cronward workspace list`,
 
 ## Stopping automatically (`--until`)
 
-`--until "<plain-English condition>"` on `schedule-prompt` turns a recurring job into one
+`--until "<plain-English condition>"` on `cronward schedule` turns a recurring job into one
 that stops itself once the condition holds — e.g. `--until "the venue has replied"`
 or `--until "the invoice has been paid"`. Only valid alongside a real `--repeat`
 (not `--repeat=no`, which has nothing to stop).
@@ -146,7 +146,7 @@ repeat spec — it's a second thing that could be silently wrong.
 
 Job definitions and logs live under `${XDG_CONFIG_HOME:-$HOME/.config}/cronward/`;
 launchd plists under `~/Library/LaunchAgents/com.cronward.<name>.plist`. `NTFY_URL`/
-`NTFY_TOKEN` are read from the environment at `schedule-prompt` time and embedded into the
+`NTFY_TOKEN` are read from the environment at `cronward schedule` time and embedded into the
 job/plist (mode `0600`) — export them from wherever this machine keeps credentials,
 never hard-code a token in a prompt or job name. Full paths, the run-judging
 mechanism (why not `herdr agent prompt --wait`), and a known Cloudflare-fronted-ntfy

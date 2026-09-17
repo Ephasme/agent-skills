@@ -15,7 +15,7 @@ description: >-
   implementation. Pass --fast to skip the closing structural sweep.
 ---
 
-# Plan Hardening
+# Harden plan
 
 Run the plan through rounds of review and fixes until it holds up to reality. Each round verifies claims, surfaces findings, gathers any needed clarifications, applies fixes, and re-reviews — and stops when a round produces no fixes. Once that loop converges, a final closing structural sweep (Step 5) looks for the out-of-the-box defects that survive claim verification.
 
@@ -31,7 +31,7 @@ All four combinations are legal. **REPORT is read-only on the plan file itself**
 
 Say which mode ran, in the first line of the output.
 
-**Invocation:** `plan-hardening [--fix] [--fast] [<plan-file>]`, however this agent invokes skills. A path argument names the plan directly and skips Step 0's discovery — which is how another skill should call this one, since a caller always knows its own plan file and shouldn't make this skill guess from conversational context.
+**Invocation:** `harden-plan [--fix] [--fast] [<plan-file>]`, however this agent invokes skills. A path argument names the plan directly and skips Step 0's discovery — which is how another skill should call this one, since a caller always knows its own plan file and shouldn't make this skill guess from conversational context.
 
 ## Guardrails
 

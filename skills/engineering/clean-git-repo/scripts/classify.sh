@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Read-only git classifier for branches and worktrees (git-cleanup skill).
+# Read-only git classifier for branches and worktrees (clean-git-repo skill).
 #
 # For each branch and worktree, it answers the questions that decide whether
 # they are safe to delete or remove:

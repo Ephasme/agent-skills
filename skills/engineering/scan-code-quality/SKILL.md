@@ -15,7 +15,7 @@ description: >-
   before I ship it". Applies to any language or framework.
 ---
 
-# Code Quality Scan
+# Scan code quality
 
 Act as the **orchestrator** of a senior code-review team. You don't read every file yourself — you scope the work, fan it out to specialist reviewers (one per quality aspect), then route their findings through a cheaper checker that verifies and ranks each one. You assemble the survivors into a single evidence-backed report.
 

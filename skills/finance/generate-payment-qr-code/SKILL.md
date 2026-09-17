@@ -4,7 +4,7 @@ description: Génère un QR code de paiement SEPA (EPC069-12) scannable par les 
 disable-model-invocation: true
 ---
 
-# payment-qr — QR code de paiement SEPA (EPC)
+# generate-payment-qr-code — QR code de paiement SEPA (EPC)
 
 **Invocation explicite uniquement.** Cette skill produit un instrument de paiement portant un
 IBAN : cela ne doit jamais arriver au jugé. Certains agents respectent la clé
