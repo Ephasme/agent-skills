@@ -49,7 +49,7 @@ Only now ask for the code, then run with `MFA` set to what the user gave:
 
 ```bash
 MFA=123456
-read -r AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN < <(
+creds=$(
   env -u AWS_ACCESS_KEY_ID -u AWS_SECRET_ACCESS_KEY -u AWS_SESSION_TOKEN \
     aws --profile loup-iam sts assume-role \
       --role-arn arn:aws:iam::226016658082:role/AdminAccessRole \
@@ -57,7 +57,9 @@ read -r AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN < <(
       --serial-number arn:aws:iam::226016658082:mfa/1password \
       --token-code "$MFA" --duration-seconds 3600 \
       --query 'Credentials.[AccessKeyId,SecretAccessKey,SessionToken]' --output text
-) && [ -n "$AWS_SESSION_TOKEN" ] \
+)
+read -r AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN <<< "$creds"
+[ -n "$AWS_SESSION_TOKEN" ] \
   && export AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN \
   && (umask 077; printf 'export AWS_ACCESS_KEY_ID=%s\nexport AWS_SECRET_ACCESS_KEY=%s\nexport AWS_SESSION_TOKEN=%s\n' \
        "$AWS_ACCESS_KEY_ID" "$AWS_SECRET_ACCESS_KEY" "$AWS_SESSION_TOKEN" > "$TMPDIR/admin.env.$$") \
@@ -84,6 +86,14 @@ Three details carry weight, none of them cosmetic:
   shared and world-writable: anyone can pre-create `.admin.env` there, and the
   redirection would then write real credentials into their file. Writing to
   `admin.env.$$` and renaming keeps a good session intact if the mint fails.
+- **Capture with `$(…)` + a here-string, never `read < <(…)`.** When the shell
+  running these commands is non-interactive with no controlling terminal,
+  `read` from a process substitution blocks forever instead of returning: the
+  command never completes and the failure looks like a hung AWS call, sending
+  you after the network or the MFA code. Reproduced with no AWS involved —
+  `read -r A B C < <(printf "x y z\n")` hangs, while the same line inside
+  `bash -c` returns instantly. A here-string fed from a command substitution
+  reads from a regular file descriptor and is unaffected.
 
 The exports land in the persistent shell, so subsequent `bash` calls in this
 session are already admin.
