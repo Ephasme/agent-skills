@@ -284,7 +284,7 @@ cannot reach each other.
 | `meta` | execute-autonomously, hand-off-session, schedule-prompt, tighten-responses |
 | `health` | cbt |
 | `legal` | french-insurance-law |
-| `helpers` | move-workspace-files |
+| `helpers` | move-workspace-files, post-deploy-changelog |
 
 `skills/<category>/<skill>/SKILL.md` is discovered natively — the CLI walks one extra level inside
 `skills/` for exactly this catalog layout. No manifest file is needed. Categories organise the
