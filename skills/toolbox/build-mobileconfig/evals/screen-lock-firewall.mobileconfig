@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>PayloadContent</key>
+	<array>
+		<dict>
+			<key>PayloadType</key>
+			<string>com.apple.security.firewall</string>
+			<key>PayloadIdentifier</key>
+			<string>com.example.baseline</string>
+			<key>PayloadUUID</key>
+			<string>9C1E0F4A-2B7D-4E61-8F3A-1D2C3B4A5E6F</string>
+			<key>PayloadVersion</key>
+			<integer>1</integer>
+			<key>EnableFirewall</key>
+			<string>true</string>
+			<key>EnableStealthMode</key>
+			<true/>
+			<key>EnableLogging</key>
+			<true/>
+			<key>LoggingOption</key>
+			<string>detail</string>
+		</dict>
+		<dict>
+			<key>PayloadType</key>
+			<string>com.apple.screensaver</string>
+			<key>PayloadIdentifier</key>
+			<string>com.example.baseline.screensaver</string>
+			<key>PayloadUUID</key>
+			<string>9C1E0F4A-2B7D-4E61-8F3A-1D2C3B4A5E6F</string>
+			<key>PayloadVersion</key>
+			<integer>1</integer>
+			<key>idleTime</key>
+			<integer>300</integer>
+			<key>askForPassword</key>
+			<true/>
+			<key>askForPasswordDelay</key>
+			<integer>0</integer>
+		</dict>
+		<dict>
+			<key>PayloadType</key>
+			<string>com.apple.screensaver</string>
+			<key>PayloadIdentifier</key>
+			<string>com.example.baseline.screensaver2</string>
+			<key>PayloadUUID</key>
+			<string>0B7F3E21-55AA-4C9D-9E0E-7A6B5C4D3E2F</string>
+			<key>PayloadVersion</key>
+			<integer>1</integer>
+			<key>loginWindowIdleTime</key>
+			<integer>300</integer>
+		</dict>
+	</array>
+	<key>PayloadDisplayName</key>
+	<string>Example baseline</string>
+	<key>PayloadIdentifier</key>
+	<string>com.example.baseline</string>
+	<key>PayloadType</key>
+	<string>Configuration</string>
+	<key>PayloadUUID</key>
+	<string>4D1A2B3C-0000-4000-8000-000000000001</string>
+	<key>PayloadVersion</key>
+	<integer>1</integer>
+	<key>PayloadScope</key>
+	<string>User</string>
+	<key>RemovalDate</key>
+	<date>2026-12-31T00:00:00Z</date>
+</dict>
+</plist>

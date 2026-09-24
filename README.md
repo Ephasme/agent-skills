@@ -280,7 +280,7 @@ cannot reach each other.
 | `engineering` | brainstorm-design, clean-git-repo, debug-systematically, execute-plan, harden-plan, refine-document, scan-code-quality, strip-legacy-content, write-plan |
 | `finance` | generate-payment-qr-code |
 | `research` | assess-true-quality, cite-or-refuse, fact-check-document, harden-case |
-| `toolbox` | assume-aws-admin, free-disk-space |
+| `toolbox` | assume-aws-admin, build-mobileconfig, free-disk-space |
 | `meta` | execute-autonomously, hand-off-session, schedule-prompt, tighten-responses |
 | `health` | cbt |
 | `legal` | french-insurance-law |

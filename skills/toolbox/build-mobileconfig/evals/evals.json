@@ -1,0 +1,70 @@
+{
+  "skill_name": "build-mobileconfig",
+  "evals": [
+    {
+      "id": 1,
+      "name": "eap-tls-wifi",
+      "prompt": "We're moving the office Wi-Fi \"Example-Corp\" to WPA2-Enterprise with EAP-TLS. The RADIUS server is radius.example.com and its cert is signed by our own root CA (attached: radius-ca.pem). Each Mac already gets a client identity through a separate SCEP profile, so don't put an identity in this one \u2014 just trust our CA and join automatically, including at the login window. Make me the .mobileconfig for our Macs.",
+      "expected_output": "A System-scoped profile with a com.apple.security.root (or pkcs1) payload holding the DER of radius-ca.pem and a com.apple.wifi.managed payload whose EAPClientConfiguration has AcceptEAPTypes [13], PayloadCertificateAnchorUUID pointing at the CA payload's PayloadUUID, TLSTrustedServerNames radius.example.com; stable derived UUIDs; lint clean. Flags that the client identity must be in the SAME profile for EAP-TLS (PayloadCertificateUUID resolves within one profile), so 'separate SCEP profile' is a real problem, and says SetupModes Loginwindow behaviour is unverified.",
+      "files": [
+        "evals/radius-ca.pem"
+      ],
+      "expectations": [
+        "A .mobileconfig is produced and parses as an XML plist",
+        "Apple-schema lint reports 0 errors",
+        "Every PayloadUUID is unique and no payload PayloadIdentifier repeats or equals the profile's",
+        "PayloadScope is explicitly System",
+        "A certificate payload carries the DER of radius-ca.pem",
+        "Wi-Fi payload: SSID Example-Corp, AcceptEAPTypes == [13]",
+        "PayloadCertificateAnchorUUID names the CA payload's PayloadUUID in this profile",
+        "TLSTrustedServerNames includes radius.example.com",
+        "Answer warns that EAP-TLS needs the client identity referenced from the Wi-Fi payload (PayloadCertificateUUID) and that this reference only resolves within the same profile, so a separate SCEP profile will not work as-is",
+        "Answer says joining at the login window (SetupModes) is unverified or must be tested on a real Mac"
+      ]
+    },
+    {
+      "id": 2,
+      "name": "pppc-raycast-accessibility",
+      "prompt": "Raycast keeps asking every new hire to grant it Accessibility, and our designers also want it to have Screen Recording without the prompt. Write a PPPC profile for Raycast (bundle id com.raycast.macos) that pre-approves both so nobody has to click anything. Our fleet is on macOS 26 and 27.",
+      "expected_output": "A com.apple.TCC.configuration-profile-policy profile with a correct CodeRequirement (from codesign -dr -), IdentifierType bundleID. Explains that ScreenCapture cannot be granted by a profile (deny only, or AllowStandardUserToSetSystemService), that Accessibility granting is deprecated in macOS 27 (points to DDM app.settings Privacy), that PPPC requires MDM delivery with user-approved MDM (no manual install), and does not use both Allowed and Authorization.",
+      "files": [],
+      "expectations": [
+        "A .mobileconfig is produced and parses as an XML plist",
+        "Apple-schema lint reports 0 errors",
+        "Every PayloadUUID is unique and no payload PayloadIdentifier repeats or equals the profile's",
+        "PayloadScope is explicitly System",
+        "One com.apple.TCC.configuration-profile-policy payload",
+        "Raycast entries use IdentifierType bundleID and the exact codesign designated requirement",
+        "No entry sets both Allowed and Authorization",
+        "ScreenCapture is not 'granted' (Allowed true / Authorization Allow), which a profile cannot do",
+        "Answer states Screen Recording cannot be pre-granted by a profile (only denied, or delegated to standard users via AllowStandardUserToSetSystemService)",
+        "Answer states granting Accessibility through PPPC is deprecated in macOS 27 (DDM app.settings / user-visible, user-changeable)",
+        "Answer states the PPPC profile only works delivered by MDM (manual install refused) with user-approved MDM"
+      ]
+    },
+    {
+      "id": 3,
+      "name": "fix-broken-baseline",
+      "prompt": "A contractor gave us this security baseline profile (attached screen-lock-firewall.mobileconfig) and it 'installs fine' on his test Mac but our MDM keeps reporting nothing changed on half the fleet. Can you review it, tell me what's wrong, and give me a fixed version?",
+      "expected_output": "Identifies: firewall payload in User scope (must be System), EnableFirewall is a string not boolean, EnableLogging/LoggingOption removed on macOS 15+, duplicate PayloadUUID across payloads, payload PayloadIdentifier equal to the profile's, two com.apple.screensaver payloads (multiple:false), loginWindowIdleTime not a valid key (errata), missing moduleName (required in schema), RemovalDate silently removes enforcement. Delivers a fixed profile that lints clean.",
+      "files": [
+        "evals/screen-lock-firewall.mobileconfig"
+      ],
+      "expectations": [
+        "A .mobileconfig is produced and parses as an XML plist",
+        "Apple-schema lint reports 0 errors",
+        "Every PayloadUUID is unique and no payload PayloadIdentifier repeats or equals the profile's",
+        "PayloadScope is explicitly System",
+        "EnableFirewall is a boolean true",
+        "EnableLogging and LoggingOption are gone",
+        "Exactly one com.apple.screensaver payload, without loginWindowIdleTime",
+        "No RemovalDate / DurationUntilRemoval",
+        "Answer identifies PayloadScope User as a cause: the firewall payload requires a System-scoped profile",
+        "Answer identifies EnableFirewall being a string instead of a boolean",
+        "Answer identifies the duplicated PayloadUUID shared by two payloads",
+        "Answer identifies the two com.apple.screensaver payloads (only one allowed per Mac)",
+        "Answer explains that RemovalDate makes the profile remove itself, silently dropping enforcement"
+      ]
+    }
+  ]
+}
