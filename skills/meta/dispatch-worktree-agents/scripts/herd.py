@@ -1,17 +1,23 @@
 #!/usr/bin/env python3
 """herd — run a DAG of coding tasks as omp agents, one herdr worktree each.
 
-    herd.py check  <manifest>          validate, resolve the model, print the waves
+    herd.py check  <manifest>          validate, resolve the model, print the waves and PR stacks
     herd.py render <manifest> [id...]  write prompts/<id>.md previews (worktree path unresolved)
     herd.py start  <manifest>          check, then run the scheduler in its own herdr tab
     herd.py run    <manifest>          the scheduler loop itself (what `start` runs)
     herd.py launch <manifest> <id>     launch one task now; --force ignores unfinished deps
     herd.py status <manifest>          one line per task
+    herd.py stack  <manifest>          open/retarget PRs and link each chain as a GitHub stack
 
 A task launches when every task in its `after` list has a done marker AND a clean
 worktree. Its branch is cut from its first dependency (or the manifest base) and
 every other dependency is merged in; a conflicting merge is aborted and handed to
 the agent as its first step. Paths in the manifest are relative to its directory.
+
+With `"pr": "stack"` in the manifest, the dependency graph is also a set of GitHub
+stacked pull requests: every chain of single-dependency tasks is one stack, each PR
+based on the branch below it. `stack` (run by the scheduler whenever a task is done)
+pushes, opens missing PRs as drafts, fixes bases and links the chain.
 """
 
 import argparse
@@ -39,8 +45,8 @@ class HerdError(Exception):
 
 # ---------------------------------------------------------------- plumbing
 
-def sh(*argv, cwd=None, check=True):
-    p = subprocess.run(argv, cwd=cwd, capture_output=True, text=True)
+def sh(*argv, cwd=None, check=True, env=None):
+    p = subprocess.run(argv, cwd=cwd, capture_output=True, text=True, env=env)
     if check and p.returncode != 0:
         raise HerdError(f"{' '.join(shlex.quote(a) for a in argv)} failed ({p.returncode}): {(p.stderr or p.stdout).strip()}")
     return p
@@ -74,6 +80,9 @@ class Run:
         self.context = m.get("context")
         self.tasks = {t["id"]: t for t in m["tasks"]}
         self.order = [t["id"] for t in m["tasks"]]
+        self.pr = m.get("pr", "none")
+        if self.pr not in ("none", "stack"):
+            raise HerdError(f"`pr` must be \"none\" or \"stack\", not {self.pr!r}")
         for sub in ("done", "started", "failed", "prompts"):
             (self.dir / sub).mkdir(exist_ok=True)
 
@@ -93,7 +102,13 @@ class Run:
         t = self.tasks[tid]
         deps = self.after(tid)
         base = t.get("base") or (deps[0] if deps else self.base)
-        merge = [d for d in deps if d != base] + [b for b in t.get("merge", []) if b not in deps]
+        if self.pr == "stack" and not t.get("base") and len(deps) > 1:
+            # The dependency every other one sits below, when there is one: cutting from it
+            # needs no merge, which keeps the stack linear.
+            top = [d for d in deps if set(deps) - {d} <= self.lineage(d)]
+            base = top[0] if top else base
+        merge = [d for d in deps if d != base and d not in self.lineage(base)] + \
+                [b for b in t.get("merge", []) if b not in deps]
         return base, merge
 
     def worktree_of(self, branch):
@@ -114,6 +129,54 @@ class Run:
             placed |= set(layer)
             remaining -= set(layer)
         return out
+
+    def pr_base(self, tid):
+        """The branch a task's PR targets: the branch it was cut from."""
+        return self.base_of(tid)[0]
+
+    def stack_errors(self):
+        """GitHub merges a stack only with a fully linear history, so a layer may never merge
+        a second branch in. A task that joins several dependencies is valid only when they
+        already lie on one chain; it is then cut from the highest of them."""
+        errors = []
+        for tid in self.order:
+            deps = self.after(tid)
+            if self.tasks[tid].get("merge"):
+                errors.append(f"{tid}: `merge` is incompatible with `pr: stack` (a stack needs linear history)")
+            if len(deps) < 2:
+                continue
+            base = self.base_of(tid)[0]
+            below = self.lineage(base)
+            stray = [d for d in deps if d != base and d not in below]
+            if stray:
+                errors.append(
+                    f"{tid}: joins {', '.join(deps)}, which are not one chain, so its layer would need a merge "
+                    f"commit. Serialise them (e.g. make {stray[0]} depend on {base}) and list the top one first")
+        return errors
+
+    def lineage(self, tid):
+        """Every task below `tid` along its cut-from chain."""
+        out = set()
+        while tid in self.tasks:
+            tid = self.base_of(tid)[0]
+            out.add(tid)
+        return out
+
+    def stacks(self):
+        """Chains of the PR graph, bottom first. GitHub stacks are linear and a PR belongs to
+        one stack, so a parent's first child continues its chain and every other child starts
+        a new chain on top of the parent's branch."""
+        children = {t: [c for c in self.order if self.pr_base(c) == t] for t in self.order}
+        chains, placed = [], set()
+        for tid in self.order:
+            if tid in placed:
+                continue
+            chain = [tid]
+            while children[chain[-1]]:
+                chain.append(children[chain[-1]][0])
+            placed.update(chain)
+            chains.append(chain)
+        return chains
 
 
 # ---------------------------------------------------------------- model
@@ -173,6 +236,8 @@ def check(run, ping=False):
         errors.append(f"context file {run.context} missing")
     try:
         waves = run.waves()
+        if run.pr == "stack":
+            errors += run.stack_errors()
     except HerdError as e:
         errors.append(str(e))
         waves = []
@@ -187,6 +252,9 @@ def check(run, ping=False):
                 errors.append(str(e))
                 selectors[key] = None
 
+    if run.pr == "stack":
+        errors += stack_prerequisites(run)
+
     if errors:
         raise HerdError("check failed:\n  - " + "\n  - ".join(errors))
 
@@ -197,6 +265,11 @@ def check(run, ping=False):
             model, thinking = selectors[(run.tasks[tid].get("model", run.model), run.tasks[tid].get("thinking", run.thinking))], run.tasks[tid].get("thinking", run.thinking)
             extra = f" + merge {', '.join(merge)}" if merge else ""
             print(f"  wave {i}: {tid:<24} from {base}{extra}  [{model}:{thinking}]")
+    if run.pr == "stack":
+        for chain in run.stacks():
+            bottom = run.pr_base(chain[0])
+            kind = "stack" if len(chain) > 1 else "PR"
+            print(f"  {kind}: {bottom} <- " + " <- ".join(chain))
 
     if ping:
         for (pattern, thinking), sel in selectors.items():
@@ -264,8 +337,9 @@ def render(run, tid, worktree="(assigned at launch)", merge_note=""):
     parts.append(
         "# Where you are\n\n"
         f"- Worktree `{values['WORKTREE']}`, branch `{tid}`, cut from `{values['BASE']}`. Work only here. "
-        "Never push, never merge into another branch, never touch another worktree.\n"
-        f"- {mode}"
+        "Never merge into another branch, never touch another worktree.\n"
+        f"- {mode}\n"
+        f"- {pr_rules(run, tid)}"
     )
     if merge_note:
         parts.append("# Merge status\n\n" + merge_note)
@@ -283,6 +357,20 @@ def render(run, tid, worktree="(assigned at launch)", merge_note=""):
     return "\n\n---\n\n".join(parts) + "\n"
 
 
+def pr_rules(run, tid):
+    if run.pr != "stack":
+        return "Never push and never open a PR unless the user asks."
+    below = run.pr_base(tid)
+    return (
+        "Pull requests are managed for you as a GitHub stack: once you write your done marker, your "
+        f"branch is pushed, opened as a draft PR on `{below}` and linked into its stack. Do not open, "
+        "retarget or merge PRs yourself, never rebase a branch below yours, and never merge another "
+        "branch into yours — a stack merges only with a linear history. When the branch below you "
+        f"(`{below}`) changes, move only your own commits onto it: `git fetch origin && git rebase "
+        f"--onto origin/{below} <previous {below} tip> {tid}`, then `git push --force-with-lease`."
+    )
+
+
 def done_protocol(run, tid):
     return (
         "# Done means\n\n"
@@ -295,8 +383,106 @@ def done_protocol(run, tid):
         "The marker is what starts any agent that depends on your branch, so never create it "
         "early. Then report what changed and what is untested. This holds after plan approval "
         "and after any follow-up request: whenever the work on this branch is finished again, "
-        "the marker is the last step."
+        "the marker is the last step.\n\n"
+        + pr_rules(run, tid)
     )
+
+
+# ---------------------------------------------------------------- PR stacks
+
+GH_API_VERSION = "2026-03-10"
+
+
+def gh(run, *args, check=True):
+    # gh-stack resolves the repository from the remote URL alone and fails on an SSH host alias
+    # (`git@github.com-work:…`) that `gh` itself maps; GH_REPO makes both agree.
+    if not getattr(run, "slug", None):
+        run.slug = sh("gh", "repo", "view", "--json", "nameWithOwner", "-q", ".nameWithOwner",
+                      cwd=str(run.repo)).stdout.strip()
+    return sh("gh", *args, cwd=str(run.repo), check=check, env={**os.environ, "GH_REPO": run.slug})
+
+
+def stack_prerequisites(run):
+    if not shutil.which("gh"):
+        return ["`pr: stack` needs the GitHub CLI (`gh`) on PATH"]
+    errors = []
+    if gh(run, "stack", "--version", check=False).returncode != 0:
+        errors.append("`pr: stack` needs the gh-stack extension: `gh extension install github/gh-stack`")
+    p = gh(run, "api", "-H", f"X-GitHub-Api-Version: {GH_API_VERSION}",
+           "repos/{owner}/{repo}/stacks?per_page=1", check=False)
+    if p.returncode != 0:
+        errors.append("stacked pull requests are not available on this repository "
+                      f"(GET /stacks: {(p.stderr or p.stdout).strip()[-200:]}); enable them or use \"pr\": \"none\"")
+    return errors
+
+
+def open_pr(run, branch):
+    p = gh(run, "pr", "list", "--head", branch, "--state", "open", "--json", "number,baseRefName", check=False)
+    rows = json.loads(p.stdout or "[]") if p.returncode == 0 else []
+    return rows[0] if rows else None
+
+
+def push(run, branch):
+    """Pushes a branch the agent left local. A branch origin already has at another commit is
+    never forced: the agent that owns it rebased or pushed it deliberately."""
+    local = sh("git", "-C", str(run.repo), "rev-parse", branch).stdout.strip()
+    remote = sh("git", "-C", str(run.repo), "ls-remote", "--heads", "origin", branch).stdout.split()
+    if remote and remote[0] == local:
+        return
+    if remote and sh("git", "-C", str(run.repo), "merge-base", "--is-ancestor", remote[0], local,
+                     check=False).returncode != 0:
+        raise HerdError(f"{branch}: origin/{branch} has diverged from the local branch; not forcing it")
+    sh("git", "-C", str(run.repo), "push", "--quiet", "origin", f"{branch}:{branch}")
+
+
+def sync_stacks(run):
+    """Brings GitHub in line with the manifest for every finished task: branch pushed, a PR open
+    against its `pr_base`, each chain linked as a stack bottom first. A chain grows as its layers
+    finish, since a stack must be contiguous from its bottom. Idempotent."""
+    numbers = {}
+    for tid in run.order:
+        if not run.marker("done", tid).exists():
+            continue
+        base = run.pr_base(tid)
+        push(run, tid)
+        pr = open_pr(run, tid)
+        if pr is None:
+            summary = run.tasks[tid]["summary"]
+            gh(run, "pr", "create", "--draft", "--head", tid, "--base", base,
+               "--title", summary[:1].upper() + summary[1:], "--fill-first")
+            pr = open_pr(run, tid)
+            run.log(f"[{tid}] opened draft PR #{pr['number']} on {base}")
+        elif pr["baseRefName"] != base:
+            gh(run, "pr", "edit", str(pr["number"]), "--base", base)
+            run.log(f"[{tid}] PR #{pr['number']} retargeted {pr['baseRefName']} -> {base}")
+        numbers[tid] = pr["number"]
+
+    for chain in run.stacks():
+        linked = []
+        for tid in chain:
+            if tid not in numbers:
+                break
+            linked.append(str(numbers[tid]))
+        if len(linked) < 2:
+            continue
+        p = gh(run, "stack", "link", "--base", run.pr_base(chain[0]), *linked, check=False)
+        if p.returncode != 0:
+            raise HerdError(f"gh stack link {' '.join(linked)}: {(p.stderr or p.stdout).strip()[-300:]}")
+    return numbers
+
+
+def stack_view(run):
+    for chain in run.stacks():
+        prs = {tid: open_pr(run, tid) for tid in chain}
+        rows = [f"{tid} #{pr['number']}->{pr['baseRefName']}" if pr else f"{tid} (no PR)" for tid, pr in prs.items()]
+        label = "single PR" if len(chain) == 1 else "unlinked chain"
+        first = prs[chain[0]]
+        if first and len(chain) > 1:
+            p = gh(run, "api", "-H", f"X-GitHub-Api-Version: {GH_API_VERSION}",
+                   "repos/{owner}/{repo}/stacks?pull_request=" + str(first["number"]), "--jq", ".[0].number // empty", check=False)
+            if p.stdout.strip():
+                label = f"stack {p.stdout.strip()}"
+        print(f"{label}: {run.pr_base(chain[0])} <- " + " <- ".join(rows))
 
 
 # ---------------------------------------------------------------- launch
@@ -425,7 +611,19 @@ def stalled(run, tid):
 def run_loop(run):
     run.log(f"scheduler up for {run.name}")
     warned = set()
+    synced = None  # the set of done markers the last stack sync saw
     while True:
+        if run.pr == "stack":
+            done = frozenset(t for t in run.order if run.marker("done", t).exists())
+            if done != synced:
+                try:
+                    sync_stacks(run)
+                    synced = done
+                except HerdError as e:
+                    if ("stack", str(e)) not in warned:
+                        warned.add(("stack", str(e)))
+                        run.log(f"stack sync failed, retrying next tick: {e}")
+                        notify("PR stack sync failed", str(e)[:200])
         for tid in run.order:
             reason = stalled(run, tid)
             key = ("stalled", tid)
@@ -438,7 +636,8 @@ def run_loop(run):
             elif not reason:
                 warned.discard(key)
         waiting = [t for t in run.order if not run.marker("started", t).exists() and not run.marker("failed", t).exists()]
-        if all(run.marker("done", t).exists() or run.marker("failed", t).exists() for t in run.order):
+        if all(run.marker("done", t).exists() or run.marker("failed", t).exists() for t in run.order) \
+                and (run.pr != "stack" or synced == frozenset(t for t in run.order if run.marker("done", t).exists())):
             run.log("every task done or failed; scheduler exits")
             return
         for tid in waiting:
@@ -490,7 +689,7 @@ def status(run):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("cmd", choices=["check", "render", "start", "run", "launch", "status"])
+    ap.add_argument("cmd", choices=["check", "render", "start", "run", "launch", "status", "stack"])
     ap.add_argument("manifest")
     ap.add_argument("ids", nargs="*")
     ap.add_argument("--ping", action="store_true", help="check: send each model a one-line prompt")
@@ -514,6 +713,16 @@ def main():
                 launch(run, tid, force=a.force)
         elif a.cmd == "status":
             status(run)
+            if run.pr == "stack":
+                stack_view(run)
+        elif a.cmd == "stack":
+            if run.pr != "stack":
+                raise HerdError("the manifest has no `\"pr\": \"stack\"`")
+            errors = stack_prerequisites(run)
+            if errors:
+                raise HerdError("; ".join(errors))
+            sync_stacks(run)
+            stack_view(run)
     except HerdError as e:
         print(f"herd: {e}", file=sys.stderr)
         sys.exit(1)

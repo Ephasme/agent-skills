@@ -5,13 +5,16 @@ description: >-
   which tasks depend on which and which run in parallel, writes each agent a researched,
   self-contained prompt, and launches every task as its own omp session in its own herdr git
   worktree — plan mode and a fast model by default — with later tasks starting automatically
-  from their dependencies' branches once those finish. Use whenever the user hands over several
-  tasks, features or fixes and asks to start agents, one agent per task, a worktree each, run
-  them in parallel or in order, fan the work out, or "spin up herdr agents" — even when they
-  number the list loosely or never say "dependency".
+  from their dependencies' branches once those finish, and optionally opens the results as
+  GitHub stacked pull requests that mirror the dependency graph. Use whenever the user hands
+  over several tasks, features or fixes and asks to start agents, one agent per task, a
+  worktree each, run them in parallel or in order, fan the work out, stack the PRs, or "spin
+  up herdr agents" — even when they number the list loosely or never say "dependency".
 compatibility: >-
   herdr CLI with a running herdr server, the caller inside a herdr pane; the omp coding agent;
   git; python3. The target repository must be a git repository herdr can create worktrees in.
+  PR stacks additionally need an authenticated GitHub CLI with the gh-stack extension and
+  stacked pull requests enabled on the repository.
 ---
 
 # Dispatch worktree agents
@@ -32,6 +35,7 @@ resolution, plan mode, injection, scheduling — so never re-derive it by hand.
 | Thinking | `high` | `thinking` |
 | Mode | plan mode: the agent researches, proposes a plan, waits for approval | `"plan": false` |
 | Base | the repository's current branch | `base` |
+| PRs | none — agents never push | `"pr": "stack"`: GitHub stacked PRs from the dependency graph |
 
 Honour whatever the user says over these ("use GLM", "skip plan mode", "base on develop").
 
@@ -55,6 +59,13 @@ hear about — gate the task on it, fence it off in the prompt, or ask.
 Split a task that bundles independent work; merge two that cannot be done apart. Keep the
 number of simultaneous agents modest (≤ 4 by default): they share the machine, its ports and
 its databases.
+
+Decide whether the run ends in pull requests. When the user wants reviewable PRs and tasks
+build on each other's unmerged branches, use `"pr": "stack"` — and read
+[references/pr-stacks.md](references/pr-stacks.md) **before** fixing the graph: a stack needs
+linear history, so a task joining two parallel siblings must instead sit on a serialised
+chain, and a fan-out becomes one stack per branch. Shape the dependencies for that now, not
+after the agents have built diverging branches.
 
 Show the user the waves in a short table (task, depends on, base branch) together with the
 manifest, then launch without waiting for a reply unless something is genuinely theirs to
@@ -103,7 +114,9 @@ Manifest:
 The task `id` is the branch name and the herdr agent name, so it must match
 `[a-z][a-z0-9_-]{0,31}` and not collide with an existing branch (`lists` blocks `lists/x`).
 A task's branch is cut from its **first** `after` entry and every other entry is merged in;
-set `base` on a task to choose differently.
+set `base` on a task to choose differently. With `"pr": "stack"`, a join is cut from the
+dependency that already contains the others and nothing is merged — `check` rejects a join
+that would need a merge commit.
 
 ## 3. Launch
 
@@ -116,7 +129,9 @@ python3 "$SKILL_DIR/scripts/herd.py" start <run>/herd.json           # scheduler
 `check` fails loudly on a cycle, an unknown dependency, a missing prompt, a branch collision or
 a model that does not resolve; `--ping` sends the model one line and refuses to continue if it
 cannot answer — a model that does not answer only shows up after the agent boots, as
-`Error: No API key found`. Fix and re-run until it passes.
+`Error: No API key found`. With `"pr": "stack"` it also checks `gh`, the `gh-stack` extension
+and that the repository accepts stacks, rejects a non-linear graph, and prints the stacks it
+will build. Fix and re-run until it passes.
 
 `start` opens a `herd-<name>` tab in the caller's workspace running the scheduler, which
 survives this session. Every 20 s it launches each task whose dependencies are all done: it
@@ -133,15 +148,21 @@ The scheduler waits for a clean worktree before building on a task, and keeps ru
 every task is done or failed. The user can `touch` a marker by hand to release the next wave
 early, and `herd.py launch <manifest> <id> --force` starts one task regardless.
 
+With `"pr": "stack"`, each new done marker also pushes that branch, opens it as a draft PR on
+its base and links its chain as a GitHub stack; `herd.py stack <manifest>` does the same on
+demand. Maintenance — cascading a rebase after review changes or a trunk move, merging — is
+in [references/pr-stacks.md](references/pr-stacks.md).
+
 Then confirm with `herd.py status <run>/herd.json` — every wave-1 task should read
-`agent working (plan mode)` — before reporting.
+`agent working (plan mode)`, followed by the stack layout when stacking — before reporting.
 
 ## 4. Report
 
 Keep it short: the waves table, where each agent runs (worktree path, herdr workspace), the run
-directory, that each agent is waiting for plan approval, and anything the user has to decide.
-Name the risks you saw while splitting: siblings likely to conflict, shared ports or databases,
-a task whose plan needs a product decision.
+directory, that each agent is waiting for plan approval, the stacks that will be opened, and
+anything the user has to decide. Name the risks you saw while splitting: siblings likely to
+conflict, shared ports or databases, a task whose plan needs a product decision, siblings
+serialised only to keep a stack linear.
 
 ## When something goes wrong
 
