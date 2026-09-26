@@ -279,18 +279,24 @@ def render(run, tid, worktree="(assigned at launch)", merge_note=""):
         )
     if run.context:
         parts.append(fill((run.dir / run.context).read_text().strip()))
-    parts.append(
+    parts.append(done_protocol(run, tid))
+    return "\n\n---\n\n".join(parts) + "\n"
+
+
+def done_protocol(run, tid):
+    return (
         "# Done means\n\n"
         "Every acceptance scenario exercised for real, the project's own checks green, everything "
         f"committed on `{tid}` with a clean `git status`. Then, and only then:\n\n"
         "```\n"
-        f"touch {values['DONE']}\n"
+        f"touch {run.marker('done', tid)}\n"
         f"herdr notification show \"{tid} done\" --body \"<one line>\" --sound done\n"
         "```\n\n"
         "The marker is what starts any agent that depends on your branch, so never create it "
-        "early. Then report what changed and what is untested."
+        "early. Then report what changed and what is untested. This holds after plan approval "
+        "and after any follow-up request: whenever the work on this branch is finished again, "
+        "the marker is the last step."
     )
-    return "\n\n---\n\n".join(parts) + "\n"
 
 
 # ---------------------------------------------------------------- launch
@@ -344,11 +350,20 @@ def launch(run, tid, force=False):
 
     prompt = render(run, tid, worktree=wt, merge_note="\n".join(notes))
     (run.dir / "prompts" / f"{tid}.md").write_text(prompt)
+    # Approving a plan starts a fresh session that carries only the plan, so the task prompt —
+    # and the done protocol at its end — is gone for the whole execution phase. The system
+    # prompt survives that handoff (verified), so the protocol is pinned there as well.
+    system = run.dir / "prompts" / f"{tid}.system.md"
+    system.write_text(
+        f"You are the `{tid}` agent of the `{run.name}` run, working in `{wt}` on branch `{tid}`.\n\n"
+        + done_protocol(run, tid) + "\n"
+    )
 
     # A pane that was just created may not be at its prompt yet.
     for attempt in range(6):
         p = sh("herdr", "agent", "start", tid, "--kind", "omp", "--pane", pane, "--timeout", "120000",
-               "--", "--model", model, "--thinking", thinking, check=False)
+               "--", "--model", model, "--thinking", thinking, "--append-system-prompt", str(system),
+               check=False)
         if p.returncode == 0:
             break
         time.sleep(3)
@@ -388,13 +403,43 @@ def dep_ready(run, dep):
     return True
 
 
+def stalled(run, tid):
+    """Launched, not done, agent at rest, and its branch holds committed work on a clean tree:
+    the agent most likely finished without writing its marker. Returns a reason or None."""
+    if run.marker("done", tid).exists() or not run.marker("started", tid).exists():
+        return None
+    if agent_status(tid) not in ("idle", "done", None):
+        return None
+    w = run.worktree_of(tid)
+    if not w:
+        return None
+    if sh("git", "-C", w["path"], "status", "--porcelain", check=False).stdout.strip():
+        return None
+    base, _ = run.base_of(tid)
+    ahead = sh("git", "-C", w["path"], "rev-list", "--count", f"{base}..HEAD", check=False).stdout.strip()
+    if not ahead or ahead == "0":
+        return None
+    return f"agent {agent_status(tid) or 'gone'}, {ahead} commit(s) on a clean tree, no done marker"
+
+
 def run_loop(run):
     run.log(f"scheduler up for {run.name}")
     warned = set()
     while True:
+        for tid in run.order:
+            reason = stalled(run, tid)
+            key = ("stalled", tid)
+            if reason and key not in warned:
+                warned.add(key)
+                blocked = [t for t in run.order if tid in run.after(t)]
+                run.log(f"[{tid}] looks finished but unmarked ({reason}); blocks {', '.join(blocked) or 'nothing'}")
+                notify(f"{tid}: finished but unmarked?",
+                       f"touch {run.marker('done', tid)} to release {', '.join(blocked) or 'nothing'}")
+            elif not reason:
+                warned.discard(key)
         waiting = [t for t in run.order if not run.marker("started", t).exists() and not run.marker("failed", t).exists()]
-        if not waiting:
-            run.log("every task launched; scheduler exits")
+        if all(run.marker("done", t).exists() or run.marker("failed", t).exists() for t in run.order):
+            run.log("every task done or failed; scheduler exits")
             return
         for tid in waiting:
             states = {d: dep_ready(run, d) for d in run.after(tid)}
@@ -434,7 +479,9 @@ def status(run):
         elif run.marker("failed", tid).exists():
             state = "failed: " + run.marker("failed", tid).read_text().strip().splitlines()[0][:100]
         elif run.marker("started", tid).exists():
-            state = f"agent {agent_status(tid) or 'gone'}" + (" (plan mode)" if agent_status(tid) and in_plan_mode(tid) else "")
+            reason = stalled(run, tid)
+            state = (f"STALLED: {reason} — `touch {run.marker('done', tid)}` if it is finished" if reason else
+                     f"agent {agent_status(tid) or 'gone'}" + (" (plan mode)" if agent_status(tid) and in_plan_mode(tid) else ""))
         else:
             pending = [d for d in run.after(tid) if not run.marker("done", d).exists()]
             state = "waiting on " + ", ".join(pending) if pending else "ready"

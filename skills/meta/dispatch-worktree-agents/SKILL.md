@@ -125,10 +125,13 @@ as its first step), starts omp with the resolved model, switches it to plan mode
 prompt and confirms the agent is working. A task that fails to launch gets a `failed/<id>`
 marker, a herdr notification, and no retry.
 
-A task is done when its agent runs `touch <run>/done/<id>`, which its prompt tells it to do only
-after committing. The scheduler waits for a clean worktree before building on it. The user can
-`touch` a marker by hand to release the next wave early, and `herd.py launch <manifest> <id>
---force` starts one task regardless.
+A task is done when its agent runs `touch <run>/done/<id>`, which it is told to do only after
+committing. Approving a plan hands execution to a fresh session that carries only the plan, so
+the task prompt is gone by then; `herd.py` therefore also pins the done protocol in the agent's
+system prompt (`prompts/<id>.system.md`), which survives the handoff and any follow-up request.
+The scheduler waits for a clean worktree before building on a task, and keeps running until
+every task is done or failed. The user can `touch` a marker by hand to release the next wave
+early, and `herd.py launch <manifest> <id> --force` starts one task regardless.
 
 Then confirm with `herd.py status <run>/herd.json` — every wave-1 task should read
 `agent working (plan mode)` — before reporting.
@@ -148,6 +151,8 @@ a task whose plan needs a product decision.
   --workspace <ws>` and `git branch -D <id>`, and let the scheduler relaunch it.
 - **Worktree create fails** — nearly always a branch-name collision; rename the task id.
 - **Nothing launches** — `herd.py status` names what each task waits on; `herd.log` in the run
-  directory has every launch step.
+  directory has every launch step. A task reading `STALLED` has an idle agent, commits on a
+  clean branch and no marker — usually finished work the agent never marked (the scheduler
+  also notifies). Read its pane; if the work is complete, `touch` the marker it names.
 - Never close herdr workspaces or panes this skill did not create, and never kill a process an
   agent started.
