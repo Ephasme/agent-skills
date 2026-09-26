@@ -8,6 +8,7 @@ page id), to the vendor, or marked **measured** (observed on a real Mac) or
 ## Contents
 
 - [Container](#container)
+- [Dynamic placeholders](#dynamic-placeholders)
 - [FileVault and escrow](#filevault-and-escrow)
 - [Certificates](#certificates)
 - [Wi-Fi](#wi-fi)
@@ -40,6 +41,52 @@ page id), to the vendor, or marked **measured** (observed on a real Mac) or
 - A signed profile is CMS SignedData over the XML. MicroMDM's `PUT /v1/profiles` store verifies the
   signature and rejects a self-signed signer it cannot verify; its `InstallProfile` command path
   passes bytes through untouched.
+
+## Dynamic placeholders
+
+A `.mobileconfig` may carry `{{name}}` inside `<string>` values, left there for the MDM to
+substitute per machine at install time. Apple's schema knows nothing about the mechanism — the
+schema validates the payload *after* substitution, so lint can only check the placements the
+substitution cannot survive. Everything below is **measured** against Flock, whose renderer is
+`packages/utils/src/profile-template.ts` and whose queue row in NanoMDM holds the result
+(2026-09-26); the parts Apple owns are cited.
+
+- Substitution is on the parsed XML tree, not on the text: `textContent` is decoded first, so a
+  placeholder written as `&amp;`-escaped text is found, and the serializer re-escapes what the value
+  brings in. Never hand-escape a substituted value.
+- **A `<string>` whose entire content is one placeholder is replaced by an `<array>`** when that
+  variable holds a list, one `<string>` per value; a placeholder embedded in a longer string is
+  substituted in place, and a list joins with `"\n"`. So the plist type in the installed payload is
+  not always the type in the file — measured both ways on the same template.
+- A `<string>` is the only place a placeholder is read. In a `<key>`, a `<data>`, an `<integer>` or
+  a `<date>` it is literal text: `{{x}}` becomes a key named `{{x}}` or a number that fails to parse,
+  and nothing warns you.
+- `PayloadIdentifier`, `PayloadUUID` and `PayloadType` cannot be dynamic. The first two are what
+  `RemoveProfile` and `ProfileList` match, and what makes an update in place rather than
+  remove-and-add (Apple: `TopLevel.yaml`, `CommonPayloadKeys.yaml`); a per-machine value there wants
+  to be a *profile* per machine, not a variable. Flock's renderer refuses all three at upload.
+- A `*CertificateUUID` cannot be dynamic either: the reference resolves inside one file, so a value
+  the MDM chooses cannot name a payload that file does not contain.
+- Two names to keep straight. `Flock`'s variable catalog is keyed by name alone, so renaming a
+  variable breaks every profile referencing it — the payload is the only record of what it needs,
+  and `profiles.variables` is folded from it at upload.
+- Flock has three value layers for one machine: the value typed at a direct assignment, the values of
+  the **people groups** its owner belongs to, then those of the **machine groups** naming it
+  (docs: `docs/profiles/` in the Flock repository). A *single*-valued variable is decided by the
+  first layer that sets it, and two groups in that layer disagreeing **fails the install** naming
+  both — it does not pick one. A *list*-valued variable unions every layer instead, de-duplicated and
+  sorted. Both measured end to end.
+- A referenced variable that is not in the catalog is refused at **upload** (400). One that is
+  defined but has no value for a machine fails that machine's **install**. Neither falls back to a
+  default, so a group that only reaches some of the fleet is a fleet split, not a graceful degrade.
+- Values are sealed with the session secret (`PROFILE_VARIABLE_LABEL`), never returned by the API and
+  never written to the event log — measured by grepping the response bodies and `graven_events` for
+  the plaintext. The **rendered command** is where they are in clear: NanoMDM's `commands` table
+  holds it, which is why Flock's queue endpoint stopped returning command payloads at all
+  (`responses.queuedCommand`). Reading one back is handling a secret.
+- Read-back: `ProfileList` returns payload metadata, never settings values, so a dynamic profile
+  showing as installed proves the payload is present and nothing about the value it carries. Check
+  the artifact the value produced on the Mac.
 
 ## FileVault and escrow
 

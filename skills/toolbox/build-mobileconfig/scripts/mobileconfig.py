@@ -11,6 +11,10 @@
   mobileconfig.py build <spec.json> -o <out>   assemble a profile from a JSON spec, then lint it
   mobileconfig.py lint <file.mobileconfig>...  check a profile (XML or CMS-signed) against the schema
 
+A profile may carry `{{name}}` placeholders for the MDM to fill per machine at
+install time; `lint` reports the variables it finds instead of treating them as
+unfilled placeholders, and refuses the placements the substitution cannot survive.
+
 The schema is github.com/apple/device-management, branch `release`, cloned to
 $APPLE_DM_SCHEMA (default ~/.cache/apple-device-management). `schema --update` pulls it.
 """
@@ -344,6 +348,87 @@ def looks_placeholder(value) -> bool:
     return isinstance(value, str) and "REPLACE" in value.upper()
 
 
+# `{{name}}` is a placeholder the MDM fills per machine at install time, so it is
+# meant to stay in the file. It is not a build-time placeholder: reporting it as
+# one tells the author to fill something that must be left alone.
+DYNAMIC_RE = re.compile(r"\{\{\s*([a-z][a-z0-9_]{0,63})\s*\}\}")
+# A whole string that is nothing but one placeholder: when the MDM's catalog says
+# that variable holds a list, the string is replaced by an <array>, so the field's
+# plist type in the installed payload is not the one in this file.
+DYNAMIC_WHOLE_RE = re.compile(r"^\s*\{\{\s*[a-z][a-z0-9_]{0,63}\s*\}\}\s*$")
+# The MDM addresses a profile and each payload by these, and replaces a payload in
+# place only when they still match what is installed — so a per-machine value in
+# any of them turns every update into remove-and-add, and leaves the previous
+# profile impossible to find. Flock's renderer refuses them at upload.
+DYNAMIC_FORBIDDEN = ("PayloadIdentifier", "PayloadUUID", "PayloadType")
+
+
+def dynamic_names(value) -> list[str]:
+    return DYNAMIC_RE.findall(value) if isinstance(value, str) else []
+
+
+def looks_dynamic(value) -> bool:
+    return bool(dynamic_names(value))
+
+
+def walk_nodes(obj, path=""):
+    """Every dict key and leaf value under `obj`, with the path to it."""
+    if isinstance(obj, dict):
+        for k, v in obj.items():
+            here = f"{path}.{k}" if path else k
+            yield here, k, "key"
+            yield from walk_nodes(v, here)
+    elif isinstance(obj, list):
+        for i, v in enumerate(obj):
+            yield from walk_nodes(v, f"{path}[{i}]")
+    else:
+        yield path, obj, "value"
+
+
+def check_dynamic(prof: dict, r: Report) -> None:
+    """Report what the file asks the MDM to fill, and refuse the placements that
+    cannot work. Whether a given MDM fills placeholders at all is not something a
+    file can assert, so this informs rather than refuses."""
+    wanted: dict[str, str] = {}
+    whole: list[str] = []
+    for path, entry, kind in walk_nodes(prof):
+        if kind == "key":
+            if looks_dynamic(entry):
+                r.error(path, f"`{entry}` is a key, not a value: a dynamic placeholder may appear only inside a string value")
+            continue
+        for name in dynamic_names(entry):
+            wanted.setdefault(name, path)
+        if isinstance(entry, str) and DYNAMIC_WHOLE_RE.match(entry):
+            last = path.split(".")[-1]
+            if last not in DYNAMIC_FORBIDDEN and not CERT_REF_RE.search(last):
+                whole.append(path)
+    for key in DYNAMIC_FORBIDDEN:
+        scopes = [("profile", prof)] + [(f"payload[{i}]", p) for i, p in enumerate(prof.get("PayloadContent") or [])]
+        for where, obj in scopes:
+            if isinstance(obj, dict) and looks_dynamic(obj.get(key)):
+                r.error(
+                    where,
+                    f"`{key}` holds a dynamic placeholder; it must be identical on every machine "
+                    "(the MDM matches a profile and replaces a payload in place only when it is unchanged)",
+                )
+    if not wanted:
+        return
+    r.info(
+        "profile",
+        f"dynamic profile: the MDM fills {len(wanted)} variable(s) per machine at install — "
+        + ", ".join(sorted(wanted))
+        + ". Define each in its catalog before upload: a profile referencing an undefined variable is refused, "
+        "and a variable with no value for a machine fails that install rather than installing a default",
+    )
+    if whole:
+        r.info(
+            "profile",
+            f"{len(whole)} string(s) hold one placeholder and nothing else ({', '.join(whole[:4])}"
+            + (", …" if len(whole) > 4 else "")
+            + "); where the catalog types that variable as a list, the MDM replaces the whole <string> with an <array>",
+        )
+
+
 def version_tuple(v) -> tuple[int, ...]:
     try:
         return tuple(int(x) for x in str(v).split("."))
@@ -389,11 +474,18 @@ def check_value(value, spec: dict, where: str, os_ctx: dict, r: Report) -> None:
         if "max" in rng and value > rng["max"]:
             r.warn(where, f"`{name}` = {value} is above the schema maximum {rng['max']} (check the key's prose; Apple is sometimes inconsistent)")
     if isinstance(value, str) and spec.get("format"):
-        try:
-            if not re.fullmatch(spec["format"], value) and not looks_placeholder(value):
-                r.error(where, f"`{name}` = {value!r} does not match format {spec['format']}")
-        except re.error:
-            pass
+        if looks_dynamic(value):
+            # A certificate reference is refused outright further down; this is
+            # for the ordinary format-checked key, where the substituted value is
+            # checked by macOS and by nothing on the way there.
+            if not CERT_REF_RE.search(name):
+                r.info(where, f"`{name}` is format-checked ({spec['format']}) and holds a dynamic placeholder: the MDM substitutes without checking, so the value it fills has to match or macOS rejects the payload at install")
+        else:
+            try:
+                if not re.fullmatch(spec["format"], value) and not looks_placeholder(value):
+                    r.error(where, f"`{name}` = {value!r} does not match format {spec['format']}")
+            except re.error:
+                pass
     subkeys = spec.get("subkeys") or []
     if isinstance(value, dict) and subkeys:
         check_dict(value, subkeys, where + "." + name, kos, r)
@@ -492,13 +584,13 @@ def lint_profile(prof: dict, r: Report) -> None:
                 r.error(where, "payload PayloadIdentifier equals the profile's; append a component")
             seen_ids.add(pid)
         if isinstance(puuid, str):
-            if not UUID_RE.match(puuid):
+            if not UUID_RE.match(puuid) and not looks_dynamic(puuid):
                 r.error(where, f"PayloadUUID {puuid!r} is not a UUID")
             elif puuid.upper() in all_uuids:
                 r.error(where, f"PayloadUUID {puuid} repeats ({all_uuids[puuid.upper()]}); it must be globally unique")
             else:
                 all_uuids[puuid.upper()] = where
-                if pid and puuid.upper() != stable_uuid(pid):
+                if pid and puuid.upper() != stable_uuid(pid) and not looks_dynamic(puuid):
                     r.info(where, "PayloadUUID is not uuid5(DNS, PayloadIdentifier). Fine if it is the UUID already installed on Macs — never change it then; otherwise derive it with `uuid`")
         if p.get("PayloadVersion") not in (1, None):
             r.error(where, "PayloadVersion must be 1")
@@ -564,12 +656,16 @@ def lint_profile(prof: dict, r: Report) -> None:
         where = f"payload[{i}] {p.get('PayloadType', '?')}"
         for path, value in walk_strings({k: v for k, v in p.items() if k != "PayloadUUID"}):
             leaf = re.sub(r"\[\d+\]$", "", path).split(".")[-1]
-            if CERT_REF_RE.search(leaf) and isinstance(value, str) and UUID_RE.match(value):
+            if CERT_REF_RE.search(leaf) and isinstance(value, str) and looks_dynamic(value):
+                r.error(where, f"`{path}` is dynamic, but a certificate reference must name a PayloadUUID in this same profile: it cannot be filled per machine")
+            elif CERT_REF_RE.search(leaf) and isinstance(value, str) and UUID_RE.match(value):
                 if value.upper() not in all_uuids:
                     r.error(where, f"`{path}` = {value} names no PayloadUUID in this profile; certificate references resolve within one profile only")
             if leaf in SECRET_KEYS and isinstance(value, str) and value:
                 if looks_placeholder(value):
                     r.info(where, f"`{path}` holds a placeholder: fill it at render time, never commit the real value")
+                elif looks_dynamic(value):
+                    r.info(where, f"`{path}` is filled per machine at install: the value is sealed in the MDM's store and never returned by its API, but the profile the MDM sends carries it in clear")
                 else:
                     r.warn(where, f"`{path}` holds a credential in plaintext; anyone with the file reads it")
             elif looks_placeholder(value):
@@ -579,6 +675,8 @@ def lint_profile(prof: dict, r: Report) -> None:
         eap = p.get("EAPClientConfiguration")
         if isinstance(eap, dict) and 13 in (eap.get("AcceptEAPTypes") or []) and not p.get("PayloadCertificateUUID"):
             r.warn(where, "EAP-TLS with no PayloadCertificateUUID: the client identity must be a payload in this same profile (Apple: 'within the same profile'); an identity from another profile is undocumented")
+
+    check_dynamic(prof, r)
 
 
 def lint_file(path: Path) -> int:

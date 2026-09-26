@@ -3,14 +3,17 @@ name: build-mobileconfig
 description: >-
   Builds, reviews and fixes macOS configuration profiles (.mobileconfig) against
   Apple's own device-management schema, with stable payload UUIDs, correct scope,
-  same-profile certificate references and no committed secrets. Use whenever the
-  user wants to create, write, generate, edit, lint, validate, debug or explain a
-  .mobileconfig / configuration profile / MDM profile / payload for a Mac — Wi-Fi,
-  VPN, certificates, FileVault escrow, firewall, Gatekeeper, passcode, PPPC/TCC,
-  system or kernel extensions, restrictions, login window, screen saver, managed
-  app preferences (e.g. a vendor's bundle ID) — or asks "why won't this profile
-  install", "which payload does X", "is this key still supported", even when
-  they never say "mobileconfig". Not for iOS-only profiles or DDM declarations.
+  same-profile certificate references, per-machine variable placeholders and no
+  committed secrets. Use whenever the user wants to create, write, generate,
+  edit, lint, validate, debug or explain a .mobileconfig / configuration profile
+  / MDM profile / payload for a Mac — Wi-Fi, VPN, certificates, FileVault
+  escrow, firewall, Gatekeeper, passcode, PPPC/TCC, system or kernel extensions,
+  restrictions, login window, screen saver, managed app preferences (e.g. a
+  vendor's bundle ID) — or asks for a value filled per machine at install time
+  (a dynamic profile: `{{name}}` variables the MDM resolves, an SSH key list, a
+  per-machine name or endpoint), or asks "why won't this profile install",
+  "which payload does X", "is this key still supported", even when they never say
+  "mobileconfig". Not for iOS-only profiles or DDM declarations.
 compatibility: >-
   macOS with git, plutil, openssl and uv (the helper is a uv inline script that
   pulls pyyaml). Network once, to clone github.com/apple/device-management.
@@ -124,6 +127,11 @@ scope and `TargetDeviceType` are never hand-typed:
 - `removal_disallowed`, `extra_top_level` for anything else at the top.
 - `--keep-uuids-from <file>` when changing a profile **already on Macs** whose
   UUIDs were not derived: the deployed UUIDs win, so the update is in place.
+- A value that differs per machine — an SSH key list, a per-site endpoint, a
+  per-user name — is a `{{name}}` placeholder left in a `<string>` for the MDM to
+  fill at install, not a `REPLACE-…` you fill before upload. The two are not
+  interchangeable; see **A per-machine value is a placeholder the MDM fills**
+  below.
 
 Hand-writing XML is fine for a trivial edit to an existing profile; lint it
 afterwards all the same.
@@ -133,13 +141,16 @@ afterwards all the same.
 Run `lint`. Fix every ERROR. For each WARN, either fix it or state why it
 stands (e.g. "requires user-approved MDM — fine, these Macs are ADE-enrolled";
 `[INFERENCE]` if that is a reading rather than a quote). `plutil -lint` alone
-proves only that the XML parses.
+proves only that the XML parses. Lint reports a dynamic profile's variables in
+its INFO rows — treat that list as work for the operator, not as noise.
 
 Then tell the user what the profile does **not** prove: `ProfileList` returns
 payload metadata, never values, so an installed profile is evidence the payload
-is present, not that it works. Name the read-back that does prove it — a
-`SecurityInfo` field, a `profiles show` on the Mac, the app's own status — or say
-none exists.
+is present, not that it works — and for a dynamic one, not that the machine got
+the value it should have. Name the read-back that does prove it — the artifact
+the value produces on the Mac, a `SecurityInfo` field, a `profiles show`, the
+app's own status — or say none exists. The MDM's own queue view is where the
+rendered values are checked, and reading it there is handling a secret.
 
 ### 5. Deliver
 
@@ -181,7 +192,41 @@ PKCS #12, a removal password — anyone with the file reads it, and profile
 encryption needs a certificate already on that one Mac, so it is not a fix.
 Commit a template with a `REPLACE-…` placeholder and fill it at render time from
 the secret store. A placeholder installs cleanly and does nothing, so it must
-never be the thing uploaded.
+never be the thing uploaded. Where the value differs per machine, the next rule
+is the mechanism instead.
+
+**A per-machine value is a placeholder the MDM fills, not one you fill.** Two
+mechanisms look alike and are not. `REPLACE-…`, substituted before upload,
+produces one file for every Mac. `{{name}}`, left in the file, is substituted by
+the MDM per machine at the install — so the file is a template at rest and only
+ever becomes concrete on the way to one device. Reach for it when the value
+genuinely differs per machine (an SSH key list, a per-machine endpoint, a
+per-user name) and the MDM supports it; otherwise prefer the fixed value, because
+a variable the MDM cannot resolve **fails that install** rather than falling back
+to a default. The rules the mechanism imposes:
+
+- Inside `<string>` values only. A placeholder in a `<key>`, a `<data>` or a
+  number is not a placeholder — it is literal text that reaches the Mac.
+- Never in `PayloadIdentifier`, `PayloadUUID`, `PayloadType` or any
+  `*CertificateUUID`. The first three have to stay identical on every machine or
+  the update stops being in place; a certificate reference has to name a payload
+  in this same file.
+- A `<string>` holding **nothing but** one placeholder may be replaced by an
+  `<array>` when that variable holds a list — the plist type in the installed
+  payload is then not the one in the file. Nothing on the Mac side can be
+  surprised by that (the payload is validated after substitution), but a
+  placeholder meant as one string does not survive being typed as a list.
+- The values are sealed in the MDM's store: not in its API responses, not in its
+  event log. The profile it *sends* carries them in clear, so the operator's
+  stdout, a command log or a `curl` of the device queue is a leak even though the
+  API looks clean.
+- Syntax, the catalog the variables must be defined in, and the precedence
+  between a value typed at assignment and one a group carries are all the MDM's,
+  not Apple's. This skill writes `{{name}}` — lowercase, digits and underscores,
+  starting with a letter — because that is what the MDM here accepts; confirm
+  against the MDM's own docs before shipping a template somewhere else. Name
+  every variable the profile references, so the operator can define each one
+  before the upload is refused or the install fails.
 
 **Top-level keys that bite:** `RemovalDate`, `DurationUntilRemoval` (silently
 drop enforcement), `PayloadExpirationDate` (prompts the user), `ConsentText`
@@ -199,7 +244,8 @@ prefer the vendor's current key name over whatever an old template used.
 `references/learnings.md` — read the section for the payload you are touching
 before writing it: FileVault + escrow, certificates, Wi-Fi, VPN / network
 extensions, PPPC, system and kernel extensions, firewall, Gatekeeper, passcode,
-restrictions and Activation Lock, managed preferences.
+restrictions and Activation Lock, managed preferences, dynamic per-machine
+placeholders.
 
 ## Answer shape
 
@@ -207,6 +253,8 @@ The profile (path), the lint result, then:
 
 - keys set, one line each with the reason;
 - deliberately absent keys that someone would plausibly add, with the reason;
+- for a dynamic profile, every `{{variable}}` the file now references, and what
+  the operator has to define before it installs at all;
 - gates (UAMDM, supervision, ADE, manual-install refused, macOS floor);
 - how to verify on a real Mac, or that nothing can;
 - anything with no primary source, said as such.

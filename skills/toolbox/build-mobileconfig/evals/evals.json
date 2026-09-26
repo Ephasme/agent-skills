@@ -65,6 +65,26 @@
         "Answer identifies the two com.apple.screensaver payloads (only one allowed per Mac)",
         "Answer explains that RemovalDate makes the profile remove itself, silently dropping enforcement"
       ]
+    },
+    {
+      "id": 4,
+      "name": "dynamic-authorized-keys",
+      "prompt": "Our MDM fills {{name}} values per machine at install time. I want ONE profile for the whole fleet that puts each Mac's own SSH authorized keys in place and sets the login name it should use, instead of hand-building a profile per machine. Each Mac's keys come from the group it is in. Write me the .mobileconfig.",
+      "expected_output": "A profile whose per-machine values are left as {{name}} placeholders inside <string> values, so one file serves the fleet: never a REPLACE- placeholder, never one machine's real value, never a per-machine PayloadUUID. The keys field is a <string> holding exactly one placeholder (the MDM may expand it to an <array> when the variable is a list); the login name is a whole-string placeholder too. No placeholder in PayloadIdentifier, PayloadUUID, PayloadType or any *CertificateUUID. The answer names every variable the profile references, says each must be defined in the MDM's catalog before the upload is accepted, and that a machine with no value fails its install rather than installing a default. Notes that an installed dynamic profile proves the payload is present and nothing about the value it carries (ProfileList returns metadata, never values), so the check is the artifact on the Mac, not the MDM's profile list.",
+      "files": [],
+      "expectations": [
+        "A .mobileconfig is produced and parses as an XML plist",
+        "Apple-schema lint reports 0 errors",
+        "Every per-machine value is a {{name}} placeholder left in the file: no REPLACE- placeholder, and no real key or login name committed",
+        "Every placeholder sits inside a <string> value, never in a <key>, <data> or number",
+        "No placeholder appears in PayloadIdentifier, PayloadUUID, PayloadType or any *CertificateUUID",
+        "The keys string holds exactly one placeholder and nothing else",
+        "PayloadUUIDs are derived from the payload identifiers, one set for the whole fleet (no per-machine UUID)",
+        "Answer names each variable the profile references",
+        "Answer states the variables must exist in the MDM's catalog before upload, and that a missing value fails that machine's install rather than falling back to a default",
+        "Answer states the installed profile proves presence, not the value (ProfileList returns payload metadata, never settings values)",
+        "Lint output is shown, and the INFO lines naming the dynamic variables are not reported as errors"
+      ]
     }
   ]
 }
