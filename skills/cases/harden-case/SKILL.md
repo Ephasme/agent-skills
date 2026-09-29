@@ -89,8 +89,9 @@ identity and working-copy state have not changed unexpectedly.
 
 - Never write a fact not reopened at its primary source. A role report is not a source.
 - Never send sensitive case data to web search, outbound messages, or unrelated services.
-- Treat zones defined as hand-owned or untouchable by `cases/RUNBOOK.md` as read-only. Raise
-  findings there to the user, including front matter, journal or log entries, and Notes.
+- Treat zones the repository defines as hand-owned or untouchable (its instructions, and the
+  `sync-case` contract where the case is tracked) as read-only. Raise findings there to the user,
+  including front matter, journal or log entries, and Notes.
 - Never strip legacy from or compress `journal.md`, curated history, `documents/`, or `archive/`.
 - Move circulated wrong facts to the repository-defined wrong-facts record; never silently delete.
 - Before deletion, confirm the path is tracked, inside case scope, not a protected/generated
@@ -123,8 +124,9 @@ Run preflight:
    `AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, and `.cursor/rules`. Resolve explicit path pointers.
    Nearest scoped repository instructions override broader repository instructions, while host,
    system, and user instructions retain their normal higher precedence.
-5. Read `cases/RUNBOOK.md`, case `README.md` including front matter, and the case's scoped
-   instructions. If status is not active, ask before continuing.
+5. Read the case `README.md` including front matter, and the case's scoped instructions. If the
+   case is tracked, its sync contract is the `sync-case` skill. If status is not active, ask
+   before continuing.
 
 If the host cannot enumerate or search files, follow explicit paths and links from the root map,
 case README, and instruction files. Require one opened authority to declare that map exhaustive, or
@@ -170,7 +172,8 @@ never a storage decision, and never a write. It must also emit one `tasker-*` fi
 task and per analysis invariant so the adversary can judge its evidence, dates, priority, and
 dependency edges.
 
-Before using a connected source, confirm authorization and the `cases/RUNBOOK.md` health signals.
+Before using a connected source, confirm authorization and its health signals (for a tracked
+case, the `sync-case` skill's source traps).
 Never interpret silence as evidence from an unhealthy or unverified source.
 
 Challenge every checker report using the adversary contract in
