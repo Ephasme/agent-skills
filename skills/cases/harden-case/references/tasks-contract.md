@@ -40,7 +40,7 @@ tasks:
     priority: P0 # P0 deadline/money risk; P1 required; P2 normal; P3 optional
     due: YYYY-MM-DD # or null
     due_source: "Primary source and derivation" # or null
-    owner: loup # person/role or null
+    owner: jane # person/role as the repository names them, or null
     waiting_on: null # non-empty when blocked
     depends_on: []
     parent: null

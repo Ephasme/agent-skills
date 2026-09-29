@@ -1,6 +1,6 @@
 ---
 name: harden-case
-description: Makes a case in this repository trustworthy before a deadline, payment, meeting, filing, third-party message, handoff, or archive. Use when asked to harden, audit, stress-test, poke holes in, comprehensively fact-check, tighten, or “durcir / vérifier / fiabiliser” a case — including when the ask is prompted by an accumulated journal or log that has gone without human review, or by repeated updates leaving uncertainty about what still holds. Invoke only on an explicit request — never load it on your own initiative, since it rewrites the case from primary sources and costs a long run.
+description: Makes a case in a case-archive repository (one folder per case under `cases/`, each with a README, documents and optionally an append-only journal) trustworthy before a deadline, payment, meeting, filing, third-party message, handoff, or archive. Use when asked to harden, audit, stress-test, poke holes in, comprehensively fact-check, tighten, or “durcir / vérifier / fiabiliser” a case — including when the ask is prompted by an accumulated journal or log that has gone without human review, or by repeated updates leaving uncertainty about what still holds. Invoke only on an explicit request — never load it on your own initiative, since it rewrites the case from primary sources and costs a long run.
 disable-model-invocation: true
 ---
 
@@ -19,6 +19,19 @@ This skill follows the portable Agent Skills layout: `SKILL.md` plus relative re
 and trigger discovery are host concerns. Preserve the entire skill directory when installing it.
 Read [references/host-compatibility.md](references/host-compatibility.md) before orchestration and
 [references/protocols.md](references/protocols.md) before dispatching any role.
+
+## The repository contract
+
+A case is `cases/<slug>/`: a `README.md` whose front-matter carries at least `case`, `status` and
+optionally `language`; a `documents/` folder of primary sources; and, when the case is tracked, an
+append-only `journal.md` plus machine-managed README blocks whose contract is the `sync-case`
+skill. Resolved cases may live under `cases/archive/`.
+
+Everything else is the repository's to declare, in its agent instructions (root and per-case):
+which zones are hand-owned, where superseded or circulated wrong facts are recorded, which ledger
+holds cross-case money, which task tracker holds the work, and the language rule by audience.
+Discover each one there. Where an authority this run needs is not declared, do not invent a file
+for it — report what you would have written and ask where it belongs.
 
 ## Choose the effective mode
 
