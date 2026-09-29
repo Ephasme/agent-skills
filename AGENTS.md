@@ -24,7 +24,7 @@ No package manager, no dependencies, no build. Node 22 in CI.
 
 ## Key Conventions
 
-- Categories are fixed: `engineering`, `finance`, `health`, `helpers`, `legal`, `meta`,
+- Categories are fixed: `cases`, `engineering`, `finance`, `health`, `helpers`, `legal`, `meta`,
   `research`, `toolbox`. Adding one means editing `CATEGORIES` in `scripts/validate.mjs`.
 - `name` must equal the directory name and be unique across all categories.
 - Frontmatter: the six spec fields plus `disable-model-invocation`. Nothing else.

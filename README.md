@@ -267,7 +267,7 @@ Portability — the contract above:
 Hygiene:
 
 11. No absolute home paths (`/home/you/…`, `/Users/you/…`), no `__pycache__`, nothing over 1 MiB.
-12. Only the eight categories below.
+12. Only the nine categories below.
 
 A skill must be **self-contained**: anything it runs lives in its own `scripts/`. Where two skills
 need the same helper, both ship a copy rather than sharing one — they install independently and
@@ -277,9 +277,10 @@ cannot reach each other.
 
 | Category | Skills |
 | --- | --- |
+| `cases` | harden-case, sync-case |
 | `engineering` | brainstorm-design, clean-git-repo, debug-systematically, execute-plan, harden-plan, refine-document, scan-code-quality, strip-legacy-content, write-plan |
 | `finance` | generate-payment-qr-code |
-| `research` | assess-true-quality, cite-or-refuse, fact-check-document, harden-case |
+| `research` | assess-true-quality, cite-or-refuse, fact-check-document |
 | `toolbox` | assume-aws-admin, build-mobileconfig, free-disk-space, set-filevault-recovery-key |
 | `meta` | execute-autonomously, hand-off-session, schedule-prompt, tighten-responses |
 | `health` | cbt |
@@ -307,8 +308,8 @@ Restore either with `git checkout 65cd4c3 -- skills/engineering/<skill>`.
 `~/.agents/plugins/trackers/scripts/trackers`, so retiring it left the plugin with no caller — no
 cron entry, no timer, and no `~/.claude-trackers` state dir referenced it either. The plugin is
 gone from the machine and from the dotfiles. `harden-case` outlived the category because it never
-used the CLI: it reads a case directory and whatever conventions that repository declares, so it
-moved to `research` beside the other verification skills.
+used the CLI: it reads a case directory and whatever conventions that repository declares. It sat
+in `research` until `sync-case` joined it in `cases`.
 
 **A second reviewer per task.** `spec-to-pr` used to run a spec reviewer and a quality reviewer in
 parallel on every task, then delegate a whole-branch pass to `two-axis-review`. Both collapsed into
