@@ -278,7 +278,7 @@ cannot reach each other.
 | Category | Skills |
 | --- | --- |
 | `cases` | harden-case, sync-case |
-| `engineering` | brainstorm-design, clean-git-repo, debug-systematically, execute-plan, harden-plan, refine-document, scan-code-quality, strip-legacy-content, write-plan |
+| `engineering` | brainstorm-design, clean-git-repo, debug-systematically, execute-plan, harden-plan, refine-document, scan-code-quality, strip-legacy-content, ui-ux-playbook, write-plan |
 | `finance` | generate-payment-qr-code |
 | `research` | assess-true-quality, cite-or-refuse, fact-check-document |
 | `toolbox` | assume-aws-admin, build-mobileconfig, free-disk-space, set-filevault-recovery-key |
