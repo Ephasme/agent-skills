@@ -4,8 +4,8 @@ description: >-
   Hardens an engineering plan against reality — verifies every claim it makes against the
   codebase and the docs, surfaces the collateral damage it doesn't handle, and closes with
   a structural sweep for the ambiguity, missing contracts, and unstated invariants that claim
-  verification cannot catch. Reports by default and changes nothing; pass --fix to also
-  apply fixes and re-review until a round finds nothing. Use when the user hands over a
+  verification cannot catch. Fixes by default, re-reviewing until a round finds nothing;
+  pass --no-fix to only report. Use when the user hands over a
   plan, design doc, RFC, ADR, refactor proposal, or migration document and asks anything
   skeptical of it — harden, stress test, poke holes in, sanity check — even without the
   word "plan". Also covers the near-final structural read before handoff — "final pass",
@@ -23,15 +23,15 @@ Run the plan through rounds of review and fixes until it holds up to reality. Ea
 
 | Invocation | Behaviour |
 |---|---|
-| *(bare)* | **REPORT** — the default. One pass: verify claims, assess collateral damage, triage by severity, run the closing structural sweep, then **stop and report**. Never edits the plan, never asks a question, never loops. |
-| `--fix` | **FIX** — verify, ask about genuine judgement calls, apply fixes, and re-review until a round produces no fixes; then the closing sweep, re-looping if the sweep changed anything. |
+| *(bare)* | **FIX** — the default. Verify, ask about genuine judgement calls, apply fixes, and re-review until a round produces no fixes; then the closing sweep, re-looping if the sweep changed anything. |
+| `--no-fix` | **REPORT** — one pass: verify claims, assess collateral damage, triage by severity, run the closing structural sweep, then **stop and report**. Never edits the plan, never asks a question, never loops. |
 | `--fast` | Orthogonal to both: skip Step 5, the closing structural sweep. |
 
 All four combinations are legal. **REPORT is read-only on the plan file itself**, not just on the codebase — the deliverable is a findings report the caller acts on, which is what makes the mode safe to run on a plan you don't own.
 
 Say which mode ran, in the first line of the output.
 
-**Invocation:** `harden-plan [--fix] [--fast] [<plan-file>]`, however this agent invokes skills. A path argument names the plan directly and skips Step 0's discovery — which is how another skill should call this one, since a caller always knows its own plan file and shouldn't make this skill guess from conversational context.
+**Invocation:** `harden-plan [--no-fix] [--fast] [<plan-file>]`, however this agent invokes skills. A path argument names the plan directly and skips Step 0's discovery — which is how another skill should call this one, since a caller always knows its own plan file and shouldn't make this skill guess from conversational context.
 
 ## Guardrails
 

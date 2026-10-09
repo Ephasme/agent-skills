@@ -13,7 +13,7 @@ Loup has handed off a multi-step build — often a queue of plans or phases — 
 
 1. Finish the task in progress.
 2. Take the next plan/phase in the queue.
-3. **Re-harden it before executing** — fold in everything you learned implementing the previous phase(s); assumptions it made may now be known-true or known-false, so fix the plan first. (Use the `harden-plan` skill with `--fix` if it is installed — the flag is what makes it amend the plan rather than just report. Otherwise re-read the plan against the code yourself and correct it in place.)
+3. **Re-harden it before executing** — fold in everything you learned implementing the previous phase(s); assumptions it made may now be known-true or known-false, so fix the plan first. (Use the `harden-plan` skill if it is installed — its default mode amends the plan; never pass `--no-fix`, which only reports. Otherwise re-read the plan against the code yourself and correct it in place.)
 4. Implement it inline, fully — then verify it: run the tests, run the thing, and confirm the acceptance criteria hold. "Implemented" is not "verified".
 5. Repeat until the queue is empty.
 
