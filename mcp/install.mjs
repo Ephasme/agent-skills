@@ -8,10 +8,14 @@
 // the agent send that literal text as the credential, because neither expands an unset
 // variable.
 //
-// Usage: node mcp/install.mjs [--dry-run] [--only omp|claude]
+// Usage: node mcp/install.mjs [--dry-run] [--only omp|claude] [--manifest <path>]…
+//
+// `--manifest` adds another catalog's server list — each server keeps that catalog's own
+// helpers, so a second repo's servers read that repo's secrets. Repeat it for each one; the
+// default is this repo's own servers.json.
 
 import { closeSync, copyFileSync, openSync, readFileSync, renameSync, statSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -21,14 +25,20 @@ const REF = /^(.*?)\$\{([A-Z0-9_]+)\}$/;
 const argv = process.argv.slice(2);
 const dryRun = argv.includes('--dry-run');
 const only = argv.includes('--only') ? argv[argv.indexOf('--only') + 1] : null;
+const extra = argv.flatMap((a, i) => (a === '--manifest' && argv[i + 1] ? [resolve(argv[i + 1])] : []));
 
-const servers = JSON.parse(readFileSync(join(HERE, 'servers.json'), 'utf8'));
+const manifests = [join(HERE, 'servers.json'), ...extra].map((path) => ({
+  dir: dirname(path),
+  servers: JSON.parse(readFileSync(path, 'utf8')),
+}));
+const servers = Object.assign({}, ...manifests.map((m) => m.servers));
+const catalogOf = (name) => manifests.find((m) => name in m.servers).dir;
 
 /** omp runs a `!`-prefixed header value through /bin/sh -c and drops the header if it prints
  * nothing — config/resolve-config-value.ts and mcp/manager.ts in can1357/oh-my-pi. */
-const ompHeader = (value) => {
+const ompHeader = (value, dir) => {
   const ref = REF.exec(value);
-  return ref ? `!sh ${join(HERE, 'secret.sh')} '${ref[1]}' ${ref[2]}` : value;
+  return ref ? `!sh ${join(dir, 'secret.sh')} '${ref[1]}' ${ref[2]}` : value;
 };
 
 const targets = {
@@ -40,7 +50,10 @@ const targets = {
       mcpServers: Object.fromEntries(
         Object.entries(servers).map(([name, s]) => {
           const out = { type: s.type, url: s.url };
-          if (s.headers) out.headers = Object.fromEntries(Object.entries(s.headers).map(([h, v]) => [h, ompHeader(v)]));
+          if (s.headers)
+            out.headers = Object.fromEntries(
+              Object.entries(s.headers).map(([h, v]) => [h, ompHeader(v, catalogOf(name))]),
+            );
           if (s.oauth) out.oauth = s.oauth;
           if (s.auth) out.auth = s.auth;
           return [name, out];
@@ -56,7 +69,7 @@ const targets = {
       mcpServers: Object.fromEntries(
         Object.entries(servers).map(([name, s]) => {
           const out = { type: 'http', url: s.url };
-          if (s.headers) out.headersHelper = join(HERE, 'headers.mjs');
+          if (s.headers) out.headersHelper = join(catalogOf(name), 'headers.mjs');
           return [name, out];
         }),
       ),

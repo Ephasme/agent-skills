@@ -17,6 +17,7 @@ git@github.com:Ephasme/agent-skills.git
 - [Authoring](#authoring)
 - [What the validator enforces, and why](#what-the-validator-enforces-and-why)
 - [Catalog](#catalog)
+- [Skill dependencies](dependencies.md)
 - [Third-party skills](#third-party-skills)
 - [The `agents/` directory](#the-agents-directory)
 
@@ -74,13 +75,15 @@ Naming `universal` installs the same content, because `universal`'s own skills d
 
 ## MCP servers
 
-`mcp/servers.json` lists them — 18 remote HTTP servers, no credentials. `mcp/install.mjs` writes
-that list into both agents' own config files and leaves every other key in them alone.
+`mcp/servers.json` lists mine — 12 remote HTTP servers, no credentials. `mcp/install.mjs` writes that
+list into both agents' own config files and leaves every other key in them alone. `--manifest <path>`
+adds another catalog's list; each server keeps that catalog's helpers, so the Sherpas servers read the
+Sherpas secrets:
 
 ```sh
 node mcp/install.mjs --dry-run     # what would change
 node mcp/install.mjs               # omp's ~/.omp/agent/mcp.json, Claude Code's ~/.claude.json
-node mcp/install.mjs --only omp    # one of them
+node mcp/install.mjs --manifest ~/code/work/agent-skills/mcp/servers.json
 ```
 
 Credentials live in `mcp/secrets.sops.yaml`, age-encrypted, key at `~/.config/sops/age/keys.txt`;
@@ -163,23 +166,23 @@ the same helper, each ships a copy — they install independently and cannot rea
 | Category | Skills |
 | --- | --- |
 | `cases` | harden-case, sync-case |
-| `engineering` | brainstorm-design, clean-git-repo, create-cleanup-roadmap, debug-systematically, execute-plan, harden-plan, refine-document, review-pr-list, scan-code-quality, strip-legacy-content, ui-ux-playbook, write-plan |
+| `engineering` | clean-git-repo, create-cleanup-roadmap |
 | `finance` | generate-payment-qr-code |
 | `health` | cbt |
-| `helpers` | move-workspace-files |
 | `legal` | french-insurance-law |
-| `meta` | dispatch-worktree-agents, execute-autonomously, hand-off-session, schedule-prompt, tighten-responses |
+| `meta` | dispatch-worktree-agents, hand-off-session, schedule-prompt, tighten-responses |
 | `research` | assess-true-quality, cite-or-refuse, fact-check-document |
-| `toolbox` | assume-aws-admin, build-mobileconfig, free-disk-space, set-filevault-recovery-key |
+| `toolbox` | free-disk-space |
 
-30 skills. The CLI discovers a `SKILL.md` at any depth under `skills/`, and any `SKILL.md` sitting
+15 skills. The CLI discovers a `SKILL.md` at any depth under `skills/`, and any `SKILL.md` sitting
 directly inside a repo subdirectory; this repo uses `skills/<category>/<skill>/SKILL.md`, so no
 manifest file is needed. Categories organise this repo only; installed skills are flat.
 
-Sherpas-specific skills live in their own private catalog instead, `Les-Sherpas/agent-skills`:
-`ship-production` (the production release runbook), `review-pr-board` (that org's PR review, whose
-defaults `review-pr-list` here applies), and `post-deploy-changelog`, which `ship-production` calls
-for its last phase.
+The Sherpas-specific skills live in their own private catalog, `Les-Sherpas/agent-skills` — the
+production release runbook and the changelog it ends with, that org's PR review, the AWS admin
+session, the MDM profile work, and the engineering method skills (plan, debug, quality scan,
+document refinement). Two skills here still name skills that moved there, which
+[`dependencies.md`](dependencies.md) draws.
 
 ## Third-party skills
 

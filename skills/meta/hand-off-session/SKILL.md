@@ -77,7 +77,7 @@ This assumes a Unix-like remote (it needs `mktemp`, `ssh`, and `rsync`/`scp`); i
 
 ## Moving a pack
 
-Pass `--move` together with `--send=<target>` to go one step further: instead of leaving the archive sitting in its private remote temp directory, unpack it directly into the identical project on that machine (same project name as the current one, e.g. being in `sherpas-api` locally and running `--output=pack --send=nas --move` unpacks into `sherpas-api` on `nas`). `--move` only makes sense together with `--send` (which in turn requires `--output=pack`, per above) — if `--move` is passed without `--send`, stop and tell the user rather than guessing which target they meant.
+Pass `--move` together with `--send=<target>` to go one step further: instead of leaving the archive sitting in its private remote temp directory, unpack it directly into the identical project on that machine (same project name as the current one, e.g. being in `api` locally and running `--output=pack --send=nas --move` unpacks into `api` on `nas`). `--move` only makes sense together with `--send` (which in turn requires `--output=pack`, per above) — if `--move` is passed without `--send`, stop and tell the user rather than guessing which target they meant.
 
 Resolving *where* to unpack doesn't depend on the pack itself, so do it first — before spending effort building the pack, so a failure here doesn't waste that work:
 

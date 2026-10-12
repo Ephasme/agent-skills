@@ -2,25 +2,13 @@
   "apify": {
     "type": "http",
     "url": "https://mcp.apify.com/",
-    "headers": { "Authorization": "Bearer ${APIFY_API_TOKEN}" }
+    "headers": {
+      "Authorization": "Bearer ${APIFY_API_TOKEN}"
+    }
   },
   "calcom": {
     "type": "http",
     "url": "https://mcp.cal.com/mcp"
-  },
-  "slack": {
-    "type": "http",
-    "url": "https://mcp.slack.com/mcp",
-    "oauth": {
-      "clientId": "${SLACK_CLIENT_ID}",
-      "clientSecret": "${SLACK_CLIENT_SECRET}"
-    },
-    "auth": {
-      "type": "oauth",
-      "tokenUrl": "https://slack.com/api/oauth.v2.user.access",
-      "clientId": "${SLACK_CLIENT_ID}",
-      "clientSecret": "${SLACK_CLIENT_SECRET}"
-    }
   },
   "whatsapp": {
     "type": "http",
@@ -51,10 +39,6 @@
     "type": "http",
     "url": "https://google-perso.loup-peluso.com/mcp"
   },
-  "google-pro": {
-    "type": "http",
-    "url": "https://google-work.loup-peluso.com/mcp"
-  },
   "google-maps": {
     "type": "http",
     "url": "https://maps.loup-peluso.com/mcp",
@@ -75,10 +59,6 @@
     "type": "http",
     "url": "https://mcp.notion.com/mcp?account=perso"
   },
-  "notion-pro": {
-    "type": "http",
-    "url": "https://mcp.notion.com/mcp?account=pro"
-  },
   "snipeit": {
     "type": "http",
     "url": "https://snipeit.loup-peluso.com/mcp",
@@ -87,30 +67,11 @@
       "CF-Access-Client-Secret": "${SNIPEIT_CF_ACCESS_CLIENT_SECRET}"
     }
   },
-  "grafana": {
-    "type": "http",
-    "url": "https://grafana.loup-peluso.com/mcp",
-    "headers": {
-      "CF-Access-Client-Id": "${GRAFANA_CF_ACCESS_CLIENT_ID}",
-      "CF-Access-Client-Secret": "${GRAFANA_CF_ACCESS_CLIENT_SECRET}"
-    }
-  },
   "dagu": {
     "type": "http",
     "url": "https://dagu.loup-peluso.com/mcp",
-    "headers": { "Authorization": "Bearer ${DAGU_MCP_API_KEY}" }
-  },
-  "flock": {
-    "type": "http",
-    "url": "https://flock.sherpas.com/mcp",
-    "headers": { "Authorization": "Bearer ${FLOCK_API_KEY}" }
-  },
-  "argocd-work": {
-    "type": "http",
-    "url": "https://argocd-work.loup-peluso.com/mcp",
     "headers": {
-      "CF-Access-Client-Id": "${ARGOCD_WORK_CF_ACCESS_CLIENT_ID}",
-      "CF-Access-Client-Secret": "${ARGOCD_WORK_CF_ACCESS_CLIENT_SECRET}"
+      "Authorization": "Bearer ${DAGU_MCP_API_KEY}"
     }
   },
   "argocd-perso": {
