@@ -1,0 +1,124 @@
+{
+  "apify": {
+    "type": "http",
+    "url": "https://mcp.apify.com/",
+    "headers": { "Authorization": "Bearer ${APIFY_API_TOKEN}" }
+  },
+  "calcom": {
+    "type": "http",
+    "url": "https://mcp.cal.com/mcp"
+  },
+  "slack": {
+    "type": "http",
+    "url": "https://mcp.slack.com/mcp",
+    "oauth": {
+      "clientId": "${SLACK_CLIENT_ID}",
+      "clientSecret": "${SLACK_CLIENT_SECRET}"
+    },
+    "auth": {
+      "type": "oauth",
+      "tokenUrl": "https://slack.com/api/oauth.v2.user.access",
+      "clientId": "${SLACK_CLIENT_ID}",
+      "clientSecret": "${SLACK_CLIENT_SECRET}"
+    }
+  },
+  "whatsapp": {
+    "type": "http",
+    "url": "https://whatsapp.loup-peluso.com/mcp",
+    "headers": {
+      "Authorization": "Bearer ${WHATSAPP_MCP_TOKEN}",
+      "CF-Access-Client-Id": "${WHATSAPP_CF_ACCESS_CLIENT_ID}",
+      "CF-Access-Client-Secret": "${WHATSAPP_CF_ACCESS_CLIENT_SECRET}"
+    }
+  },
+  "imessage": {
+    "type": "http",
+    "url": "https://imessage.loup-peluso.com/mcp",
+    "headers": {
+      "CF-Access-Client-Id": "${IMESSAGE_CF_ACCESS_CLIENT_ID}",
+      "CF-Access-Client-Secret": "${IMESSAGE_CF_ACCESS_CLIENT_SECRET}"
+    }
+  },
+  "splitwise": {
+    "type": "http",
+    "url": "https://splitwise.loup-peluso.com/mcp",
+    "headers": {
+      "CF-Access-Client-Id": "${SPLITWISE_CF_ACCESS_CLIENT_ID}",
+      "CF-Access-Client-Secret": "${SPLITWISE_CF_ACCESS_CLIENT_SECRET}"
+    }
+  },
+  "google-perso": {
+    "type": "http",
+    "url": "https://google-perso.loup-peluso.com/mcp"
+  },
+  "google-pro": {
+    "type": "http",
+    "url": "https://google-work.loup-peluso.com/mcp"
+  },
+  "google-maps": {
+    "type": "http",
+    "url": "https://maps.loup-peluso.com/mcp",
+    "headers": {
+      "CF-Access-Client-Id": "${MAPS_CF_ACCESS_CLIENT_ID}",
+      "CF-Access-Client-Secret": "${MAPS_CF_ACCESS_CLIENT_SECRET}"
+    }
+  },
+  "tesla": {
+    "type": "http",
+    "url": "https://tesla.loup-peluso.com/mcp",
+    "headers": {
+      "CF-Access-Client-Id": "${TESLA_CF_ACCESS_CLIENT_ID}",
+      "CF-Access-Client-Secret": "${TESLA_CF_ACCESS_CLIENT_SECRET}"
+    }
+  },
+  "notion-perso": {
+    "type": "http",
+    "url": "https://mcp.notion.com/mcp?account=perso"
+  },
+  "notion-pro": {
+    "type": "http",
+    "url": "https://mcp.notion.com/mcp?account=pro"
+  },
+  "snipeit": {
+    "type": "http",
+    "url": "https://snipeit.loup-peluso.com/mcp",
+    "headers": {
+      "CF-Access-Client-Id": "${SNIPEIT_CF_ACCESS_CLIENT_ID}",
+      "CF-Access-Client-Secret": "${SNIPEIT_CF_ACCESS_CLIENT_SECRET}"
+    }
+  },
+  "grafana": {
+    "type": "http",
+    "url": "https://grafana.loup-peluso.com/mcp",
+    "headers": {
+      "CF-Access-Client-Id": "${GRAFANA_CF_ACCESS_CLIENT_ID}",
+      "CF-Access-Client-Secret": "${GRAFANA_CF_ACCESS_CLIENT_SECRET}"
+    }
+  },
+  "dagu": {
+    "type": "http",
+    "url": "https://dagu.loup-peluso.com/mcp",
+    "headers": { "Authorization": "Bearer ${DAGU_MCP_API_KEY}" }
+  },
+  "flock": {
+    "type": "http",
+    "url": "https://flock.sherpas.com/mcp",
+    "headers": { "Authorization": "Bearer ${FLOCK_API_KEY}" }
+  },
+  "argocd-work": {
+    "type": "http",
+    "url": "https://argocd-work.loup-peluso.com/mcp",
+    "headers": {
+      "CF-Access-Client-Id": "${ARGOCD_WORK_CF_ACCESS_CLIENT_ID}",
+      "CF-Access-Client-Secret": "${ARGOCD_WORK_CF_ACCESS_CLIENT_SECRET}"
+    }
+  },
+  "argocd-perso": {
+    "type": "http",
+    "url": "https://argocd-perso.loup-peluso.com/mcp",
+    "headers": {
+      "CF-Access-Client-Id": "${ARGOCD_PERSO_CF_ACCESS_CLIENT_ID}",
+      "CF-Access-Client-Secret": "${ARGOCD_PERSO_CF_ACCESS_CLIENT_SECRET}"
+    }
+  }
+}

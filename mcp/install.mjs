@@ -1,0 +1,141 @@
+#!/usr/bin/env node
+// Install the servers in servers.json into every agent that reads a JSON config:
+// omp's ~/.omp/agent/mcp.json and Claude Code's ~/.claude.json (user scope).
+//
+// No credential is written to either file. omp gets a `!` indirection to mcp/secret.sh
+// and Claude Code a headersHelper pointing at mcp/headers.mjs, both of which read
+// mcp/secrets.sops.yaml at connection time — a static "Bearer ${VAR}" header would have
+// the agent send that literal text as the credential, because neither expands an unset
+// variable.
+//
+// Usage: node mcp/install.mjs [--dry-run] [--only omp|claude]
+
+import { closeSync, copyFileSync, openSync, readFileSync, renameSync, statSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const HERE = dirname(fileURLToPath(import.meta.url));
+const HOME = process.env.HOME;
+const REF = /^(.*?)\$\{([A-Z0-9_]+)\}$/;
+
+const argv = process.argv.slice(2);
+const dryRun = argv.includes('--dry-run');
+const only = argv.includes('--only') ? argv[argv.indexOf('--only') + 1] : null;
+
+const servers = JSON.parse(readFileSync(join(HERE, 'servers.json'), 'utf8'));
+
+/** omp runs a `!`-prefixed header value through /bin/sh -c and drops the header if it prints
+ * nothing — config/resolve-config-value.ts and mcp/manager.ts in can1357/oh-my-pi. */
+const ompHeader = (value) => {
+  const ref = REF.exec(value);
+  return ref ? `!sh ${join(HERE, 'secret.sh')} '${ref[1]}' ${ref[2]}` : value;
+};
+
+const targets = {
+  omp: {
+    path: join(HOME, '.omp/agent/mcp.json'),
+    render: () => ({
+      $schema:
+        'https://raw.githubusercontent.com/can1357/oh-my-pi/main/packages/coding-agent/src/config/mcp-schema.json',
+      mcpServers: Object.fromEntries(
+        Object.entries(servers).map(([name, s]) => {
+          const out = { type: s.type, url: s.url };
+          if (s.headers) out.headers = Object.fromEntries(Object.entries(s.headers).map(([h, v]) => [h, ompHeader(v)]));
+          if (s.oauth) out.oauth = s.oauth;
+          if (s.auth) out.auth = s.auth;
+          return [name, out];
+        }),
+      ),
+    }),
+  },
+  claude: {
+    path: join(HOME, '.claude.json'),
+    // `oauth` is left out: Claude Code keeps an OAuth client secret in the keychain, set
+    // once through its own CLI, and expands no ${VAR} outside command/args/env/url/headers.
+    render: () => ({
+      mcpServers: Object.fromEntries(
+        Object.entries(servers).map(([name, s]) => {
+          const out = { type: 'http', url: s.url };
+          if (s.headers) out.headersHelper = join(HERE, 'headers.mjs');
+          return [name, out];
+        }),
+      ),
+    }),
+  },
+};
+
+const readTarget = (path) => {
+  const stat = statSync(path, { throwIfNoEntry: false });
+  if (!stat) return { previous: {}, text: null, mode: 0o600 };
+  const text = readFileSync(path, 'utf8');
+  return { previous: JSON.parse(text), text, mode: stat.mode & 0o777 };
+};
+
+/** Compact when the file is, pretty when it is — ~/.claude.json is one long line. */
+const serialise = (doc, text) =>
+  (text === null || text.includes('\n') ? JSON.stringify(doc, null, 2) : JSON.stringify(doc)) + '\n';
+
+const lines = [];
+let failed = false;
+
+for (const [name, target] of Object.entries(targets)) {
+  if (only && only !== name) continue;
+
+  const { previous, text, mode } = readTarget(target.path);
+  // The manifest owns `mcpServers` outright; every other key in the target is left alone.
+  const doc = { ...previous, ...target.render() };
+  const next = serialise(doc, text);
+
+  const was = previous.mcpServers ?? {};
+  const added = Object.keys(doc.mcpServers).filter((s) => !(s in was));
+  const changed = Object.keys(doc.mcpServers).filter(
+    (s) => s in was && JSON.stringify(was[s]) !== JSON.stringify(doc.mcpServers[s]),
+  );
+  const removed = Object.keys(was).filter((s) => !(s in doc.mcpServers));
+  const summary = `+${added.length} ~${changed.length} -${removed.length}`;
+  const detail = [
+    added.length && `    added:   ${added.join(', ')}`,
+    changed.length && `    changed: ${changed.join(', ')}`,
+    removed.length && `    removed: ${removed.join(', ')}`,
+  ].filter(Boolean);
+
+  if (text !== null && next === text) {
+    lines.push(`${name}: unchanged (${Object.keys(doc.mcpServers).length} servers)`);
+    continue;
+  }
+
+  if (dryRun) {
+    lines.push(`${name}: would write ${target.path} (${summary})`, ...detail);
+    continue;
+  }
+
+  if (text !== null) {
+    // Refuse the write when the agent rewrote the file since we read it — Claude Code
+    // rewrites ~/.claude.json while it runs.
+    if (readFileSync(target.path, 'utf8') !== text) {
+      lines.push(`${name}: ${target.path} changed under us — nothing written`);
+      failed = true;
+      continue;
+    }
+    copyFileSync(target.path, `${target.path}.bak`);
+  }
+
+  const tmp = `${target.path}.tmp-${process.pid}`;
+  closeSync(openSync(tmp, 'w', mode));
+  writeFileSync(tmp, next, { mode });
+  renameSync(tmp, target.path);
+  lines.push(`${name}: wrote ${target.path} (${summary})`, ...detail);
+}
+
+console.log(lines.join('\n'));
+
+const needsOauth = Object.entries(servers).filter(([, s]) => s.oauth).map(([name]) => name);
+if (needsOauth.length && only !== 'omp') {
+  console.log(
+    `\n${needsOauth.join(', ')}: Claude Code keeps an OAuth client secret in the keychain, so register it\n` +
+      'once with `claude mcp add --transport http <name> <url> --scope user --client-id <id>\n' +
+      '--client-secret`. Both values are in mcp/secrets.sops.yaml.',
+  );
+}
+
+process.exit(failed ? 1 : 0);

@@ -23,6 +23,7 @@ One directory per skill: `skills/<category>/<skill>/SKILL.md`.
 | Validate the catalog | `node scripts/validate.mjs` |
 | Validate quietly (errors only) | `node scripts/validate.mjs --quiet` |
 | Reinstall the store from this working tree | `npx -y skills@latest add . --skill '*' -g --yes --agent universal` |
+| Install the MCP servers into both agents | `node mcp/install.mjs` |
 
 `scripts/validate.mjs` takes no path argument; it always walks the whole catalog. CI runs it on
 Node 22.
@@ -56,6 +57,11 @@ skill is live immediately — no activation step, no per-profile links.
 - A skill that fans work out across sub-agents states a serial fallback for agents that have none.
 - `agents/*.md` are omp sub-agent definitions, exempt from the portability contract and not
   installed by the `skills` CLI; symlink one into `~/.omp/agent/agents/` to activate it.
+- MCP servers live in `mcp/servers.json`, installed into omp and Claude Code by `mcp/install.mjs`.
+  Write no credential into a config file: `mcp/servers.json` names each one as `${VAR}`, the value
+  rests in `mcp/secrets.sops.yaml` (age-encrypted, `.sops.yaml` holds the recipient), and
+  `mcp/secret.sh` / `mcp/headers.mjs` read it at connect time. Name a server's secret after its
+  header (`WHATSAPP_CF_ACCESS_CLIENT_ID`), not after the host.
 
 ## External References
 
@@ -65,3 +71,4 @@ skill is live immediately — no activation step, no per-profile links.
 | Every rule the validator enforces, with rationale | `scripts/validate.mjs` |
 | Discovery smoke test and portability install, beyond the validator | `.github/workflows/validate.yml` |
 | Working papers for `assess-true-quality` (plans, research, testing) | `docs/` |
+| MCP server list, installer, and the two secret helpers | `mcp/` |
