@@ -281,7 +281,7 @@ cannot reach each other.
 | `engineering` | brainstorm-design, clean-git-repo, debug-systematically, execute-plan, harden-plan, refine-document, review-pr-list, scan-code-quality, strip-legacy-content, ui-ux-playbook, write-plan |
 | `finance` | generate-payment-qr-code |
 | `research` | assess-true-quality, cite-or-refuse, fact-check-document |
-| `toolbox` | assume-aws-admin, build-mobileconfig, free-disk-space, set-filevault-recovery-key |
+| `toolbox` | assume-aws-admin, build-mobileconfig, free-disk-space, set-filevault-recovery-key, ship-production |
 | `meta` | execute-autonomously, hand-off-session, schedule-prompt, tighten-responses |
 | `health` | cbt |
 | `legal` | french-insurance-law |
