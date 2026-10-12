@@ -166,15 +166,20 @@ the same helper, each ships a copy — they install independently and cannot rea
 | `engineering` | brainstorm-design, clean-git-repo, create-cleanup-roadmap, debug-systematically, execute-plan, harden-plan, refine-document, review-pr-list, scan-code-quality, strip-legacy-content, ui-ux-playbook, write-plan |
 | `finance` | generate-payment-qr-code |
 | `health` | cbt |
-| `helpers` | move-workspace-files, post-deploy-changelog |
+| `helpers` | move-workspace-files |
 | `legal` | french-insurance-law |
 | `meta` | dispatch-worktree-agents, execute-autonomously, hand-off-session, schedule-prompt, tighten-responses |
 | `research` | assess-true-quality, cite-or-refuse, fact-check-document |
-| `toolbox` | assume-aws-admin, build-mobileconfig, free-disk-space, set-filevault-recovery-key, ship-production |
+| `toolbox` | assume-aws-admin, build-mobileconfig, free-disk-space, set-filevault-recovery-key |
 
-32 skills. The CLI discovers a `SKILL.md` at any depth under `skills/`, and any `SKILL.md` sitting
+30 skills. The CLI discovers a `SKILL.md` at any depth under `skills/`, and any `SKILL.md` sitting
 directly inside a repo subdirectory; this repo uses `skills/<category>/<skill>/SKILL.md`, so no
 manifest file is needed. Categories organise this repo only; installed skills are flat.
+
+Sherpas-specific skills live in their own private catalog instead, `Les-Sherpas/agent-skills`:
+`ship-production` (the production release runbook), `review-pr-board` (that org's PR review, whose
+defaults `review-pr-list` here applies), and `post-deploy-changelog`, which `ship-production` calls
+for its last phase.
 
 ## Third-party skills
 

@@ -27,10 +27,10 @@ PRs marked `Reviewed` on the project board, and one report.
 
 | Setting | Default |
 |---|---|
-| Repositories | `sherpas-api`, `sherpas-bo`, `sherpas-front-static` (owner `Les-Sherpas`) |
+| Repositories | named by the user, or the defaults of an installed organisation skill (`review-pr-board` carries Les Sherpas') |
 | Fast model | `openrouter/deepseek/deepseek-v4.1-flash` |
 | Strong model | `cc/claude-opus-5-5:high` |
-| Project board | GitHub project #4, owner `Les-Sherpas` ("⛰ Les Sherpas - Marketplace"), field `Status` |
+| Project board | named by the user, or the installed organisation skill's board |
 
 Anything the user says overrides these.
 
@@ -43,7 +43,7 @@ Resolve the input to a set of `<owner>/<repo>#<N>`:
 | PR URLs, `repo#N`, bare `#N` in the message | as given; a bare number belongs to the default repo it exists in — if it exists in more than one, ask |
 | Slack thread | Slack MCP: the parent message and every reply |
 | GitHub issue or PR | `gh issue view` / `gh pr view` with `--comments`, plus linked and closing PRs |
-| GitHub project view or status ("Ready for review") | `gh project item-list 4 --owner Les-Sherpas --query 'is:pr is:open status:"Ready for review"' -L 500 --format json` — the default limit is 30 |
+| GitHub project view or status ("Ready for review") | `gh project item-list <number> --owner <owner> --query 'is:pr is:open status:"Ready for review"' -L 500 --format json` — the default limit is 30 |
 | Search ("my open PRs", "everything by Alice this week") | `gh search prs` with matching qualifiers |
 | Notion or Linear page, local file | that service's MCP, or read the file |
 
@@ -67,8 +67,7 @@ Before starting any reviewer, read each PR's metadata and diffstat:
   - migrations or `db/`
   - money, invoices or funding
   - auth or permissions
-  - course or booking scheduling (`courseOccupiesTeacherSlot` and its callers)
-  - cross-module contracts or orval DTOs
+  - cross-module contracts or generated DTOs
   - concurrency
   - more than one module
 
@@ -129,7 +128,7 @@ steps 3–4 as `pr-<N>-strong`. The strong review's findings replace the fast on
 
 Read each review critically; the verdict is yours, not the reviewer's. For each `accept`:
 check membership with `gh pr view <url> --json projectItems`, then
-`gh project item-edit 4 --owner Les-Sherpas --url <url> --field Status --value Reviewed`.
+`gh project item-edit <number> --owner <owner> --url <url> --field Status --value Reviewed`.
 A PR not on the board is reported, never added.
 
 That is the only write. No pushes, comments, approvals or Slack messages, and leave every
@@ -145,7 +144,7 @@ Two tables, then the per-PR notes.
 
 | PR | Repo | Model (why) | Verdict | Top risk | Board |
 |---|---|---|---|---|---|
-| #1234 | sherpas-api | strong (migration) | human-look | #2 | not set: human-look |
+| #1234 | <repo> | strong (migration) | human-look | #2 | not set: human-look |
 
 `Top risk` cites an issue number from the table below.
 
