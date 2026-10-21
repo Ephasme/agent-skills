@@ -81,5 +81,12 @@
       "CF-Access-Client-Id": "${ARGOCD_PERSO_CF_ACCESS_CLIENT_ID}",
       "CF-Access-Client-Secret": "${ARGOCD_PERSO_CF_ACCESS_CLIENT_SECRET}"
     }
+  },
+  "omniroute": {
+    "type": "http",
+    "url": "https://omniroute.loup-peluso.com/api/mcp/stream",
+    "headers": {
+      "Authorization": "Bearer ${OMNIROUTE_MCP_API_KEY}"
+    }
   }
 }
