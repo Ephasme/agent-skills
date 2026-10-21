@@ -81,13 +81,5 @@
       "CF-Access-Client-Id": "${ARGOCD_PERSO_CF_ACCESS_CLIENT_ID}",
       "CF-Access-Client-Secret": "${ARGOCD_PERSO_CF_ACCESS_CLIENT_SECRET}"
     }
-  },
-  "stripe-dom": {
-    "type": "http",
-    "url": "https://mcp.stripe.com/?omp-server=stripe-dom"
-  },
-  "stripe-rem": {
-    "type": "http",
-    "url": "https://mcp.stripe.com/?omp-server=stripe-rem"
   }
 }
