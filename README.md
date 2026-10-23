@@ -169,12 +169,13 @@ the same helper, each ships a copy — they install independently and cannot rea
 | `engineering` | clean-git-repo, create-cleanup-roadmap |
 | `finance` | generate-payment-qr-code |
 | `health` | cbt |
+| `helpers` | write-children-story |
 | `legal` | french-insurance-law |
 | `meta` | hand-off-session, schedule-prompt, tighten-responses |
 | `research` | assess-true-quality, cite-or-refuse, fact-check-document |
 | `toolbox` | free-disk-space |
 
-14 skills. The CLI discovers a `SKILL.md` at any depth under `skills/`, and any `SKILL.md` sitting
+15 skills. The CLI discovers a `SKILL.md` at any depth under `skills/`, and any `SKILL.md` sitting
 directly inside a repo subdirectory; this repo uses `skills/<category>/<skill>/SKILL.md`, so no
 manifest file is needed. Categories organise this repo only; installed skills are flat.
 
