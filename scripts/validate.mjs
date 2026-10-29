@@ -22,11 +22,6 @@ import { fileURLToPath } from 'node:url';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const SKILLS = join(ROOT, 'skills');
 const QUIET = process.argv.includes('--quiet');
-// This lints repo content and nothing else. It used to also lint the harness
-// registry and the MCP manifest, which were machine facts no checkout carried —
-// hence a --home fixture flag and a --no-registry escape for CI. Both records were
-// deleted on 2026-08-16 when ~/.config/tack/config.yaml became the only one, and
-// `tack doctor` checks it where it actually lives.
 
 // Categories organise this repo only; installed skills are flat. The set is
 // deliberate — a new one is a decision, not a side effect of `mkdir`.
