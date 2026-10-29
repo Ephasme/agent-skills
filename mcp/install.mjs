@@ -8,13 +8,14 @@
 // the agent send that literal text as the credential, because neither expands an unset
 // variable.
 //
-// Usage: node mcp/install.mjs [--dry-run] [--only omp|claude] [--manifest <path>]…
+// Usage: node mcp/install.mjs [--dry-run] [--only omp|claude] [--manifest <path>]… [--skip <name>]…
 //
 // `--manifest` adds another catalog's server list — each server keeps that catalog's own
 // helpers, so a second repo's servers read that repo's secrets. Repeat it for each one; the
-// default is this repo's own servers.json.
+// default is this repo's own servers.json. `--skip` leaves out a server some manifest lists,
+// and removes it from the targets if an earlier run wrote it.
 
-import { closeSync, copyFileSync, openSync, readFileSync, renameSync, statSync, writeFileSync } from 'node:fs';
+import { closeSync, copyFileSync, mkdirSync, openSync, readFileSync, renameSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -25,14 +26,20 @@ const REF = /^(.*?)\$\{([A-Z0-9_]+)\}$/;
 const argv = process.argv.slice(2);
 const dryRun = argv.includes('--dry-run');
 const only = argv.includes('--only') ? argv[argv.indexOf('--only') + 1] : null;
-const extra = argv.flatMap((a, i) => (a === '--manifest' && argv[i + 1] ? [resolve(argv[i + 1])] : []));
+const valuesOf = (flag) => argv.flatMap((a, i) => (a === flag && argv[i + 1] ? [argv[i + 1]] : []));
+const extra = valuesOf('--manifest').map((p) => resolve(p));
+const skip = new Set(valuesOf('--skip'));
 
 const manifests = [join(HERE, 'servers.json'), ...extra].map((path) => ({
   dir: dirname(path),
-  servers: JSON.parse(readFileSync(path, 'utf8')),
+  servers: Object.fromEntries(
+    Object.entries(JSON.parse(readFileSync(path, 'utf8'))).filter(([name]) => !skip.has(name)),
+  ),
 }));
 const servers = Object.assign({}, ...manifests.map((m) => m.servers));
-const catalogOf = (name) => manifests.find((m) => name in m.servers).dir;
+// The last catalog declaring a name wins the merge above, so it is also the one whose helpers
+// must serve it — anything else pairs one catalog's server with another catalog's secrets.
+const catalogOf = (name) => manifests.findLast((m) => name in m.servers).dir;
 
 /** omp runs a `!`-prefixed header value through /bin/sh -c and drops the header if it prints
  * nothing — config/resolve-config-value.ts and mcp/manager.ts in can1357/oh-my-pi. */
@@ -132,6 +139,10 @@ for (const [name, target] of Object.entries(targets)) {
     }
     copyFileSync(target.path, `${target.path}.bak`);
   }
+
+  // A machine with Claude Code and no omp has no ~/.omp/agent/ yet — readTarget treats the
+  // missing file as an empty one, so the directory has to be there before we write into it.
+  mkdirSync(dirname(target.path), { recursive: true });
 
   const tmp = `${target.path}.tmp-${process.pid}`;
   closeSync(openSync(tmp, 'w', mode));

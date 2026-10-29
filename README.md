@@ -97,10 +97,7 @@ agent expands an unset `${VAR}` — omp sends the literal text, Claude Code warn
 
 Rotating a credential is then `sops mcp/secrets.sops.yaml` and a restart of omp — Claude Code runs
 the helper on every connection, while omp caches a header once it resolves and retries a failed one
-after 30 s. Slack is the one server whose OAuth client secret Claude Code keeps in its keychain
-rather than its config, so register that once with
-`claude mcp add --transport http slack … --client-secret`; the installer prints the command after
-it runs.
+after 30 s.
 
 The ciphertext is committed here, where the repo is public — the secrets rest entirely on the age
 key, which is not.
@@ -166,7 +163,7 @@ the same helper, each ships a copy — they install independently and cannot rea
 | Category | Skills |
 | --- | --- |
 | `cases` | harden-case, sync-case |
-| `engineering` | clean-git-repo, create-cleanup-roadmap |
+| `engineering` | clean-git-repo, create-cleanup-roadmap, slack-loading-triage |
 | `finance` | generate-payment-qr-code |
 | `health` | cbt |
 | `helpers` | write-children-story |
@@ -175,7 +172,7 @@ the same helper, each ships a copy — they install independently and cannot rea
 | `research` | assess-true-quality, cite-or-refuse, fact-check-document |
 | `toolbox` | free-disk-space, mailer-cleanup |
 
-16 skills. The CLI discovers a `SKILL.md` at any depth under `skills/`, and any `SKILL.md` sitting
+17 skills. The CLI discovers a `SKILL.md` at any depth under `skills/`, and any `SKILL.md` sitting
 directly inside a repo subdirectory; this repo uses `skills/<category>/<skill>/SKILL.md`, so no
 manifest file is needed. Categories organise this repo only; installed skills are flat.
 

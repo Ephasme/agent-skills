@@ -1,5 +1,6 @@
 #!/bin/sh
-# One MCP header value for omp, read from the SOPS store next to this script:
+# One MCP header value for omp, read at connection time from the SOPS store next to this
+# script, or from the environment when that store is absent:
 #
 #   secret.sh 'Bearer ' APIFY_API_TOKEN
 #
@@ -10,8 +11,13 @@
 set -eu
 
 [ "$#" -eq 2 ] || { echo "usage: $(basename "$0") PREFIX NAME" >&2; exit 2; }
+case "$2" in *[!A-Za-z0-9_]*) echo "usage: $(basename "$0") PREFIX NAME" >&2; exit 2 ;; esac
 
 here=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
-value=$(sops exec-env "$here/secrets.sops.yaml" "printf '%s' \"\$$2\"") || exit 1
+if [ -f "$here/secrets.sops.yaml" ]; then
+  value=$(sops exec-env "$here/secrets.sops.yaml" "printf '%s' \"\$$2\"") || exit 1
+else
+  value=$(eval "printf '%s' \"\${$2-}\"")
+fi
 [ -n "$value" ] || exit 1
 printf '%s%s' "$1" "$value"
