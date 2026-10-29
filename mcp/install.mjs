@@ -16,6 +16,7 @@
 // and removes it from the targets if an earlier run wrote it.
 
 import { closeSync, copyFileSync, mkdirSync, openSync, readFileSync, renameSync, statSync, writeFileSync } from 'node:fs';
+import childProcess from 'node:child_process';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -48,6 +49,25 @@ const ompHeader = (value, dir) => {
   return ref ? `!sh ${join(dir, 'secret.sh')} '${ref[1]}' ${ref[2]}` : value;
 };
 
+// omp and Claude Code expand no ${VAR} inside `oauth`/`auth` (only env/headers get
+// resolution), so placeholders there must be resolved at install time — via the same
+// secret.sh indirection omp headers use. A `${VAR}` the secrets file does not define
+// yields an empty string and aborts the install: a literal "${SLACK_CLIENT_ID}" sent as
+// a client id produces Slack's "Invalid client_id parameter" screen, which is how the
+// bug surfaced the first time.
+const resolveOauthPlaceholders = (oauth, dir) =>
+  Object.fromEntries(
+    Object.entries(oauth).map(([k, v]) => {
+      if (typeof v !== 'string') return [k, v];
+      const ref = REF.exec(v);
+      if (!ref) return [k, v];
+      const { execFileSync } = childProcess;
+      const value = execFileSync('/bin/sh', [join(dir, 'secret.sh'), '', ref[2]], { encoding: 'utf8' }).trim();
+      if (!value) throw new Error(`${ref[2]} missing from ${join(dir, 'secrets.sops.yaml')} — run node mcp/keys.mjs`);
+      return [k, value];
+    }),
+  );
+
 const targets = {
   omp: {
     path: join(HOME, '.omp/agent/mcp.json'),
@@ -61,8 +81,8 @@ const targets = {
             out.headers = Object.fromEntries(
               Object.entries(s.headers).map(([h, v]) => [h, ompHeader(v, catalogOf(name))]),
             );
-          if (s.oauth) out.oauth = s.oauth;
-          if (s.auth) out.auth = s.auth;
+          if (s.oauth) out.oauth = resolveOauthPlaceholders(s.oauth, catalogOf(name));
+          if (s.auth) out.auth = resolveOauthPlaceholders(s.auth, catalogOf(name));
           return [name, out];
         }),
       ),
@@ -70,12 +90,11 @@ const targets = {
   },
   claude: {
     path: join(HOME, '.claude.json'),
-    // `oauth` is left out: Claude Code keeps an OAuth client secret in the keychain, set
-    // once through its own CLI, and expands no ${VAR} outside command/args/env/url/headers.
     render: () => ({
       mcpServers: Object.fromEntries(
         Object.entries(servers).map(([name, s]) => {
           const out = { type: 'http', url: s.url };
+          if (s.oauth) out.oauth = resolveOauthPlaceholders(s.oauth, catalogOf(name));
           if (s.headers) out.headersHelper = join(catalogOf(name), 'headers.mjs');
           return [name, out];
         }),
@@ -152,14 +171,5 @@ for (const [name, target] of Object.entries(targets)) {
 }
 
 console.log(lines.join('\n'));
-
-const needsOauth = Object.entries(servers).filter(([, s]) => s.oauth).map(([name]) => name);
-if (needsOauth.length && only !== 'omp') {
-  console.log(
-    `\n${needsOauth.join(', ')}: Claude Code keeps an OAuth client secret in the keychain, so register it\n` +
-      'once with `claude mcp add --transport http <name> <url> --scope user --client-id <id>\n' +
-      '--client-secret`. Both values are in mcp/secrets.sops.yaml.',
-  );
-}
 
 process.exit(failed ? 1 : 0);
