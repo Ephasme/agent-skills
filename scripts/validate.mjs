@@ -12,16 +12,24 @@
 //   https://agentskills.io/specification
 //   https://platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices
 //
-// Usage: node scripts/validate.mjs [--quiet]
+// Usage: node scripts/validate.mjs [--quiet] [--root <catalog>] [--also <catalog>]...
+//
+// --root checks another catalog instead of this one. --also loads a second catalog's skill
+// names without checking it: both install into one flat store, so a name in both is an error.
 
 import { readdir, readFile, stat } from 'node:fs/promises';
-import { join, relative, dirname } from 'node:path';
+import { join, relative, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 
-const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
+const flag = (name) =>
+  process.argv.flatMap((a, i) => (a === name && process.argv[i + 1] ? [resolve(process.argv[i + 1])] : []));
+// Piped through stdin, node names the module `[eval1]` in the cwd: default to the cwd itself.
+const self = fileURLToPath(import.meta.url);
+const ROOT = flag('--root')[0] ?? (/\[eval\d*\]$/.test(self) ? process.cwd() : join(dirname(self), '..'));
 const SKILLS = join(ROOT, 'skills');
 const QUIET = process.argv.includes('--quiet');
+const ALSO = flag('--also');
 
 // Categories organise this repo only; installed skills are flat. The set is
 // deliberate — a new one is a decision, not a side effect of `mkdir`.
@@ -172,7 +180,8 @@ async function checkSkill(category, slug) {
     // Installs flatten to one directory per name, so a collision silently overwrites.
     if (data.name !== slug) fail(skillMd, `frontmatter name "${data.name}" != directory "${slug}"`);
     if (found.has(data.name)) {
-      fail(skillMd, `duplicate skill name "${data.name}" (also ${relative(ROOT, found.get(data.name))})`);
+      const where = found.get(data.name);
+      fail(skillMd, `duplicate skill name "${data.name}" (also ${where.startsWith(ROOT) ? relative(ROOT, where) : where})`);
     }
     found.set(data.name, skillMd);
   }
@@ -294,6 +303,19 @@ async function main() {
     if (!CATEGORIES.includes(c)) fail(join(SKILLS, c), 'undeclared category (add it to CATEGORIES + README)');
   }
 
+  // Names only: the other catalog runs its own validation.
+  let also = 0;
+  for (const other of ALSO) {
+    for (const c of await readdir(join(other, 'skills'), { withFileTypes: true })) {
+      if (!c.isDirectory()) continue;
+      for (const s of await readdir(join(other, 'skills', c.name), { withFileTypes: true })) {
+        const md = join(other, 'skills', c.name, s.name, 'SKILL.md');
+        const name = /^name:\s*(\S+)/m.exec(await readFile(md, 'utf-8').catch(() => ''))?.[1];
+        if (name) found.set(name, md), also++;
+      }
+    }
+  }
+
   for (const category of categories.filter((c) => CATEGORIES.includes(c))) {
     const slugs = (await readdir(join(SKILLS, category), { withFileTypes: true }))
       .filter((e) => e.isDirectory())
@@ -308,7 +330,7 @@ async function main() {
     process.exit(1);
   }
   if (!QUIET) {
-    console.log(`✓ ${found.size} skills across ${categories.length} categories, no problems`);
+    console.log(`✓ ${found.size - also} skills across ${categories.length} categories, no problems`);
   }
 }
 

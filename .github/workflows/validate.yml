@@ -1,26 +1,49 @@
 name: validate
 
+# Also callable from another catalog's CI, which validates its own checkout with this repo's
+# validator and fails on a skill name both catalogs would install:
+#
+#   jobs:
+#     validate:
+#       uses: Ephasme/agent-skills/.github/workflows/validate.yml@main
+#       with:
+#         runs-on: '["self-hosted", "linux"]'
 on:
   push:
   pull_request:
+  workflow_call:
+    inputs:
+      runs-on:
+        description: JSON runner label, or array of labels
+        type: string
+        default: '"ubuntu-latest"'
 
 jobs:
   validate:
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(inputs.runs-on || '"ubuntu-latest"') }}
     steps:
       - uses: actions/checkout@v4
+      # This repo, for its validator; when called from another catalog, also its skill names.
+      - uses: actions/checkout@v4
+        with:
+          repository: Ephasme/agent-skills
+          path: .ephasme
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
 
       - name: Validate the catalog
-        run: node scripts/validate.mjs
+        run: |
+          also=()
+          [ "$GITHUB_REPOSITORY" = Ephasme/agent-skills ] || also=(--also .ephasme)
+          node .ephasme/scripts/validate.mjs --root . "${also[@]}"
 
       # Guards against a layout change the validator cannot see: the CLI must
       # still discover every skill from the repo root, and skip none of them.
       - name: Discovery smoke test
         run: |
           set -euo pipefail
+          rm -rf .ephasme
           expected=$(find skills -name SKILL.md | wc -l)
           out=$(npx -y skills add . -l 2>&1 | sed 's/\x1b\[[0-9;]*[a-zA-Z]//g')
           echo "$out"
