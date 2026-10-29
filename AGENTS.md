@@ -50,9 +50,9 @@ no global skills directory, and fails once per skill. The install copies into
 - No absolute home paths with a real user name, no `__pycache__` or `*.pyc`, no file over 1 MiB.
 - `agents/*.md` are omp sub-agent definitions. They're exempt from the portability rules and the
   `skills` CLI doesn't install them; activate one by symlinking it into `~/.omp/agent/agents/`.
-- Skills present in both catalogs must stay byte-identical: same name in a flat store, so whichever
-  installs last wins. Change both copies together and check with `diff -r`. The shared set is every
-  skill directory name that exists in both repos' `skills/`.
+- Other catalogs install skills from here rather than copying them, and get every push to `main` on
+  their next `skills update`. Renaming or deleting a skill breaks their install command: treat a
+  skill's name as public API.
 
 ## Secrets
 
