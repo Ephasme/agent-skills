@@ -2,22 +2,23 @@
 """slack-reaction.py — add or remove a Slack reaction via the Web API.
 
 The Slack MCP server exposes add and get reactions only; removal exists at the
-API but not as an MCP tool. This script closes that gap. The token is the MCP
-session token (xoxe.xoxp-…) stored by omp when the Slack MCP server completed
-OAuth — it acts as the user (auth.test answers user_id U…), carries
-`reactions:write`, and is accepted by the Web API. It is never read from
-environment variables because there is none; the store location is fixed.
+API but not as an MCP tool. This script closes that gap. Token: the user token
+of the user's own Slack app from SLACK_USER_TOKEN (xoxp-…, needs
+`reactions:write`); when unset, the MCP session token omp stored after the
+Slack MCP server's OAuth, which also acts as the user and is accepted by the
+Web API.
 
 Usage:
   slack-reaction.py add    <channel> <ts> <emoji>     e.g. emoji "white_check_mark"
   slack-reaction.py remove <channel> <ts> <emoji>
-  slack-reaction.py test                              auth.test + store check
+  slack-reaction.py test                              auth.test with the chosen token
 
-Exit codes: 0 ok, 1 Slack error, 2 usage/not found, 3 no token in store.
+Exit codes: 0 ok, 1 Slack error, 2 usage/not found, 3 no token found.
 """
 import json
 import sqlite3
 from pathlib import Path
+import os
 import sys
 import urllib.request
 
@@ -27,6 +28,9 @@ API = "https://slack.com/api/"
 
 
 def load_token():
+    token = os.environ.get("SLACK_USER_TOKEN")
+    if token:
+        return token
     con = sqlite3.connect(DB)
     try:
         rows = con.execute(
@@ -36,7 +40,7 @@ def load_token():
     finally:
         con.close()
     if not rows:
-        print("no slack mcp oauth credential in " + DB, file=sys.stderr)
+        print(f"SLACK_USER_TOKEN unset and no slack mcp oauth credential in {DB}", file=sys.stderr)
         sys.exit(3)
     # last row wins: newest login
     data = json.loads(rows[-1][0])

@@ -85,8 +85,8 @@ one invariant the user cares about.
 
 1. **Reaction removal works.** The Slack MCP server has no remove tool; remove reactions with the
    skill's own script: `$SKILL_DIR/scripts/slack-reaction.py remove <channel> <ts> <emoji>` (Web API
-   `reactions.remove`, token read from omp's MCP OAuth store). `test` subcommand verifies the store
-   first. Fails or no store → stop and say so; do not process anything.
+   `reactions.remove`; token from `SLACK_USER_TOKEN`, else omp's MCP OAuth store). `test` subcommand
+   checks the token first. Fails or no token → stop and say so; do not process anything.
 2. **Identity.** Resolve the user's own Slack user id; it is the DM target and the reaction owner.
 3. **Repo.** `REPO` is a git repo, `gh auth status` passes, `BASE_BRANCH` exists on the remote,
    `git fetch origin` succeeds.
