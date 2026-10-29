@@ -163,7 +163,7 @@ the same helper, each ships a copy — they install independently and cannot rea
 | Category | Skills |
 | --- | --- |
 | `cases` | harden-case, sync-case |
-| `engineering` | clean-git-repo, create-cleanup-roadmap, slack-loading-triage |
+| `engineering` | clean-git-repo, create-cleanup-roadmap |
 | `finance` | generate-payment-qr-code |
 | `health` | cbt |
 | `helpers` | write-children-story |
@@ -172,13 +172,13 @@ the same helper, each ships a copy — they install independently and cannot rea
 | `research` | assess-true-quality, cite-or-refuse, fact-check-document |
 | `toolbox` | free-disk-space, mailer-cleanup |
 
-17 skills. The CLI discovers a `SKILL.md` at any depth under `skills/`, and any `SKILL.md` sitting
+16 skills. The CLI discovers a `SKILL.md` at any depth under `skills/`, and any `SKILL.md` sitting
 directly inside a repo subdirectory; this repo uses `skills/<category>/<skill>/SKILL.md`, so no
 manifest file is needed. Categories organise this repo only; installed skills are flat.
 
 The Sherpas-specific skills live in their own private catalog, `Les-Sherpas/agent-skills` — the
 production release runbook and the changelog it ends with, that org's PR review, the AWS admin
-session, the MDM profile work, and the engineering method skills (plan, debug, quality scan,
+session, the MDM profile work, the Slack :loading: triage, and the engineering method skills (plan, debug, quality scan,
 document refinement). Two skills here still name skills that moved there, which
 [`dependencies.md`](dependencies.md) draws.
 
