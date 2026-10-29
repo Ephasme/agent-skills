@@ -59,14 +59,6 @@
     "type": "http",
     "url": "https://mcp.notion.com/mcp?account=perso"
   },
-  "snipeit": {
-    "type": "http",
-    "url": "https://snipeit.loup-peluso.com/mcp",
-    "headers": {
-      "CF-Access-Client-Id": "${SNIPEIT_CF_ACCESS_CLIENT_ID}",
-      "CF-Access-Client-Secret": "${SNIPEIT_CF_ACCESS_CLIENT_SECRET}"
-    }
-  },
   "dagu": {
     "type": "http",
     "url": "https://dagu.loup-peluso.com/mcp",
@@ -75,12 +67,10 @@
     }
   },
   "argocd-perso": {
-    "type": "http",
-    "url": "https://argocd-perso.loup-peluso.com/mcp",
-    "headers": {
-      "CF-Access-Client-Id": "${ARGOCD_PERSO_CF_ACCESS_CLIENT_ID}",
-      "CF-Access-Client-Secret": "${ARGOCD_PERSO_CF_ACCESS_CLIENT_SECRET}"
-    }
+    "type": "stdio",
+    "command": "sops",
+    "args": ["exec-env", "mcp/secrets.sops.yaml", "npx -y argocd-mcp@0.9.0 stdio"],
+    "env": { "ARGOCD_BASE_URL": "https://argocd.loup-peluso.com" }
   },
   "omniroute": {
     "type": "http",

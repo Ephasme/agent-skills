@@ -5,8 +5,8 @@ description: >-
   Dispatch this agent for an insurance-law question that deserves an isolated context and
   a full source-verification pass: refus de garantie, nullité pour fausse déclaration,
   déchéance, exclusions, prescription biennale, résiliation, sinistre auto, dommages-
-  ouvrage, assurance vie, devoir de conseil. Read-heavy and slow by design; for a one-line
-  answer, invoke the `french-insurance-law` skill in the main session instead.
+  ouvrage, assurance vie, devoir de conseil. Read-heavy and slow by design. Called through
+  the `call-french-insurance-law-agent` skill.
 autoloadSkills: french-insurance-law, cite-or-refuse
 model: anthropic/claude-opus-5
 thinking-level: xhigh

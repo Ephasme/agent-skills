@@ -50,6 +50,9 @@ no global skills directory, and fails once per skill. The install copies into
 - No absolute home paths with a real user name, no `__pycache__` or `*.pyc`, no file over 1 MiB.
 - `agents/*.md` are omp sub-agent definitions. They're exempt from the portability rules and the
   `skills` CLI doesn't install them; activate one by symlinking it into `~/.omp/agent/agents/`.
+- Skills present in both catalogs must stay byte-identical: same name in a flat store, so whichever
+  installs last wins. Change both copies together and check with `diff -r`. The shared set is every
+  skill directory name that exists in both repos' `skills/`.
 
 ## Secrets
 
@@ -60,17 +63,19 @@ committed to this public repo, so the secrets are only as safe as the age key.
 - The age key is read from `$SOPS_AGE_KEY_FILE`, otherwise
   `~/Library/Application Support/sops/age/keys.txt` on macOS or `~/.config/sops/age/keys.txt`
   elsewhere. It never goes in the repo.
-- `mcp/servers.json` refers to each secret as `${VAR}`, and `VAR` is its key in the store. Name a
-  new secret after the header it fills (`WHATSAPP_CF_ACCESS_CLIENT_ID`), not after the host.
-- Agent configs are edited by hand from `mcp/servers.json` and hold references, never values:
-  - omp: `"Authorization": "!sh <repo>/mcp/secret.sh 'Bearer ' <VAR>"`
-  - Claude Code: `"headersHelper": "<repo>/mcp/headers.mjs"`
-
-  Both helpers decrypt the store when the agent connects, fall back to the environment when the
-  store is missing, and drop the header when the value is empty. Never write a bare `${VAR}`:
-  neither agent expands it, so the literal text gets sent.
-- After rotating a secret, restart omp: it caches a header once resolved. Claude Code runs its
-  helper on every connection.
+- A secret's key in the store is the env var or header placeholder that uses it. Name a new header
+  secret after the header it fills (`WHATSAPP_CF_ACCESS_CLIENT_ID`), not after the host.
+- Agent configs are edited by hand from `mcp/servers.json` and hold references, never values. Run
+  the agent from the repo root, or make the `mcp/…` paths absolute.
+  - **stdio servers** read their token from the environment. Their entry runs
+    `sops exec-env mcp/secrets.sops.yaml "<server command>"`, which decrypts the store into the
+    server's environment only. Non-secret settings (base URLs) go in the entry's `env`.
+  - **HTTP servers** carry `${VAR}` in a header. omp: `"!sh <repo>/mcp/secret.sh '<prefix>' <VAR>"`;
+    Claude Code: `"headersHelper": "<repo>/mcp/headers.mjs"`. Both decrypt at connect time and drop
+    the header when the value is empty. Never write a bare `${VAR}`: neither agent expands it, so
+    the literal text gets sent.
+- After rotating a secret, restart omp. stdio servers read the store when they start; omp caches a
+  resolved header.
 - Never print, paste or commit a decrypted value.
 
 ## References

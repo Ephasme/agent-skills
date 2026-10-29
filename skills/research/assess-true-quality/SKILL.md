@@ -146,8 +146,8 @@ test.
 | Comparing two libraries/APIs on engineering merit | ordinary engineering judgement — this skill answers only the *supply-side* half (is it maintained, is the vendor solvent) |
 | Whether claims in a document the user supplied are true | `fact-check-document` |
 | Pure sourcing discipline on any topic | `cite-or-refuse` |
-| French insurance cover, a refused claim, a policy | `french-insurance-law` |
-| Whether a therapy or mental-health product works | `cbt` |
+| French insurance cover, a refused claim, a policy | `call-french-insurance-law-agent`, if installed |
+| Whether a therapy or mental-health product works | `call-cbt-agent`, if installed |
 | Medical, legal or financial advice for a specific person | no skill here — state the evidence and say the decision belongs with a professional |
 
 ## Domain map
@@ -208,10 +208,9 @@ skipped:
    70% (2025 report). Every such percentage needs its year attached.
 6. **Ownership changes.** CNET went Red Ventures (2020–2024) → Ziff Davis (Q3 2024). Re-check the
    parent before quoting a tier — `evidence-tiers.md`'s procedure, not its map, is the durable part.
-7. **This corpus was built by agents and self-audited.** Of the citations first drafted here, several
-   were wrong or stale on first verification (see `docs/plans/2026-08-19-true-quality-skill.md`'s
-   Verification record) — a `?`-marked or `secondary`-flagged row in `source-ledger.md` is a lead,
-   not a settled fact.
+7. **This corpus was built by agents and self-audited.** Several of the first-draft citations were
+   wrong or stale on first verification, so a `?`-marked or `secondary`-flagged row in
+   `source-ledger.md` is a lead, not a settled fact.
 
 ## Kill switch
 

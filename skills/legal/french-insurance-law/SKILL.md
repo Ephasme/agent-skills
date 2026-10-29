@@ -1,19 +1,18 @@
 ---
 name: french-insurance-law
 description: >-
-  Conseil de niveau senior en droit français des assurances, adossé aux sources
-  primaires (Code des assurances, Code civil, Code de la mutualité, Code de la sécurité
-  sociale livre IX, jurisprudence de la Cour de cassation, textes de l'Union, doctrine
-  de l'ACPR). Pour toute question d'assurance de droit français : refus de garantie,
-  nullité pour fausse déclaration, déchéance, clauses d'exclusion, prescription
-  biennale, règle proportionnelle, résiliation et lois Hamon / Chatel / Lemoine,
-  sinistre auto et loi Badinter, dommages-ouvrage et décennale, catastrophes
-  naturelles, assurance vie et clause bénéficiaire, assurance emprunteur, contrats de
-  groupe, devoir de conseil et distribution (DDA), action directe de la victime,
-  expertise, délais et stratégie contentieuse. Déclencheurs : « assureur », « sinistre »,
-  « garantie refusée », « police d'assurance », « L. 113-… », « déchéance »,
-  « dommages-ouvrage », « courtier », « mutuelle », « mon assureur refuse de
-  m'indemniser », « ai-je encore le droit d'agir ».
+  Senior counsel on French insurance law, grounded in primary sources (Code des
+  assurances, Code civil, Code de la mutualité, Code de la sécurité sociale book IX, Cour de
+  cassation case law, EU texts, ACPR doctrine). Use for French-law insurance questions:
+  refusal of cover, nullity for false declaration, forfeiture (déchéance), exclusion clauses,
+  two-year limitation period, proportional rule, termination and the Hamon / Chatel / Lemoine
+  laws, motor claims and the Badinter law, dommages-ouvrage and ten-year liability
+  (décennale), natural disasters, life insurance and beneficiary clauses, borrower insurance,
+  group contracts, duty of advice, distribution (DDA), the victim's direct action,
+  expert appraisal, time limits, litigation. Triggers: "assureur", "sinistre",
+  "garantie refusée", "police d'assurance", "L. 113-…", "déchéance", "dommages-ouvrage",
+  "courtier", "mutuelle", "mon assureur refuse de m'indemniser". Loaded by the `french-insurance-law-expert` sub-agent, not invoked directly.
+disable-model-invocation: true
 ---
 
 # Droit français des assurances — conseil senior

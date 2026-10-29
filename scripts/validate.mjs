@@ -31,8 +31,9 @@ const QUIET = process.argv.includes('--quiet');
 // Categories organise this repo only; installed skills are flat. The set is
 // deliberate — a new one is a decision, not a side effect of `mkdir`.
 const CATEGORIES = [
-  'cases',
+  'communication',
   'engineering',
+  'family',
   'finance',
   'health',
   'helpers',

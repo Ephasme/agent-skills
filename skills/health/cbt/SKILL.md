@@ -12,7 +12,9 @@ description: >-
   reality (who may legally practise, "Mon soutien psy", ALD, access). Also when asked
   whether a CBT claim is still current, or to extend or re-verify the corpus. Triggers:
   "TCC", "CBT", "psychothérapie", "Mon soutien psy", a named CBT technique or third-wave
-  therapy, and phrasings like "does CBT actually work", "combien de séances".
+  therapy, "does CBT actually work", "combien de séances". Loaded by the `cbt-expert`
+  sub-agent, not invoked directly.
+disable-model-invocation: true
 ---
 
 # CBT research corpus
