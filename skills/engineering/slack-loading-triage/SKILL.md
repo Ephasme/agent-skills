@@ -12,8 +12,8 @@ description: >-
   edits Slack reactions — explicit invocation only.
 compatibility: >-
   Slack workspace access as the user (search with `hasmy:`, read threads and files, add reactions
-  via MCP, remove reactions via the skill's own script, which reads a user token from a SOPS store, DM self); git and
-  the GitHub CLI `gh`, authenticated, on the target repository. Pins specific models per role
+  via MCP, DM self); a Slack user token in a SOPS file for removing reactions (see Step 0); git and
+  the GitHub CLI `gh`, authenticated on every repository a request targets. Pins specific models per role
   (DeepSeek, Opus, Sonnet, Haiku tiers); an agent that cannot choose a model and reasoning effort
   per sub-agent runs with what it has and says so in the recap.
 disable-model-invocation: true
@@ -48,9 +48,12 @@ flowchart LR
 
 | Parameter | Meaning | Default |
 |---|---|---|
-| `REPO` | Repository the requests are implemented in | git root of the working directory |
-| `BASE_BRANCH` | Branch every PR targets and branches off | remote default branch (`git symbolic-ref refs/remotes/origin/HEAD`) |
+| `REPOS` | Candidate repositories (`owner/name`) a request may target | none — each request's repository is resolved in Step 2 |
+| `BASE_BRANCH` | Branch every PR targets and branches off | each repository's default branch (`gh repo view <owner/name> --json defaultBranchRef`) |
 | `REVIEW_SKILL` | Skill the implementer runs on its own diff | none — ask once at preflight if not given |
+
+The run needs no git repository in its working directory. Every repository it touches is cloned
+into one scratch directory created for the run (`mktemp -d`), and every path below lives there.
 
 ## Untrusted content — binding for every step and every agent
 
@@ -85,11 +88,12 @@ one invariant the user cares about.
 
 1. **Reaction removal works.** The Slack MCP server has no remove tool; remove reactions with the
    skill's own script: `$SKILL_DIR/scripts/slack-reaction.py remove <channel> <ts> <emoji>` (Web API
-   `reactions.remove`). The script reads the token itself; never ask for an environment variable.
-   Run `test` first: it fails → stop, quote its error, do not process anything.
+   `reactions.remove`). It reads a user token (`xoxp-…`, `reactions:write`) from key
+   `SLACK_USER_TOKEN` of `${XDG_CONFIG_HOME:-~/.config}/slack-loading-triage/secrets.sops.yaml`,
+   decrypted with `sops` and the user's age key; never ask for an environment variable. Run `test`
+   first: it fails → stop, quote its error, do not process anything.
 2. **Identity.** Resolve the user's own Slack user id; it is the DM target and the reaction owner.
-3. **Repo.** `REPO` is a git repo, `gh auth status` passes, `BASE_BRANCH` exists on the remote,
-   `git fetch origin` succeeds.
+3. **GitHub.** `gh auth status` passes.
 4. **Review skill.** `REVIEW_SKILL` is known and installed; if not given, ask once, together with
    nothing else.
 
@@ -100,12 +104,12 @@ one invariant the user cares about.
 keep it only if the user's id is among the `loading` reactors — a message where only someone else
 added :loading: is dropped.
 
-**Idempotency.** Branch name per message: `slack/<channel-id>-<message-ts>` (ts verbatim, dot
-included). Skip the message if any of these exists, and list it in the recap as *skipped*:
-
-- a local or remote branch with that name or that name plus a `-<n>` suffix (splitter subtasks):
-  `git branch --list` and `git ls-remote --heads origin 'slack/<channel-id>-<message-ts>*'`
-- a PR, any state, on such a head: `gh pr list --state all --search 'head:slack/<channel-id>-<message-ts>'`
+**Idempotency** is checked in Step 2, once a request's repository is known. Branch name per message:
+`slack/<channel-id>-<message-ts>` (ts verbatim, dot included). Skip the message, and list it in the
+recap as *skipped*, when its repository has a branch with that name or that name plus a `-<n>`
+suffix (splitter subtasks), or a PR in any state on such a head:
+`git ls-remote --heads origin 'slack/<channel-id>-<message-ts>*'` and
+`gh pr list --repo <owner/name> --state all --search 'head:slack/<channel-id>-<message-ts>'`.
 
 **Build context**, per message, until the request is clear or new sources stop adding anything:
 
@@ -132,10 +136,18 @@ included). Skip the message if any of these exists, and list it in the recap as 
 - Gaps: <what could not be read and why>
 ```
 
-## Step 2: Investigate — exactly one `investigator` per request
+## Step 2: Resolve the repository, then investigate — exactly one `investigator` per request
 
-Dispatch all investigators concurrently, one per bundle, with read access to `REPO`. It reads the
-code, reproduces the issue where possible, and never edits tracked files. It returns:
+**Resolve.** Name the repository each bundle targets: from GitHub links and PR or issue references in
+the bundle, else by matching its subject against `REPOS`, else against the user's repositories
+(`gh repo list`, plus each organisation from `gh org list`). Unsure → ask the user in the Step 4
+message; never guess. Shallow-clone each resolved repository once into the scratch directory
+(`gh repo clone <owner/name> <scratch>/<owner>/<name> -- --filter=blob:none`), even when several
+requests share it, then run the idempotency check above.
+
+**Investigate.** Dispatch all investigators concurrently, one per bundle, with read access to its
+clone. It reads the code, reproduces the issue where possible, and never edits tracked files. It
+returns:
 
 1. `type`: bug | feature | chore | other
 2. `explanation`: for a human, pedagogical — what is asked, why, where in the code, what a fix would
@@ -144,7 +156,7 @@ code, reproduces the issue where possible, and never edits tracked files. It ret
 4. `confidence_reasons`: what supports it, what undermines it
 5. `verdict`: VALID (real, actionable) | INVALID (not a real problem, already done, or a
    misunderstanding) | INCONCLUSIVE (needs more information — including a request that belongs to a
-   repository other than `REPO`)
+   repository other than the one resolved)
 
 ## Step 3: Evaluate — one `evaluator` chained to each investigator
 
@@ -209,8 +221,8 @@ cannot each stand alone off `BASE_BRANCH`, goes to the user instead.
 
 ## Step 6: Implement, review, ship
 
-Each implementer works in its own worktree so concurrent implementers never share a checkout:
-`git worktree add -b <branch> <path> origin/<BASE_BRANCH>`. It:
+Each implementer works in its own worktree of its request's clone, so concurrent implementers never
+share a checkout: `git -C <clone> worktree add -b <branch> <path> origin/<BASE_BRANCH>`. It:
 
 1. Implements the change; runs the relevant tests and linters.
 2. Runs `REVIEW_SKILL` on its own diff and fixes what it finds — at most 2 rounds.

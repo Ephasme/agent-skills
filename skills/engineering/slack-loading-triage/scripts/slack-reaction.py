@@ -4,7 +4,9 @@
 The Slack MCP server exposes add and get reactions only; removal exists at the
 API but not as an MCP tool. This script closes that gap with the user token of
 the user's own Slack app (xoxp-…, needs `reactions:write`), read at each call
-from key SLACK_USER_TOKEN of the SOPS store below, so no session has to export it.
+from key SLACK_USER_TOKEN of the SOPS file
+${XDG_CONFIG_HOME:-~/.config}/slack-loading-triage/secrets.sops.yaml, so it
+runs from any directory and no session has to export it.
 
 Usage:
   slack-reaction.py add    <channel> <ts> <emoji>     e.g. emoji "white_check_mark"
@@ -14,13 +16,18 @@ Usage:
 Exit codes: 0 ok, 1 Slack error, 2 usage, 3 token unreadable from the store.
 """
 import json
+import os
 import subprocess
 import sys
 import urllib.request
 from pathlib import Path
 
 API = "https://slack.com/api/"
-STORE = Path.home() / "code" / "perso" / "agent-skills" / "mcp" / "secrets.sops.yaml"
+STORE = (
+    Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config")
+    / "slack-loading-triage"
+    / "secrets.sops.yaml"
+)
 
 
 def load_token():
