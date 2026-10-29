@@ -3,28 +3,34 @@
 
 The Slack MCP server exposes add and get reactions only; removal exists at the
 API but not as an MCP tool. This script closes that gap with the user token of
-the user's own Slack app, read from SLACK_USER_TOKEN (xoxp-…, needs
-`reactions:write`).
+the user's own Slack app (xoxp-…, needs `reactions:write`), read at each call
+from key SLACK_USER_TOKEN of the SOPS store below, so no session has to export it.
 
 Usage:
   slack-reaction.py add    <channel> <ts> <emoji>     e.g. emoji "white_check_mark"
   slack-reaction.py remove <channel> <ts> <emoji>
   slack-reaction.py test                              auth.test with the token
 
-Exit codes: 0 ok, 1 Slack error, 2 usage, 3 SLACK_USER_TOKEN unset.
+Exit codes: 0 ok, 1 Slack error, 2 usage, 3 token unreadable from the store.
 """
 import json
-import os
+import subprocess
 import sys
 import urllib.request
+from pathlib import Path
 
 API = "https://slack.com/api/"
+STORE = Path.home() / "code" / "perso" / "agent-skills" / "mcp" / "secrets.sops.yaml"
 
 
 def load_token():
-    token = os.environ.get("SLACK_USER_TOKEN")
-    if not token:
-        print("SLACK_USER_TOKEN unset", file=sys.stderr)
+    run = subprocess.run(
+        ["sops", "-d", "--extract", '["SLACK_USER_TOKEN"]', str(STORE)],
+        capture_output=True, text=True,
+    )
+    token = run.stdout.strip()
+    if run.returncode != 0 or not token:
+        print(f"SLACK_USER_TOKEN unreadable from {STORE}: {run.stderr.strip()}", file=sys.stderr)
         sys.exit(3)
     return token
 

@@ -12,7 +12,7 @@ description: >-
   edits Slack reactions — explicit invocation only.
 compatibility: >-
   Slack workspace access as the user (search with `hasmy:`, read threads and files, add reactions
-  via MCP, remove reactions via the skill's own script with a user token in `SLACK_USER_TOKEN`, DM self); git and
+  via MCP, remove reactions via the skill's own script, which reads a user token from a SOPS store, DM self); git and
   the GitHub CLI `gh`, authenticated, on the target repository. Pins specific models per role
   (DeepSeek, Opus, Sonnet, Haiku tiers); an agent that cannot choose a model and reasoning effort
   per sub-agent runs with what it has and says so in the recap.
@@ -85,8 +85,8 @@ one invariant the user cares about.
 
 1. **Reaction removal works.** The Slack MCP server has no remove tool; remove reactions with the
    skill's own script: `$SKILL_DIR/scripts/slack-reaction.py remove <channel> <ts> <emoji>` (Web API
-   `reactions.remove`; token from `SLACK_USER_TOKEN`). `test` subcommand
-   checks the token first. Fails or no token → stop and say so; do not process anything.
+   `reactions.remove`). The script reads the token itself; never ask for an environment variable.
+   Run `test` first: it fails → stop, quote its error, do not process anything.
 2. **Identity.** Resolve the user's own Slack user id; it is the DM target and the reaction owner.
 3. **Repo.** `REPO` is a git repo, `gh auth status` passes, `BASE_BRANCH` exists on the remote,
    `git fetch origin` succeeds.
