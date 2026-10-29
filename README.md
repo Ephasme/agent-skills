@@ -1,202 +1,90 @@
 # agent-skills
 
-One folder per skill, each self-contained, in the [Agent Skills](https://agentskills.io) open
-format — the same `SKILL.md` contract Claude Code, Codex, Cursor, Gemini CLI, opencode, Copilot,
-Goose and others read. Installed with the [`skills`](https://github.com/vercel-labs/skills) CLI.
+My agent skills, one self-contained directory each, in the open
+[Agent Skills](https://agentskills.io) format: the same `SKILL.md` contract read by Claude Code,
+Codex, Cursor, Gemini CLI, opencode, Copilot, Goose and others. They're installed with the
+[`skills`](https://github.com/vercel-labs/skills) CLI.
 
-Public at [`Ephasme/agent-skills`](https://github.com/Ephasme/agent-skills). That SSH URL is the
-source string throughout this document:
-
-```
-git@github.com:Ephasme/agent-skills.git
-```
-
-- [The portability contract](#the-portability-contract)
+- [Portability](#portability)
 - [Install](#install)
-- [MCP servers](#mcp-servers)
-- [Authoring](#authoring)
-- [What the validator enforces, and why](#what-the-validator-enforces-and-why)
 - [Catalog](#catalog)
-- [Skill dependencies](dependencies.md)
-- [Third-party skills](#third-party-skills)
-- [The `agents/` directory](#the-agents-directory)
+- [MCP servers](#mcp-servers)
+- [Sub-agents](#sub-agents)
+- [Authoring](#authoring)
 
-## The portability contract
+## Portability
 
-A skill works the same in every agent that reads the format. That is deliberate, not accidental,
-and `scripts/validate.mjs` enforces the parts of it a script can check. CI proves the rest: it
-installs the whole catalog for `codex`, `cursor`, `opencode` and `gemini-cli`, none of which the
-catalog is written against.
+A skill behaves the same in every agent that reads the format. `scripts/validate.mjs` enforces what
+a script can check, and CI installs the whole catalog for `codex`, `cursor`, `opencode` and
+`gemini-cli` to prove the rest.
 
-**Name the capability, never the product.** Ask for "a structured multiple-choice prompt", not
-`AskUserQuestion`; for "the strongest model available", not a model by brand and version; for the
-repo's agent instructions as a set (`AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, `.cursor/rules`), never
-one alone. A product name bets the reader is one particular agent, and that bet is usually wrong.
-
-**Degrade, don't fail.** A skill that fans work across sub-agents says what to run instead when the
-agent has none: the same units, in series, with results written to files between them. Parallelism
-is an optimisation; the isolation it buys is the point, and files and ordering buy it too.
-
-**Declare hard requirements in `compatibility`.** An external binary, a credential, a network
-dependency, or a target product belongs in the spec's optional `compatibility` field —
-`hand-off-session` declares its Unix-like host with `tar`, `ssh` and `rsync`/`scp` there.
-
-**Frontmatter stays inside the standard.** `name` and `description` are required; `license`,
-`compatibility`, `metadata` and `allowed-tools` are the rest. One client extension is allowed,
-`disable-model-invocation`, because an agent that ignores it still behaves correctly: every skill
-carrying it also says "explicit invocation only" in prose.
-
-**No path that only resolves in one place.** No `${CLAUDE_PLUGIN_ROOT}`, no `$CLAUDE_CONFIG_DIR`,
-no absolute home path. A skill refers to its own files as `$SKILL_DIR/scripts/x` and says once that
-`$SKILL_DIR` is notation for its own directory, not an exported variable.
+- **Name the capability, not the product.** Ask for "a structured multiple-choice prompt", not
+  `AskUserQuestion`; for "the strongest model available", not a model name. When a skill refers to
+  repo instructions, it names the whole set (`AGENTS.md`, `CLAUDE.md`, `GEMINI.md`,
+  `.cursor/rules`), never just one.
+- **Degrade instead of failing.** A skill that fans work out to sub-agents says what to do without
+  them: the same units run in series, with results written to files in between.
+- **Put hard requirements in `compatibility`.** External binaries, credentials, network access or a
+  target product go in that optional frontmatter field.
+- **Stay inside the standard frontmatter.** The one extension, `disable-model-invocation`, is safe
+  because every skill that sets it also says "explicit invocation only" in its text.
+- **No path that only resolves on one machine or in one agent.** A skill refers to its own files as
+  `$SKILL_DIR/…` and explains that notation once.
 
 ## Install
 
 ```sh
-SRC=git@github.com:Ephasme/agent-skills.git
-
-npx -y skills@latest add "$SRC" --skill scan-code-quality -g --yes --agent universal
-npx -y skills@latest add "$SRC" --skill '*'              -g --yes --agent universal
-npx skills list                                          # what is installed
-npx skills update                                        # pull newer versions into the store
+npx -y skills@latest add git@github.com:Ephasme/agent-skills.git --skill '*' -g --yes --agent universal
+npx -y skills@latest add git@github.com:Ephasme/agent-skills.git --list   # see what's available
+npx skills update                                                         # pull newer versions
 ```
 
-Each skill lands in `~/.agents/skills/<name>`. omp reads that store directly, so an install is
-live immediately — no activation step. The store is machine state and is not chezmoi-tracked; what
-is tracked, in the dotfiles, is `~/.config/skills/sources` — one `skills add` argument list per
-line, covering the catalog and every skill installed from another repo — applied by
-`.chezmoiscripts/run_after_repos.sh` on every `chezmoi apply`.
+Swap `'*'` for a skill name to install just that one. Skills land in `~/.agents/skills/<name>`,
+which omp reads directly, so they're live straight away. Keep `--agent universal`: without it the
+CLI also targets `promptscript`, which has no global directory, and fails once per skill.
 
-`--agent universal` is not cosmetic. Left to choose, the CLI expands its universal agents, and that
-set includes `promptscript`, which declares no global skills dir — so a bare `-g` prints
-`PromptScript does not support global skill installation` once per skill (verified on skills@1.7.2).
-Naming `universal` installs the same content, because `universal`'s own skills dir **is**
-`~/.agents/skills`, without the failures.
+On my machines, `~/.config/skills/sources` (managed by chezmoi) lists every catalog to install,
+including third-party skills, and `chezmoi apply` installs them. Third-party skills aren't copied
+into this repo, so they keep getting upstream updates.
+
+## Catalog
+
+Each skill lives at `skills/<category>/<skill>/SKILL.md`. Categories only organise this repo;
+installed skills are flat. `dependencies.md` shows which skills call which, including two edges into
+the Sherpas catalog (`Les-Sherpas/agent-skills`), which holds the work skills.
 
 ## MCP servers
 
-`mcp/servers.json` lists mine — 12 remote HTTP servers, no credentials. `mcp/install.mjs` writes that
-list into both agents' own config files and leaves every other key in them alone. `--manifest <path>`
-adds another catalog's list; each server keeps that catalog's helpers, so the Sherpas servers read the
-Sherpas secrets:
+`mcp/servers.json` lists my MCP servers, with credentials referenced as `${VAR}` and never inlined.
+I copy entries into each agent's config by hand: omp's `~/.omp/agent/mcp.json` and Claude Code's
+`~/.claude.json`.
+
+Credentials are stored in `mcp/secrets.sops.yaml`, encrypted with age, and read by
+`mcp/secret.sh` (omp) or `mcp/headers.mjs` (Claude Code) when the agent connects. The rules are in
+[`AGENTS.md`](AGENTS.md#secrets). To edit or rotate one:
 
 ```sh
-node mcp/install.mjs --dry-run     # what would change
-node mcp/install.mjs               # omp's ~/.omp/agent/mcp.json, Claude Code's ~/.claude.json
-node mcp/install.mjs --manifest ~/code/work/agent-skills/mcp/servers.json
+sops mcp/secrets.sops.yaml
 ```
 
-Credentials live in `mcp/secrets.sops.yaml`, age-encrypted, key at `~/.config/sops/age/keys.txt`;
-`mcp/servers.json` names them as `${VAR}`. Neither config file ever holds a value, because neither
-agent expands an unset `${VAR}` — omp sends the literal text, Claude Code warns and does the same:
+`mcp/slack-app-manifest.json` is the manifest for the Slack app behind the `slack` server.
 
-| Agent | What the config gets | When the value is read |
-| --- | --- | --- |
-| omp | `"Authorization": "!sh mcp/secret.sh 'Bearer ' APIFY_API_TOKEN"` | at connect; the header is dropped when the key is absent |
-| Claude Code | `"headersHelper": "<path>/mcp/headers.mjs"` | on every connection, printing the headers as JSON |
+## Sub-agents
 
-Rotating a credential is then `sops mcp/secrets.sops.yaml` and a restart of omp — Claude Code runs
-the helper on every connection, while omp caches a header once it resolves and retries a failed one
-after 30 s.
+`agents/*.md` are omp sub-agent definitions, not skills. Several drive a skill from this catalog
+and load it rather than repeating it. The `skills` CLI doesn't install them, so activate one with a
+symlink:
 
-The ciphertext is committed here, where the repo is public — the secrets rest entirely on the age
-key, which is not.
+```sh
+ln -s ~/code/perso/agent-skills/agents/<name>.md ~/.omp/agent/agents/
+```
 
 ## Authoring
 
 ```sh
-git -C ~/code/perso/agent-skills pull
 $EDITOR skills/<category>/<skill>/SKILL.md
-node scripts/validate.mjs
-# reinstall the store from the working tree
-npx -y skills@latest add ~/code/perso/agent-skills --skill '*' -g --yes --agent universal
+node scripts/validate.mjs        # must exit 0 before you commit
+npx -y skills@latest add . --skill '*' -g --yes --agent universal   # install your working tree
 ```
 
-The install **copies** into `~/.agents/skills/<name>`, so edits in this working tree are not live —
-re-run the add, or `skills update` once pushed, to pick them up. `scripts/validate.mjs` takes no
-path argument; it always walks the whole catalog, and `--quiet` prints errors only.
-
-Always pass `--agent universal` alongside `-g`; without it the run ends in `promptscript` failures —
-see [Install](#install).
-
-## What the validator enforces, and why
-
-Spec limits — [agentskills.io/specification](https://agentskills.io/specification):
-
-1. `name`: 1–64 chars, lowercase alphanumeric with single internal hyphens, equal to its directory,
-   unique across the catalog (installs flatten to `~/.agents/skills/<name>`, so a collision
-   silently overwrites), and free of the reserved words `claude` and `anthropic`.
-2. `description`: 1–1024 chars, no XML tags, third person. It is the only field loaded at startup
-   and the only thing an agent uses to decide whether the skill applies — it must say both what the
-   skill does and when to reach for it.
-3. `compatibility`, when present: ≤500 chars.
-4. Frontmatter keys: the six spec fields — `name`, `description`, `license`, `compatibility`,
-   `metadata`, `allowed-tools` — plus the one declared extension. Nothing else.
-
-Progressive disclosure — [skill authoring best practices](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices):
-
-5. `SKILL.md` body under 500 lines; past that, detail moves into `references/`.
-6. Reference chains one level deep: every `references/*.md` is linked from `SKILL.md` directly, so
-   an agent that follows a link reads the whole file rather than previewing a file it reached
-   through another file.
-7. A reference file over 100 lines with two or more sections carries a `## Contents` list, so a
-   partial read still shows its scope.
-8. Every `scripts/…`, `references/…` and `assets/…` path a skill mentions exists.
-
-Portability — [the contract above](#the-portability-contract):
-
-9. No harness-only variable, no hard-coded agent config directory, no harness product name, no model
-   brand or version, no harness-specific tool or dispatch API, no plugin-namespaced skill reference.
-   A skill whose subject genuinely is one product declares it in `compatibility` and is exempt.
-10. `CLAUDE.md` is only ever named on a line that also names `AGENTS.md`.
-
-Hygiene:
-
-11. No absolute home paths, no `__pycache__`, no file over 1 MiB.
-12. Only the nine categories below.
-
-A skill is **self-contained**: anything it runs lives in its own `scripts/`. Where two skills need
-the same helper, each ships a copy — they install independently and cannot reach each other.
-
-## Catalog
-
-| Category | Skills |
-| --- | --- |
-| `cases` | harden-case, sync-case |
-| `engineering` | clean-git-repo, create-cleanup-roadmap |
-| `finance` | generate-payment-qr-code |
-| `health` | cbt |
-| `helpers` | write-children-story |
-| `legal` | french-insurance-law |
-| `meta` | hand-off-session, schedule-prompt, tighten-responses |
-| `research` | assess-true-quality, cite-or-refuse, fact-check-document |
-| `toolbox` | free-disk-space, mailer-cleanup |
-
-16 skills. The CLI discovers a `SKILL.md` at any depth under `skills/`, and any `SKILL.md` sitting
-directly inside a repo subdirectory; this repo uses `skills/<category>/<skill>/SKILL.md`, so no
-manifest file is needed. Categories organise this repo only; installed skills are flat.
-
-The Sherpas-specific skills live in their own private catalog, `Les-Sherpas/agent-skills` — the
-production release runbook and the changelog it ends with, that org's PR review, the AWS admin
-session, the MDM profile work, the Slack :loading: triage, and the engineering method skills (plan, debug, quality scan,
-document refinement). Two skills here still name skills that moved there, which
-[`dependencies.md`](dependencies.md) draws.
-
-## Third-party skills
-
-Nine skills in the store — `agents-md`, `caveman`, `find-skills`, `gnhf`, `lavish`,
-`migrate-radix-to-base`, `ponytail`, `shadcn`, `skill-creator` — come from other repos and are not
-vendored here, since a copy would fork them off upstream updates. Their sources are named in the
-list described under [Install](#install): nothing about a skill is tracked in the dotfiles beyond
-that list.
-
-## The `agents/` directory
-
-`cbt-expert.md`, `french-insurance-law-expert.md` and `quality-scout.md` are omp sub-agent
-definitions, not skills — a subagent definition is a per-product format the portability contract
-does not reach. Each sits beside the skill it drives and autoloads that skill rather than restating
-it. The `skills` CLI installs skills only, so activation is one hand-made symlink:
-
-```sh
-ln -s ~/code/perso/agent-skills/agents/cbt-expert.md ~/.omp/agent/agents/
-```
+The full rule set, with the reason for each rule, is in `scripts/validate.mjs`.

@@ -1,74 +1,85 @@
 # Agent Instructions
 
-Catalog of portable agent skills in the [Agent Skills](https://agentskills.io/specification) format.
-One directory per skill: `skills/<category>/<skill>/SKILL.md`.
+Personal catalog of portable agent skills in the [Agent Skills](https://agentskills.io/specification)
+format, one directory per skill at `skills/<category>/<skill>/SKILL.md`. The repo is public.
 
 ## Critical constraints
 
 - `node scripts/validate.mjs` must exit 0 before every commit.
-- Reinstall from the repo root with `npx -y skills@latest add . --skill '*' -g --yes --agent
-  universal`. `--agent universal` is required next to `-g`: without it the CLI also targets
-  `promptscript`, which has no global skills dir, and reports a failure per skill.
-- Keep the repo dependency-free: no package manager, no build step, no runtime dependency for
-  `scripts/validate.mjs`.
-- Keep every `SKILL.md` at `skills/<category>/<skill>/SKILL.md`. The CLI also installs any
-  `SKILL.md` sitting directly inside a repo subdirectory, so a copy left outside `skills/` ships
-  as a skill. Retire a skill by deleting it — git history is the archive, never an `archive/`
-  directory.
+- Keep the repo dependency-free: no package manager, no build step, nothing `scripts/validate.mjs`
+  needs at runtime.
+- Every `SKILL.md` lives at `skills/<category>/<skill>/SKILL.md`. The CLI also installs any
+  `SKILL.md` sitting directly inside a repo subdirectory, so a stray copy outside `skills/` ships
+  as a skill. To retire a skill, delete it; git history is the archive.
+- Never commit a plaintext secret. See [Secrets](#secrets).
 
 ## Commands
 
 | Task | Command |
 |------|---------|
-| Validate the catalog | `node scripts/validate.mjs` |
-| Validate quietly (errors only) | `node scripts/validate.mjs --quiet` |
-| Reinstall the store from this working tree | `npx -y skills@latest add . --skill '*' -g --yes --agent universal` |
-| Install the MCP servers into both agents | `node mcp/install.mjs` |
+| Validate the catalog | `node scripts/validate.mjs` (`--quiet` for errors only) |
+| Install this working tree into the store | `npx -y skills@latest add . --skill '*' -g --yes --agent universal` |
+| Edit or rotate a secret | `sops mcp/secrets.sops.yaml` |
 
-`scripts/validate.mjs` takes no path argument; it always walks the whole catalog. CI runs it on
-Node 22.
-The install copies into `~/.agents/skills/<name>`, which omp reads directly, so the installed
-skill is live immediately — no activation step, no per-profile links.
+Always pass `--agent universal` with `-g`. Without it the CLI also targets `promptscript`, which has
+no global skills directory, and fails once per skill. The install copies into
+`~/.agents/skills/<name>`, so edits here aren't live until you re-run it.
 
-## Key Conventions
+## Conventions
 
-- Categories: `cases`, `engineering`, `finance`, `health`, `helpers`, `legal`, `meta`,
-  `research`, `toolbox`. Adding one means editing `CATEGORIES` in `scripts/validate.mjs`.
-- `name`: 1–64 chars, lowercase alphanumeric with single internal hyphens, equal to its
-  directory, unique across the catalog, free of `claude` and `anthropic`.
-- `description`: 1–1024 chars, no XML tags, third person. `compatibility`, when present, ≤500 chars.
-- Frontmatter keys: `name`, `description`, `license`, `compatibility`, `metadata`,
-  `allowed-tools`, plus the one extension `disable-model-invocation`. Nothing else.
-- `SKILL.md` body under 500 lines; overflow goes to `references/`.
-- Every `references/*.md` is linked from `SKILL.md` directly — one level deep, never
-  reference-to-reference. Every `scripts/…`, `references/…` and `assets/…` path a `SKILL.md`
-  mentions must exist.
-- A `references/*.md` over 100 lines with 2+ sections carries a `## Contents` list.
+- Categories are the ones in `CATEGORIES` in `scripts/validate.mjs`; adding one means editing that
+  list.
+- `name`: 1–64 chars, lowercase alphanumerics with single internal hyphens, matching its directory,
+  unique across the catalog, and free of `claude` and `anthropic`.
+- `description`: 1–1024 chars, no XML tags, third person. `compatibility`, if present, ≤500 chars.
+- Frontmatter keys: `name`, `description`, `license`, `compatibility`, `metadata`, `allowed-tools`,
+  plus one extension, `disable-model-invocation`. Nothing else.
+- `SKILL.md` body stays under 500 lines; the rest goes in `references/`, each file linked straight
+  from `SKILL.md`, never from another reference. A reference over 100 lines with two or more
+  sections starts with a `## Contents` list.
+- Every `scripts/…`, `references/…` and `assets/…` path a `SKILL.md` mentions must exist.
 - `$SKILL_DIR` is notation for the skill's own directory, not an exported variable; a skill that
   uses it says so once.
-- Name capabilities, not products: no agent brand names, model versions, harness-only variables
-  (`${CLAUDE_PLUGIN_ROOT}`), harness-specific tool or dispatch names, or hard-coded agent config
-  dirs. A skill whose subject is one product declares it in `compatibility`.
-- `CLAUDE.md` is a symlink to `AGENTS.md`; name it only on a line that also names `AGENTS.md`.
-- No absolute home path with a real user name (`/Users/<you>/…`, `/home/<you>/…`), no
-  `__pycache__` or `*.pyc`, no file over 1 MiB.
-- Skills are self-contained: helpers live in the skill's own `scripts/`, copied per skill rather
-  than shared, because skills install independently.
-- A skill that fans work out across sub-agents states a serial fallback for agents that have none.
-- `agents/*.md` are omp sub-agent definitions, exempt from the portability contract and not
-  installed by the `skills` CLI; symlink one into `~/.omp/agent/agents/` to activate it.
-- MCP servers live in `mcp/servers.json`, installed into omp and Claude Code by `mcp/install.mjs`.
-  Write no credential into a config file: `mcp/servers.json` names each one as `${VAR}`, the value
-  rests in `mcp/secrets.sops.yaml` (age-encrypted, `.sops.yaml` holds the recipient), and
-  `mcp/secret.sh` / `mcp/headers.mjs` read it at connect time. Name a server's secret after its
-  header (`WHATSAPP_CF_ACCESS_CLIENT_ID`), not after the host.
+- Name capabilities, not products: no agent brands, model versions, harness-only variables
+  (`${CLAUDE_PLUGIN_ROOT}`), harness-specific tools or hard-coded agent config directories. A skill
+  whose subject is one product declares it in `compatibility`.
+- Skills are self-contained. Helpers live in the skill's own `scripts/`, copied rather than shared,
+  because skills install independently.
+- A skill that fans work out to sub-agents gives a serial fallback for agents that have none.
+- `CLAUDE.md` is a symlink to `AGENTS.md`; only mention it on a line that also names `AGENTS.md`.
+- No absolute home paths with a real user name, no `__pycache__` or `*.pyc`, no file over 1 MiB.
+- `agents/*.md` are omp sub-agent definitions. They're exempt from the portability rules and the
+  `skills` CLI doesn't install them; activate one by symlinking it into `~/.omp/agent/agents/`.
 
-## External References
+## Secrets
+
+MCP credentials live in `mcp/secrets.sops.yaml`, a SOPS store encrypted with age. The ciphertext is
+committed to this public repo, so the secrets are only as safe as the age key.
+
+- `.sops.yaml` names the age recipient, so `sops` encrypts new values without `--age`.
+- The age key is read from `$SOPS_AGE_KEY_FILE`, otherwise
+  `~/Library/Application Support/sops/age/keys.txt` on macOS or `~/.config/sops/age/keys.txt`
+  elsewhere. It never goes in the repo.
+- `mcp/servers.json` refers to each secret as `${VAR}`, and `VAR` is its key in the store. Name a
+  new secret after the header it fills (`WHATSAPP_CF_ACCESS_CLIENT_ID`), not after the host.
+- Agent configs are edited by hand from `mcp/servers.json` and hold references, never values:
+  - omp: `"Authorization": "!sh <repo>/mcp/secret.sh 'Bearer ' <VAR>"`
+  - Claude Code: `"headersHelper": "<repo>/mcp/headers.mjs"`
+
+  Both helpers decrypt the store when the agent connects, fall back to the environment when the
+  store is missing, and drop the header when the value is empty. Never write a bare `${VAR}`:
+  neither agent expands it, so the literal text gets sent.
+- After rotating a secret, restart omp: it caches a header once resolved. Claude Code runs its
+  helper on every connection.
+- Never print, paste or commit a decrypted value.
+
+## References
 
 | Need | File |
 |------|------|
-| Portability contract, install, authoring loop | `README.md` |
-| Every rule the validator enforces, with rationale | `scripts/validate.mjs` |
-| Discovery smoke test and portability install, beyond the validator | `.github/workflows/validate.yml` |
-| Working papers for `assess-true-quality` (plans, research, testing) | `docs/` |
-| MCP server list, installer, and the two secret helpers | `mcp/` |
+| Portability contract, install, catalog | `README.md` |
+| Every rule the validator enforces | `scripts/validate.mjs` |
+| CI: discovery smoke test and cross-agent install | `.github/workflows/validate.yml` |
+| Which skill depends on which | `dependencies.md` |
+| Working papers for `assess-true-quality` | `docs/` |
+| MCP server list and secret helpers | `mcp/` |
