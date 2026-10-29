@@ -98,5 +98,9 @@
       "callbackPort": 3118,
       "redirectUri": "http://localhost:3118/callback"
     }
+  },
+  "exa": {
+    "type": "http",
+    "url": "https://mcp.exa.ai/mcp"
   }
 }
