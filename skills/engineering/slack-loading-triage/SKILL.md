@@ -11,12 +11,15 @@ description: >-
   "process what I promised on Slack", or runs slack-loading-triage. Pushes branches, opens PRs and
   edits Slack reactions — explicit invocation only.
 compatibility: >-
-  Slack workspace access as the user (search with `hasmy:`, read threads and files, add and remove
-  reactions, DM self); git and the GitHub CLI `gh`, authenticated, on the target repository. Pins
-  specific models per role (DeepSeek, Opus, Sonnet, Haiku tiers); an agent that cannot choose a
-  model and reasoning effort per sub-agent runs with what it has and says so in the recap.
+  Slack workspace access as the user (search with `hasmy:`, read threads and files, add reactions
+  via MCP, remove reactions via the skill's own script and omp's MCP OAuth store, DM self); git and
+  the GitHub CLI `gh`, authenticated, on the target repository. Pins specific models per role
+  (DeepSeek, Opus, Sonnet, Haiku tiers); an agent that cannot choose a model and reasoning effort
+  per sub-agent runs with what it has and says so in the recap.
 disable-model-invocation: true
 ---
+
+`$SKILL_DIR` below is notation for this skill's own directory, not an exported variable.
 
 # Slack loading triage
 
@@ -80,10 +83,10 @@ before reading the investigator's output, and flag in the recap that evaluations
 Stop and report if any of these fails; a half-run that opens PRs and cannot clear :loading: breaks the
 one invariant the user cares about.
 
-1. **Reaction removal works.** Find a way to remove the user's own reaction: the Slack integration's
-   remove-reaction capability, else Web API `reactions.remove` with a user token (`xoxp-`, scope
-   `reactions:write`) from the environment variable `SLACK_USER_TOKEN`. Neither available → stop and
-   say so; do not process anything.
+1. **Reaction removal works.** The Slack MCP server has no remove tool; remove reactions with the
+   skill's own script: `$SKILL_DIR/scripts/slack-reaction.py remove <channel> <ts> <emoji>` (Web API
+   `reactions.remove`, token read from omp's MCP OAuth store). `test` subcommand verifies the store
+   first. Fails or no store → stop and say so; do not process anything.
 2. **Identity.** Resolve the user's own Slack user id; it is the DM target and the reaction owner.
 3. **Repo.** `REPO` is a git repo, `gh auth status` passes, `BASE_BRANCH` exists on the remote,
    `git fetch origin` succeeds.
