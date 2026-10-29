@@ -59,9 +59,9 @@ the Sherpas catalog (`Les-Sherpas/agent-skills`), which holds the work skills.
 I copy entries into each agent's config by hand: omp's `~/.omp/agent/mcp.json` and Claude Code's
 `~/.claude.json`.
 
-Credentials are stored in `mcp/secrets.sops.yaml`, encrypted with age, and read by
-`mcp/secret.sh` (omp) or `mcp/headers.mjs` (Claude Code) when the agent connects. The rules are in
-[`AGENTS.md`](AGENTS.md#secrets). To edit or rotate one:
+Credentials are stored in `mcp/secrets.sops.yaml`, encrypted with age, and decrypted by a `sops`
+call in each agent's config when it connects. The rules are in [`AGENTS.md`](AGENTS.md#secrets). To
+edit or rotate one:
 
 ```sh
 sops mcp/secrets.sops.yaml

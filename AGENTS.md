@@ -70,10 +70,13 @@ committed to this public repo, so the secrets are only as safe as the age key.
   - **stdio servers** read their token from the environment. Their entry runs
     `sops exec-env mcp/secrets.sops.yaml "<server command>"`, which decrypts the store into the
     server's environment only. Non-secret settings (base URLs) go in the entry's `env`.
-  - **HTTP servers** carry `${VAR}` in a header. omp: `"!sh <repo>/mcp/secret.sh '<prefix>' <VAR>"`;
-    Claude Code: `"headersHelper": "<repo>/mcp/headers.mjs"`. Both decrypt at connect time and drop
-    the header when the value is empty. Never write a bare `${VAR}`: neither agent expands it, so
-    the literal text gets sent.
+  - **HTTP servers** carry `${VAR}` in a header, filled by a `sops` call in the agent config:
+    - omp: `"!sh v=$(sops -d --extract '[\"<VAR>\"]' <store>) && printf '<prefix>%s' \"$v\""`. A
+      missing key prints nothing, and omp then drops the header.
+    - Claude Code: `"headersHelper": "sops exec-env <store> 'printf \"{\\\"<Header>\\\":\\\"<prefix>%s\\\"}\" \"${<VAR>:?}\"'"`,
+      one `%s` and one `${<VAR>:?}` per header. `:?` makes a missing key fail instead of sending
+      an empty value.
+    Never write a bare `${VAR}`: neither agent expands it, so the literal text gets sent.
 - After rotating a secret, restart omp. stdio servers read the store when they start; omp caches a
   resolved header.
 - Never print, paste or commit a decrypted value.
@@ -87,4 +90,4 @@ committed to this public repo, so the secrets are only as safe as the age key.
 | CI: discovery smoke test and cross-agent install | `.github/workflows/validate.yml` |
 | Which skill depends on which | `dependencies.md` |
 | Working papers for `assess-true-quality` | `docs/` |
-| MCP server list and secret helpers | `mcp/` |
+| MCP server list and SOPS store | `mcp/` |
