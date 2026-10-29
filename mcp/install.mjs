@@ -12,8 +12,8 @@
 //
 // `--manifest` adds another catalog's server list — each server keeps that catalog's own
 // helpers, so a second repo's servers read that repo's secrets. Repeat it for each one; the
-// default is this repo's own servers.json. `--skip` leaves out a server some manifest lists,
-// and removes it from the targets if an earlier run wrote it.
+// default is this repo's own servers.json. `--skip` leaves out a server an added manifest lists
+// (never this repo's own), and removes it from the targets if an earlier run wrote it from there.
 
 import { closeSync, copyFileSync, mkdirSync, openSync, readFileSync, renameSync, statSync, writeFileSync } from 'node:fs';
 import childProcess from 'node:child_process';
@@ -31,10 +31,10 @@ const valuesOf = (flag) => argv.flatMap((a, i) => (a === flag && argv[i + 1] ? [
 const extra = valuesOf('--manifest').map((p) => resolve(p));
 const skip = new Set(valuesOf('--skip'));
 
-const manifests = [join(HERE, 'servers.json'), ...extra].map((path) => ({
+const manifests = [join(HERE, 'servers.json'), ...extra].map((path, i) => ({
   dir: dirname(path),
   servers: Object.fromEntries(
-    Object.entries(JSON.parse(readFileSync(path, 'utf8'))).filter(([name]) => !skip.has(name)),
+    Object.entries(JSON.parse(readFileSync(path, 'utf8'))).filter(([name]) => i === 0 || !skip.has(name)),
   ),
 }));
 const servers = Object.assign({}, ...manifests.map((m) => m.servers));
