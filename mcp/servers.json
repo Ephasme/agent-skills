@@ -59,6 +59,10 @@
     "type": "http",
     "url": "https://mcp.notion.com/mcp?account=perso"
   },
+  "medicap": {
+    "type": "http",
+    "url": "https://medicap.site/api/mcp"
+  },
   "dagu": {
     "type": "http",
     "url": "https://dagu.loup-peluso.com/mcp",
