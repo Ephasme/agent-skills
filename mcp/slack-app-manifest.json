@@ -1,16 +1,18 @@
 {
   "display_information": {
-    "name": "Loup MCP",
-    "description": "Full access to the workspace as Loup, for his agents."
+    "name": "BOT Loup",
+    "description": "Full access to the workspace as Loup, for his agents.",
+    "background_color": "#18181B"
   },
   "features": {
     "app_home": {
       "home_tab_enabled": false,
       "messages_tab_enabled": true,
-      "messages_tab_read_only_enabled": false
+      "messages_tab_read_only_enabled": false,
+      "agent_tasks_enabled": true
     },
     "bot_user": {
-      "display_name": "Loup MCP",
+      "display_name": "[BOT] Loup",
       "always_online": true
     }
   },
@@ -95,11 +97,14 @@
         "im:history",
         "mpim:history"
       ]
-    }
+    },
+    "pkce_enabled": false
   },
   "settings": {
     "org_deploy_enabled": false,
     "socket_mode_enabled": false,
-    "token_rotation_enabled": false
+    "is_mcp_enabled": true,
+    "token_rotation_enabled": false,
+    "app_level_token_rotation_enabled": false
   }
 }
