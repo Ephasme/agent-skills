@@ -6,8 +6,8 @@ description: >-
   or worktrees, e.g. "close all workspaces except the ones with a worktree",
   "remove inactive worktrees", "close workspaces with no running agent", or in
   French "ferme les workspaces", "nettoie les worktrees". Audits every workspace
-  and checkout first, keeps anything with a working agent, uncommitted changes or
-  commits on no remote, and asks before anything it cannot prove is safe.
+  and checkout first, keeps anything with a working agent or uncommitted
+  changes, and acts on everything else without asking.
   Invoke only on an explicit request, since it deletes checkouts.
 compatibility: Requires herdr (terminal workspace manager), git, jq and bash.
 disable-model-invocation: true
@@ -38,20 +38,19 @@ no remote, owning workspace. Special rows:
 |---|---|---|
 | `[CLONE]` | full clone, not a worktree; may be the parent of other worktrees | never remove |
 | `BROKEN` | `.git` points at a gitdir the main repo pruned; git can't vouch for contents | report, don't `rm` |
-| `NO-GIT` | plain directory (often build output) | report, offer deletion |
+| `NO-GIT` | plain directory (often build output) | delete (`rm -rf`) |
 
 ## 2. Classify
 
-- **Active**: agent status `working` or `blocked`. Default keep. `idle` and `unknown` are not
-  active; ask if the user's wording is ambiguous.
+- **Active**: agent status `working` or `blocked`. Keep. Every other status (`idle`, `done`,
+  `unknown`) is inactive: close it, main-checkout workspaces included.
 - **SELF**: never close.
-- **Safe**: `dirty=0` and `commits_on_no_remote=0`.
-- **At risk**: anything else. Unpushed commits survive removal on the branch in the main repo;
-  uncommitted files do not.
+- **Removable**: `dirty=0`. Unpushed commits don't block removal: they survive on the branch in
+  the main repo. Name the branch and commits in the report.
+- **At risk**: `dirty>0`; uncommitted files die with the checkout.
 
-Before deleting anything at risk, show a table of what would be lost and ask: skip, remove
-unpushed-only, or force. Default: skip. "Just close them" means close the workspace, keep the
-checkout.
+Act on every inactive workspace and removable checkout without asking. Ask only for at-risk
+checkouts: show the files that would be lost, offer skip or force; default skip.
 
 ## 3. Act
 
@@ -59,8 +58,9 @@ checkout.
 |---|---|
 | Workspace with no linked checkout | `herdr workspace close <id>` |
 | Workspace whose checkout is `MISSING` | `herdr workspace close <id>` |
-| Safe worktree with a workspace | `herdr worktree remove --workspace <id>` (closes it too) |
-| Safe worktree with no workspace | `git --git-dir="$(git -C <path> rev-parse --path-format=absolute --git-common-dir)" worktree remove <path>` |
+| Removable worktree with a workspace | `herdr worktree remove --workspace <id>` (closes it too) |
+| Removable worktree with no workspace | `git --git-dir="$(git -C <path> rev-parse --path-format=absolute --git-common-dir)" worktree remove <path>` |
+| `NO-GIT` directory | `rm -rf <path>` |
 
 Never pass `--force` to either remove command without the user's explicit go-ahead for that
 checkout. Never close with `--group`.
@@ -74,5 +74,6 @@ user's usual checkout; the `git-common-dir` form above resolves the right parent
 
 ## 4. Verify and report
 
-Re-run the audit. Report: closed, removed, kept-as-active, skipped-at-risk (with what's at risk),
-left-on-disk (`BROKEN`/`NO-GIT`), and anything that failed with its error.
+Re-run the audit. Report: closed, removed (with unpushed branches/commits), deleted `NO-GIT`,
+kept-as-active, skipped-at-risk (with what's at risk), left-on-disk (`BROKEN`), and anything that
+failed with its error.
