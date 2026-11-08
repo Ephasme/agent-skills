@@ -83,6 +83,13 @@
       "Authorization": "Bearer ${OMNIROUTE_MCP_API_KEY}"
     }
   },
+  "nidi": {
+    "type": "http",
+    "url": "https://nidi.loup-peluso.com/mcp",
+    "headers": {
+      "Authorization": "Bearer ${NIDI_MCP_API_KEY}"
+    }
+  },
   "slack": {
     "type": "http",
     "url": "https://mcp.slack.com/mcp",
