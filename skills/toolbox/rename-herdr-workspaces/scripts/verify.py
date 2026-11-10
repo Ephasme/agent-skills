@@ -2,7 +2,8 @@
 """Check the live state after a rename: no placeholder label left, no duplicates,
 and every branch that could be moved actually sits on its label.
 
-Read-only. Exits 1 when a placeholder label or a duplicate remains.
+Read-only, and importable: apply.py calls `check()` so the run ends verified
+instead of needing a second command.
 
     verify.py
 """
@@ -18,11 +19,7 @@ import labels
 import survey
 
 
-def main(argv=None):
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--json", default="herdr-verified.json", help="where to write the check")
-    args = parser.parse_args(argv)
-
+def check():
     workspaces = survey.herdr_json("workspace", "list")["workspaces"]
     by_label = {}
     rows, failures = [], []
@@ -38,7 +35,7 @@ def main(argv=None):
             failures.append("%s: checkout missing (%s)" % (ws["workspace_id"], path))
             continue
         code, branch, _ = survey.git(path, "branch", "--show-current")
-        branch = branch if code == 0 and branch else "-"
+        branch = branch.strip() if code == 0 and branch.strip() else "-"
         if labels.is_generated(ws.get("label")):
             note = "placeholder label"
             failures.append("%s: label is herdr's placeholder" % ws["workspace_id"])
@@ -49,21 +46,29 @@ def main(argv=None):
             failures.append("%s: branch %s not worktree/%s" % (ws["workspace_id"], branch, ws["label"]))
         else:
             note = "ok"
-        rows.append((ws["workspace_id"], ws["label"], branch, note))
+        rows.append((ws["workspace_id"], ws.get("label"), branch, note))
 
     duplicates = {label: ids for label, ids in by_label.items() if len(ids) > 1}
     for label, ids in duplicates.items():
         failures.append("duplicate label %r on %s" % (label, ", ".join(ids)))
+    return {"rows": rows, "duplicates": duplicates, "failures": failures}
 
-    width = max([len(row[1] or "-") for row in rows] + [3])
-    for workspace_id, label, branch, note in rows:
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("--json", default="herdr-verified.json", help="where to write the check")
+    args = parser.parse_args(argv)
+
+    state = check()
+    width = max([len(row[1] or "-") for row in state["rows"]] + [3])
+    for workspace_id, label, branch, note in state["rows"]:
         print("%s  %-*s  %-34s  %s" % (workspace_id, width, label, branch, note))
     with open(args.json, "w") as handle:
-        json.dump({"rows": rows, "duplicates": duplicates, "failures": failures}, handle, indent=2)
-    if failures:
-        print("\n%d problem(s):\n  %s" % (len(failures), "\n  ".join(failures)))
+        json.dump(state, handle, indent=2)
+    if state["failures"]:
+        print("\n%d problem(s):\n  %s" % (len(state["failures"]), "\n  ".join(state["failures"])))
         return 1
-    print("\nclean: %d linked worktree(s), no placeholder label, no duplicate" % len(rows))
+    print("\nclean: %d linked worktree(s), no placeholder label, no duplicate" % len(state["rows"]))
     return 0
 
 
