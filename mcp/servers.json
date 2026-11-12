@@ -104,7 +104,7 @@
     "type": "http",
     "url": "https://mcp.exa.ai/mcp"
   },
-  "agent-mail": {
+  "agent-mail-perso": {
     "type": "http",
     "url": "https://agent-mail.loup-peluso.com/mcp/",
     "headers": {
