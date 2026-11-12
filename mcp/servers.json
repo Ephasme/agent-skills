@@ -107,5 +107,10 @@
       "CF-Access-Client-Id": "${WHATSAPP_CF_ACCESS_CLIENT_ID}",
       "CF-Access-Client-Secret": "${WHATSAPP_CF_ACCESS_CLIENT_SECRET}"
     }
+  },
+  "shadcn": {
+    "type": "stdio",
+    "command": "npx",
+    "args": ["-y", "shadcn@latest", "mcp"]
   }
 }
