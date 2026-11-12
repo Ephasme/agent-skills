@@ -103,5 +103,12 @@
   "exa": {
     "type": "http",
     "url": "https://mcp.exa.ai/mcp"
+  },
+  "agent-mail": {
+    "type": "http",
+    "url": "https://agent-mail.loup-peluso.com/mcp/",
+    "headers": {
+      "Authorization": "Bearer ${AGENT_MAIL_BEARER_TOKEN}"
+    }
   }
 }
