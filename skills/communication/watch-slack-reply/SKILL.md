@@ -59,6 +59,9 @@ SLACK_USER_TOKEN=<xoxp-...>                   # or SLACK_TOKEN_OP_REF=op://vault
 OP_ACCOUNT=<optional 1Password account for op read>
 ```
 
+The ntfy write token is also stored encrypted in the catalog's `mcp/secrets.sops.yaml` as `NTFY_TOKEN`;
+restore it on a new machine with `sops -d --extract '["NTFY_TOKEN"]' mcp/secrets.sops.yaml` from the repo root.
+
 The user token, not a bot token, because a bot only sees conversations it was invited to and the
 watched DM or private channel usually is not one of them.
 
