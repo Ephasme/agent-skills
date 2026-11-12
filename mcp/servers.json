@@ -1,43 +1,35 @@
 {
+  "agent-mail-perso": {
+    "type": "http",
+    "url": "https://agent-mail.loup-peluso.com/mcp/",
+    "headers": {
+      "Authorization": "Bearer ${AGENT_MAIL_BEARER_TOKEN}"
+    }
+  },
   "apify": {
     "type": "http",
-    "url": "https://mcp.apify.com/",
-    "headers": {
-      "Authorization": "Bearer ${APIFY_API_TOKEN}"
-    }
+    "url": "https://mcp.apify.com/"
+  },
+  "argocd-perso": {
+    "type": "stdio",
+    "command": "sops",
+    "args": ["exec-env", "mcp/secrets.sops.yaml", "npx -y argocd-mcp@0.9.0 stdio"],
+    "env": { "ARGOCD_BASE_URL": "https://argocd.loup-peluso.com" }
   },
   "calcom": {
     "type": "http",
     "url": "https://mcp.cal.com/mcp"
   },
-  "whatsapp": {
+  "dagu": {
     "type": "http",
-    "url": "https://whatsapp.loup-peluso.com/mcp",
+    "url": "https://dagu.loup-peluso.com/mcp",
     "headers": {
-      "Authorization": "Bearer ${WHATSAPP_MCP_TOKEN}",
-      "CF-Access-Client-Id": "${WHATSAPP_CF_ACCESS_CLIENT_ID}",
-      "CF-Access-Client-Secret": "${WHATSAPP_CF_ACCESS_CLIENT_SECRET}"
+      "Authorization": "Bearer ${DAGU_MCP_API_KEY}"
     }
   },
-  "imessage": {
+  "exa": {
     "type": "http",
-    "url": "https://imessage.loup-peluso.com/mcp",
-    "headers": {
-      "CF-Access-Client-Id": "${IMESSAGE_CF_ACCESS_CLIENT_ID}",
-      "CF-Access-Client-Secret": "${IMESSAGE_CF_ACCESS_CLIENT_SECRET}"
-    }
-  },
-  "splitwise": {
-    "type": "http",
-    "url": "https://splitwise.loup-peluso.com/mcp",
-    "headers": {
-      "CF-Access-Client-Id": "${SPLITWISE_CF_ACCESS_CLIENT_ID}",
-      "CF-Access-Client-Secret": "${SPLITWISE_CF_ACCESS_CLIENT_SECRET}"
-    }
-  },
-  "google-perso": {
-    "type": "http",
-    "url": "https://google-perso.loup-peluso.com/mcp"
+    "url": "https://mcp.exa.ai/mcp"
   },
   "google-maps": {
     "type": "http",
@@ -47,47 +39,38 @@
       "CF-Access-Client-Secret": "${MAPS_CF_ACCESS_CLIENT_SECRET}"
     }
   },
-  "tesla": {
+  "google-perso": {
     "type": "http",
-    "url": "https://tesla.loup-peluso.com/mcp",
-    "headers": {
-      "CF-Access-Client-Id": "${TESLA_CF_ACCESS_CLIENT_ID}",
-      "CF-Access-Client-Secret": "${TESLA_CF_ACCESS_CLIENT_SECRET}"
-    }
+    "url": "https://google-perso.loup-peluso.com/mcp"
   },
-  "notion-perso": {
+  "imessage": {
     "type": "http",
-    "url": "https://mcp.notion.com/mcp?account=perso"
+    "url": "https://imessage.loup-peluso.com/mcp",
+    "headers": {
+      "CF-Access-Client-Id": "${IMESSAGE_CF_ACCESS_CLIENT_ID}",
+      "CF-Access-Client-Secret": "${IMESSAGE_CF_ACCESS_CLIENT_SECRET}"
+    }
   },
   "medicap": {
     "type": "http",
     "url": "https://medicap.site/api/mcp"
-  },
-  "dagu": {
-    "type": "http",
-    "url": "https://dagu.loup-peluso.com/mcp",
-    "headers": {
-      "Authorization": "Bearer ${DAGU_MCP_API_KEY}"
-    }
-  },
-  "argocd-perso": {
-    "type": "stdio",
-    "command": "sops",
-    "args": ["exec-env", "mcp/secrets.sops.yaml", "npx -y argocd-mcp@0.9.0 stdio"],
-    "env": { "ARGOCD_BASE_URL": "https://argocd.loup-peluso.com" }
-  },
-  "omniroute": {
-    "type": "http",
-    "url": "https://omniroute.loup-peluso.com/api/mcp/stream",
-    "headers": {
-      "Authorization": "Bearer ${OMNIROUTE_MCP_API_KEY}"
-    }
   },
   "nidi": {
     "type": "http",
     "url": "https://nidi.loup-peluso.com/mcp",
     "headers": {
       "Authorization": "Bearer ${NIDI_MCP_API_KEY}"
+    }
+  },
+  "notion-perso": {
+    "type": "http",
+    "url": "https://mcp.notion.com/mcp?account=perso"
+  },
+  "omniroute": {
+    "type": "http",
+    "url": "https://omniroute.loup-peluso.com/api/mcp/stream",
+    "headers": {
+      "Authorization": "Bearer ${OMNIROUTE_MCP_API_KEY}"
     }
   },
   "slack": {
@@ -100,15 +83,29 @@
       "redirectUri": "http://localhost:3118/callback"
     }
   },
-  "exa": {
+  "splitwise": {
     "type": "http",
-    "url": "https://mcp.exa.ai/mcp"
-  },
-  "agent-mail-perso": {
-    "type": "http",
-    "url": "https://agent-mail.loup-peluso.com/mcp/",
+    "url": "https://splitwise.loup-peluso.com/mcp",
     "headers": {
-      "Authorization": "Bearer ${AGENT_MAIL_BEARER_TOKEN}"
+      "CF-Access-Client-Id": "${SPLITWISE_CF_ACCESS_CLIENT_ID}",
+      "CF-Access-Client-Secret": "${SPLITWISE_CF_ACCESS_CLIENT_SECRET}"
+    }
+  },
+  "tesla": {
+    "type": "http",
+    "url": "https://tesla.loup-peluso.com/mcp",
+    "headers": {
+      "CF-Access-Client-Id": "${TESLA_CF_ACCESS_CLIENT_ID}",
+      "CF-Access-Client-Secret": "${TESLA_CF_ACCESS_CLIENT_SECRET}"
+    }
+  },
+  "whatsapp": {
+    "type": "http",
+    "url": "https://whatsapp.loup-peluso.com/mcp",
+    "headers": {
+      "Authorization": "Bearer ${WHATSAPP_MCP_TOKEN}",
+      "CF-Access-Client-Id": "${WHATSAPP_CF_ACCESS_CLIENT_ID}",
+      "CF-Access-Client-Secret": "${WHATSAPP_CF_ACCESS_CLIENT_SECRET}"
     }
   }
 }
