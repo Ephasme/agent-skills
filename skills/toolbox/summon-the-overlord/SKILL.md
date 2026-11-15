@@ -1,11 +1,11 @@
 ---
-name: call-overlord
+name: summon-the-overlord
 description: >-
   Drives every git worktree that holds a coding agent to a pushed branch, an open
   pull request and a merge, deciding the merge order by the files each one touches,
   and learns that each agent is done from the pane that agent messages, never by polling.
-  Use when the user asks to call the overlord, land, merge, ship or unblock worktree
-  work, e.g. "land the worktree work", "merge the agents' PRs", "get every worktree
+  Use when the user asks to summon or call the overlord, land, merge, ship or unblock
+  worktree work, e.g. "land the worktree work", "merge the agents' PRs", "get every worktree
   PR merged", "check if they are ready to commit and push", or in French "fusionne
   les PR des worktrees", "fais atterrir le travail des agents". Also starts a job in
   one of four modes: feat, fast, hotfix or ask.
@@ -16,7 +16,7 @@ compatibility: >-
 disable-model-invocation: true
 ---
 
-# Call the overlord
+# Summon the overlord
 
 **Explicit invocation only.** A pass merges pull requests, which cannot be undone by a resolver.
 Where `disable-model-invocation` is ignored, this paragraph is the rule.
@@ -136,7 +136,7 @@ runtime behaviour: edit them to change how a worker behaves, never as documentat
 
 `adopt` adds existing workspaces or checkouts to the ownership registry so the pass renames, reviews
 and prunes them like its own; `--remove` gives one back. Ownership is never inferred from a label or
-a branch: `$XDG_STATE_HOME/call-overlord/worktrees.json` is the only source, and a corrupt registry
+a branch: `$XDG_STATE_HOME/summon-the-overlord/worktrees.json` is the only source, and a corrupt registry
 is an error, not an empty list.
 
 Adoption is a takeover, prune included: the herdr workspace holding that path is closed, a `working`

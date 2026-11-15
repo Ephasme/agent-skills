@@ -304,7 +304,7 @@ def herdr_json(*args):
     return json.loads(done.stdout)["result"]
 
 
-REGISTRY = Path(os.environ.get("XDG_STATE_HOME", Path.home() / ".local" / "state")) / "call-overlord" / "worktrees.json"
+REGISTRY = Path(os.environ.get("XDG_STATE_HOME", Path.home() / ".local" / "state")) / "summon-the-overlord" / "worktrees.json"
 
 
 def owned_paths():

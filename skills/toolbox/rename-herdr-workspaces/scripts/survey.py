@@ -166,7 +166,7 @@ STEP_LABEL = re.compile(
     r"^(?:\U0001F441|\U0001F5FA|\U0001F6E1|\u2692|\U0001F50D|\u27F3|\u2935|\u2714)\s+(SEE|PLAN|HRD|WORK|REV|REB|MRG|DONE)\b"
 )
 
-REGISTRY = Path.home() / ".local" / "state" / "call-overlord" / "worktrees.json"
+REGISTRY = Path.home() / ".local" / "state" / "summon-the-overlord" / "worktrees.json"
 
 
 def owned_paths():
