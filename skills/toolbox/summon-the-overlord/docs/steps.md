@@ -1,19 +1,21 @@
 # Worktree steps
 
-A left-panel label is `<symbol> <STEP> <name> <title>` and may end with one parenthesised fact about
-that minion's work: `🔍 REV m8 ocr-review-pr13 (PR #13)` while reviewing, `✔ DONE m8 ocr-review-pr13
-(DONE)` once merged. `rename` composes the fact from worktree facts, preferring a merged PR (`DONE`),
-then the open PR number (`PR #13`), and nothing at all when there is no PR — never `()`. The minion's
-id never goes in there: the name already sits in the label. Never in a label, a pane token or a
-registry title.
+A left-panel label is `<symbol> <STEP> <name> <title>` and may end with one parenthesised fact:
+`🔍 REV m8 ocr-review-pr13 (PR #13 - m2)` while m8 reviews the PR m2 opened, `⚒ WORK m1
+overlord-rust-port (PR #1)` in any other step, `⤵ MRG m7 overlord-panel-rows (PR #2 · merged)` once
+merged, and no parentheses at all without a PR.
+
+The owner appears in REV only, because a reviewer is the one who needs to know whose work it
+reviews, and it is never read off the current worktree. It comes from the registry field
+`pr_owner`, written by whichever minion opened the PR: every PR carries the human account, so `gh`
+cannot say it. Unknown prints `(PR #13 - ?)`.
 
 The agent panel reads the `step`, `name` and `title` tokens, published bare, so it shows
 `REV · m8 · ocr-review-pr13`. herdr's agent state stays in herdr: it is never copied into a label or
 a registry field.
 
-The minion id in parentheses belongs to one place only, the pull request title, appended by the
-minion that owns that PR: `summon-the-overlord: enforced plan mode (m2)`. Owner, not the author of
-the last commit.
+The minion id in parentheses belongs to one other place, the pull request title, appended by the
+minion that owns that PR: `summon-the-overlord: enforced plan mode (m2)`.
 
 Slugs are tool-first, target second: `ocr-review-pr13`. Spawn derives the title from the task's first
 words; pass `--title` when the job is better named than its brief.

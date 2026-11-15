@@ -358,7 +358,10 @@ def cmd_registry(args: argparse.Namespace) -> int:
         entries = registry()
         for path in args.add:
             resolved = str(Path(path).expanduser().resolve())
-            register_entry(entries, resolved, {"repo": args.source_repo or "", "task": args.task or ""})
+            register_entry(entries, resolved, {
+                "repo": args.source_repo or "", "task": args.task or "",
+                "pr_owner": args.pr_owner or "",
+            })
         save_registry(entries)
         print(f"registered {len(args.add)} path(s)")
         return 0
@@ -662,6 +665,7 @@ class Worktree:
     last_commit_at: str = ""
     checks: str = "none"
     task: str = ""
+    pr_owner: str = ""
 
 
 def registry_repos() -> list[Path]:
@@ -743,7 +747,7 @@ def _collect(repos: list[Path], base: str) -> list[Worktree]:
                 path=path, repo=path, branch="-", dirty=0, ahead=0, upstream="none",
                 slug="", pull=None, agent=agent, pane=pane, vcs=False,
                 name=meta.get("name", "-"), title=meta.get("title", ""),
-                task=str(meta.get("task") or ""),
+                task=str(meta.get("task") or ""), pr_owner=str(meta.get("pr_owner") or ""),
                 agent_status=by_ws.get(workspace, ("unknown", "-"))[0] if workspace else "unknown",
             ))
         for path in worktree_paths(repo) + sorted(registered):
@@ -766,7 +770,7 @@ def _collect(repos: list[Path], base: str) -> list[Worktree]:
                 slug=slug, pull=pull,
                 agent=agent, pane=pane, linked=path.resolve() != repo.resolve(),
                 name=meta.get("name", "-"), title=meta.get("title", ""),
-                task=str(meta.get("task") or ""),
+                task=str(meta.get("task") or ""), pr_owner=str(meta.get("pr_owner") or ""),
                 agent_status=by_ws.get(workspace, ("unknown", "-"))[0] if workspace else "unknown",
                 last_subject=run(["git", "-C", str(path), "log", "-1", "--format=%s"]),
                 last_commit_at=run(["git", "-C", str(path), "log", "-1", "--format=%cI"]),
@@ -1049,11 +1053,20 @@ def paint(step: str, name: str, title: str, fact: str = "") -> str:
     return f"{symbol} {step} {name} {title}" + (f" ({fact})" if fact else "")
 
 
-def work_fact(wt: Worktree) -> str:
-    """One fact about the minion's work: its merged outcome, else the PR it is on, else nothing."""
+def work_fact(wt: Worktree, step: str) -> str:
+    """The `()` block: `PR #<n>` in any step, the owner only in REV, `· merged` once merged.
+
+    The owner is written to the registry by whichever minion opened the PR: every PR carries the
+    human account, so `gh` cannot say it, and it is never read off the current worktree. A reviewer
+    is the one who needs it, hence REV only; an unknown owner prints `?`.
+    """
     if not wt.pull or not wt.pull.number:
         return ""
-    return "DONE" if wt.pull.state == "MERGED" else f"PR #{wt.pull.number}"
+    if wt.pull.state == "MERGED":
+        return f"PR #{wt.pull.number} · merged"
+    if step == "REV":
+        return f"PR #{wt.pull.number} - {wt.pr_owner or '?'}"
+    return f"PR #{wt.pull.number}"
 
 
 BUG_WORDS = ("fix", "bug", "crash", "broken", "regression", "panic", "error", "flake", "hotfix")
@@ -1162,7 +1175,7 @@ def cmd_rename(args: argparse.Namespace) -> int:
         step = step_for(wt, proposed, hardened)
         symbol = STEP_STYLE.get(step, ("•", "#888888"))[0]
         title = wt.title or short_title(wt)
-        label = paint(step, wt.name, title, work_fact(wt))
+        label = paint(step, wt.name, title, work_fact(wt, step))
         live_workspace, live_pane = places.get(str(wt.path.resolve()), ("", ""))
         workspace = by_path.get(str(wt.path.resolve()), "") or live_workspace
         pane = wt.pane if wt.pane not in {"-", ""} else live_pane
@@ -1902,6 +1915,7 @@ def main(argv: list[str]) -> int:
     reg.add_argument("--remove", nargs="*", default=[], help="forget these worktree paths")
     reg.add_argument("--task", default="", help="what the worktree is for")
     reg.add_argument("--source-repo", default="", help="repository path the worktree came from")
+    reg.add_argument("--pr-owner", default="", help="minion that opened this worktree's PR (mN)")
     reg.add_argument("--rename-list", action="store_true", help="workspace, label and path of every owned worktree")
 
     subs.add_parser("models", help="the models a minion may use, and the default")

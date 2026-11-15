@@ -470,23 +470,28 @@ class ReviewFixTests(unittest.TestCase):
                 }])
             self.assertEqual(json.loads(alert_file.read_text()), {"m1:BUILD": ["m1", "BUILD"]})
 
-    def test_label_carries_the_pr_fact_or_nothing(self):
-        def label(pull):
-            wt = o.Worktree(path=Path("/wt"), repo=Path("/repo"), branch="b", dirty=0, ahead=1,
-                             upstream="origin/b", slug="o/n", pull=pull, name="m8",
-                             title="ocr-review-pr13")
-            return o.paint("REV", wt.name, wt.title, o.work_fact(wt))
+    def test_label_carries_the_pr_and_the_owner_only_in_rev(self):
+        def pull(number, state="OPEN"):
+            return o.PullRequest(number=number, state=state, mergeable="MERGEABLE",
+                                 merge_state="CLEAN", draft=False, files=1)
 
-        open_pull = o.PullRequest(number=13, state="OPEN", mergeable="MERGEABLE",
-                                  merge_state="CLEAN", draft=False, files=1)
-        merged = o.PullRequest(number=13, state="MERGED", mergeable="UNKNOWN",
-                               merge_state="UNKNOWN", draft=False, files=1)
-        self.assertEqual(label(open_pull), "🔍 REV m8 ocr-review-pr13 (PR #13)")
-        self.assertEqual(label(merged), "🔍 REV m8 ocr-review-pr13 (DONE)")
-        self.assertEqual(label(None), "🔍 REV m8 ocr-review-pr13")
-        self.assertEqual(o.work_fact(o.Worktree(path=Path("/wt"), repo=Path("/repo"), branch="-",
-                                                dirty=0, ahead=0, upstream="none", slug="",
-                                                pull=None, name="m5", title="t", task="x")), "")
+        def label(step, pr, owner="", name="m8", title="ocr-review-pr13"):
+            wt = o.Worktree(path=Path("/wt"), repo=Path("/repo"), branch="b", dirty=0, ahead=1,
+                             upstream="origin/b", slug="o/n", pull=pr, name=name,
+                             title=title, pr_owner=owner)
+            return o.paint(step, wt.name, wt.title, o.work_fact(wt, step))
+
+        # m8 reviews a PR m2 opened: the reviewer is told whose work it is
+        self.assertEqual(label("REV", pull(13), "m2"), "🔍 REV m8 ocr-review-pr13 (PR #13 - m2)")
+        self.assertEqual(label("REV", pull(13)), "🔍 REV m8 ocr-review-pr13 (PR #13 - ?)")
+        # every other step states the PR alone
+        self.assertEqual(label("BUILD", pull(1), "m1", name="m1", title="overlord-rust-port"),
+                         "⚒ BUILD m1 overlord-rust-port (PR #1)")
+        self.assertEqual(label("MRG", pull(2), "m7", name="m7", title="overlord-panel-rows"),
+                         "⤵ MRG m7 overlord-panel-rows (PR #2)")
+        self.assertEqual(label("MRG", pull(2, "MERGED"), "m7", name="m7", title="overlord-panel-rows"),
+                         "⤵ MRG m7 overlord-panel-rows (PR #2 · merged)")
+        self.assertEqual(label("PLAN", None), "🗺 PLAN m8 ocr-review-pr13")
 
 
 if __name__ == "__main__":
