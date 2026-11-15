@@ -46,16 +46,27 @@ REGISTRY = STATE_DIR / "worktrees.json"
 
 
 def registry() -> dict[str, dict[str, str]]:
-    """The worktrees this overlord owns: path -> repo, branch, mode, task, created_at."""
-    try:
-        return json.loads(REGISTRY.read_text())
-    except (OSError, json.JSONDecodeError):
+    """The worktrees this overlord owns: path -> repo, branch, mode, task, created_at.
+
+    A corrupt registry raises instead of reading as empty: forgetting ownership would let
+    prune and relabel walk past work this overlord still answers for.
+    """
+    if not REGISTRY.exists():
         return {}
+    try:
+        data = json.loads(REGISTRY.read_text())
+    except (OSError, json.JSONDecodeError) as error:
+        raise SystemExit(f"registry unreadable ({REGISTRY}): {error}")
+    if not isinstance(data, dict):
+        raise SystemExit(f"registry is not an object ({REGISTRY})")
+    return data
 
 
 def save_registry(entries: dict[str, dict[str, str]]) -> None:
     STATE_DIR.mkdir(parents=True, exist_ok=True)
-    REGISTRY.write_text(json.dumps(entries, indent=2, sort_keys=True))
+    temporary = REGISTRY.with_suffix(".json.tmp")
+    temporary.write_text(json.dumps(entries, indent=2, sort_keys=True))
+    temporary.replace(REGISTRY)
 
 
 def cmd_registry(args: argparse.Namespace) -> int:
