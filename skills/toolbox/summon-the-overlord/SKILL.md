@@ -18,7 +18,7 @@ disable-model-invocation: true
 
 # Summon the overlord
 
-**Explicit invocation only.** A pass merges pull requests, which cannot be undone by a resolver.
+**Explicit invocation only.** A merge cannot be undone by a resolver.
 Where `disable-model-invocation` is ignored, this paragraph is the rule.
 
 ## You are the overlord now
@@ -46,7 +46,7 @@ status you can read, and never into your own pane.
 `$SKILL_DIR` is notation, not a set variable: this skill's directory, the one holding this `SKILL.md`.
 Every fact and every ordering decision comes from the `overlord` binary: run it, read its
 output, act on it. Never re-derive what it computed, and never carry a list of handled items into the
-next pass.
+next decision.
 
 ## Start: name yourself, then wait
 
@@ -57,58 +57,46 @@ herdr workspace rename "$HERDR_WORKSPACE_ID" "👁 OVERLORD"
 herdr pane rename "$HERDR_PANE_ID" "👁 OVERLORD"
 ```
 
-Nothing else belongs to the start: no table, no `pass`, no `preflight`, no `rename`, no plan inject
-or approve, no merge, no prune, no watcher, no workspace or agent opened, adopted, resumed or
-restarted, nothing typed into a pane, no minion prompted. `rename` skips a workspace whose label
-names `OVERLORD`, so these two commands are also what keeps this session out of its own relabel
-pass.
-
 The mail route is the project `$XDG_STATE_HOME/summon-the-overlord` (`~/.local/state/…` by
 default), agent `PinkAnchor`: minion reports land there. Nothing reads it at the start.
 
+Then the watcher:
+
+```bash
+overlord watch --detach
+```
+
+`watcher already running (pid N)` is the converged answer, not a failure: the watcher is up, carry
+on.
+
+It belongs to the ceremony because it is what decides when there is work: it sweeps every 120 s and
+prompts this pane once per newly stalled minion, so a minion that finishes, blocks or dies reaches
+the overlord without polling.
+
+Nothing else belongs to the start: no table, no `preflight`, no `rename`, no plan inject or approve,
+no merge, no prune, no workspace or agent opened, adopted, resumed or restarted, nothing typed into
+another pane, no minion prompted.
+
 Then wait for the user's instruction. Nothing starts before it.
 
-## Run a pass
+## One fact at a time
 
-```bash
-overlord pass             # the whole pass, in one process
-overlord pass --dry-run   # the same report, changing nothing
-```
-
-`pass` never opens a session: run it when the user asks for a pass, or when a decision needs the
-whole realm in one process. It prints every table — preflight, inventory, mode, order, plans,
-rename, stalls — then does every step that needs no judgement: the plan keys (`--inject --approve`),
-`rename --apply`, the merge of each ready PR in the printed order as the account that reaches its
-repository, and `prune --apply`. It ends with `## inbox`, the mail route, then `## ask`: the prompt
-each minion still owes, already worded, one `herdr agent prompt <pane> "…"` line each.
-
-That section is the model's whole job: run those lines, decide each stall, then read the tables for
-what a failure means. Never invent a prompt the script already worded.
-
-Each step runs alone when one answer is needed:
-
-```bash
-overlord inventory   # one row per worktree
-overlord mode        # which mode each worktree is in
-overlord order       # merge plan for the open PRs
-overlord plans --inject --approve
-overlord rename --apply
-overlord review      # ocr over each PR diff; the artifact gates merges
-overlord watch       # the stall table
-overlord status      # 0 when nothing is landable
-overlord prune --apply
-```
+Nothing runs a cycle for you. Read a table only when you need the fact it holds — `inventory`, `mode`,
+`order`, `plans`, `rename`, `watch --once`, `status` — then act on the row you read: `spawn` a
+minion, `herdr agent prompt` one, `review` a diff, merge a ready PR in `order`'s order with the
+recipe below, `prune --apply` a merged worktree. Every command is explicit and chosen; none of them
+does the rest.
 
 `--repo PATH` (repeatable) and `--base BRANCH` (default `main`) go before the subcommand:
-`overlord --repo PATH order`; `spawn` also takes them after. With no `--repo`, a pass covers the
-current directory when it is a checkout, every path in the ownership registry, and every repository
-open in herdr.
+`overlord --repo PATH order`; `spawn` also takes them after. With no `--repo`, every command covers
+the current directory when it is a checkout, every path in the ownership registry, and every
+repository open in herdr.
 
 `preflight --refresh` re-checks the dependencies and stores the verdict in
 `~/.overlord/config.yaml`; `--apply` also installs what brew can. A stored `ok` outlives a revoked
 token — the GitHub API says so on the first request. `gh auth login` needs a human.
 
-## Realm: what a pass sees
+## Realm: what a command sees
 
 A repository enters the realm when you name it with `--repo`, adopt it, spawn a job in it, or hold it
 open in herdr. No directory is scanned for others: anything outside that set is invisible to every
@@ -117,10 +105,10 @@ command, `order` and `status` included, and `prune` deletes only what the regist
 A target is a path, not a repo under this directory: another disk is fine, and `spawn --dest DIR`
 puts a new worktree where the job belongs instead of `~/.herdr/worktrees/<repo>`.
 
-A directory with no git is still a target: `adopt` registers it and the pass keeps it in the
-inventory with its VCS facts off (`branch -`, zero ahead, no PR). Merge, rebase and readiness do not
-apply to it, `status` never counts it as landable, and `prune` never removes it; rename, review and
-plans keep working, since they only need herdr and the pane.
+A directory with no git is still a target: `adopt` registers it, and `inventory` lists it with its
+VCS facts off (`branch -`, zero ahead, no PR). Merge, rebase and readiness do not apply to it,
+`status` never counts it as landable, and `prune` never removes it; `rename`, `review` and `plans`
+keep working, since they only need herdr and the pane.
 
 Compatibility is the only other limit: git gives the facts, `gh` the pull request, and herdr in
 `HERDR_ENV=1` presses keys and reads screens. Where herdr is absent those steps are reported as
@@ -183,10 +171,10 @@ overlord adopt wRC /path/to/checkout   # workspace ids or paths
 overlord registry --rename-list        # what it now owns
 ```
 
-`adopt` adds existing workspaces or checkouts to the ownership registry so the pass renames, reviews
-and prunes them like its own; `--remove` gives one back. Ownership is never inferred from a label or
-a branch: `$XDG_STATE_HOME/summon-the-overlord/worktrees.json` is the only source, and a corrupt registry
-is an error, not an empty list.
+`adopt` adds existing workspaces or checkouts to the ownership registry so `rename`, `review` and
+`prune` treat them like its own; `--remove` gives one back. Ownership is never inferred from a label
+or a branch: `$XDG_STATE_HOME/summon-the-overlord/worktrees.json` is the only source, and a corrupt
+registry is an error, not an empty list.
 
 Adoption is a takeover, prune included: the herdr workspace holding that path is closed, a `working`
 agent with it, and the path reopens as a workspace of its own below the overlord
@@ -204,7 +192,7 @@ line of the committed `PLAN.md` is `<!-- hardened: <sha of the plan commit> -->`
 the commit holding exactly this plan text. A marker naming an older commit is stale, and the plan
 is unhardened again.
 
-|action|meaning|what the pass does|
+|action|meaning|what you run|
 |---|---|---|
 |`harden`|plan committed, marker absent or stale|`--inject` types `/skill:harden-plan` into that pane|
 |`approve`|plan committed and its marker is current|`--approve` presses `1`: run the plan and drop the current context|
@@ -221,8 +209,8 @@ the `worktree` column is a PR to adopt a worktree for, never one to skip. The `a
 gh login that reaches that repository; a command that omits it acts as the wrong login and 404s.
 
 Ordering exists only to minimise conflicts: **every open PR of the realm ends merged.** One not
-`ready` yet is a job for the next pass, never a candidate to abandon. `pass` merges them itself; by
-hand:
+`ready` yet is a job for the next decision, never a candidate to abandon. You merge them, in the
+printed order:
 
 ```bash
 GH_TOKEN="$(gh auth token --user <account>)" gh pr merge <n> -R <slug> --squash --delete-branch
@@ -232,23 +220,21 @@ GH_TOKEN="$(gh auth token --user <account>)" gh pr merge <n> -R <slug> --squash 
 
 ## Ask the owning agent
 
-Never edit another agent's branch. `pass` prints the prompt each worktree owes, already worded: run
-those lines. Anything it cannot word — a defect found by `review`, a dialog an agent owns — is one
-instruction per message:
+Never edit another agent's branch. Whatever a table shows as owed — a harden run, a fix, a rebase,
+a defect found by `review`, a dialog an agent owns — is one instruction per message:
 
 ```bash
 herdr agent prompt <pane_id> "<instruction>"
 ```
 
 The prompt returns once delivered; the report arrives by mail, at the route the start step named.
-`pass` prints that route too, as `## inbox`, one `#mail<TAB><project><TAB><agent>` line. Once per
-session, `ensure_project(human_key "$XDG_STATE_HOME/summon-the-overlord")` then
+Once per session, `ensure_project(human_key "$XDG_STATE_HOME/summon-the-overlord")` then
 `register_agent(project_key …, name "PinkAnchor", program "omp", model "overlord",
-task_description "overlord")`. At the start of every pass, `fetch_inbox(project_key …, agent_name
-"PinkAnchor", unread_only true, include_bodies true)`. A subject beginning `<mN> DONE` is that
-minion's report, and `<mN> BLOCKED` one that needs your decision; either replaces asking the minion
-for a status. If the mail tools are missing or the server refuses, say so once and carry on from the
-tables; never retry in a loop and never fall back to prompting a minion for its status.
+task_description "overlord")`. Read the inbox when a report is due: `fetch_inbox(project_key …,
+agent_name "PinkAnchor", unread_only true, include_bodies true)`. A subject beginning `<mN> DONE` is
+that minion's report, and `<mN> BLOCKED` one that needs your decision; either replaces asking the
+minion for a status. If the mail tools are missing or the server refuses, say so once and carry on
+from the tables; never retry in a loop and never fall back to prompting a minion for its status.
 
 Conflicts: send `prompts/rebase.md` with `oldHead` and `newBase`, then gate and
 `git push --force-with-lease`. Defects: `prompts/review.md`. An agent blocked on a dialog owns it:
@@ -296,9 +282,12 @@ beside a workspace is herdr's status icon for that workspace's agent; the overlo
 because it watches and does not build. The overlord is the session running this skill, never a
 spawned agent and never an extra pane, and it is the start step that names it `👁 OVERLORD` from
 `HERDR_PANE_ID` and `HERDR_WORKSPACE_ID`, with no step and no title. `rename` skips any workspace
-whose label names `OVERLORD`, so no pass relabels it.
+whose label names `OVERLORD`, so `rename` never relabels it.
 
 ## Stalls are decisions
+
+`watch --once` prints one sweep and exits; `--stop` ends the watcher the start step left running;
+`--interval N` changes that watcher's cadence.
 
 A minion whose herdr state is `idle` while its step still implies work is stalled: `HRD`, `BUILD`,
 `REV`, `REB`, `MRG`. `PLAN` and `DONE` while idle are normal. A stall row carries name, step, title,
@@ -318,5 +307,5 @@ exits 1 while work is in flight.
 
 ## Report
 
-One table: path, branch, PR, step, action this pass, next step. Name every blocker exactly.
+One table: path, branch, PR, step, action taken, next step. Name every blocker exactly.
 Answers are prose, tables and mermaid, never JSON.
