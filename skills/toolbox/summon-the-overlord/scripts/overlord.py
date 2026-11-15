@@ -794,8 +794,9 @@ def _collect(repos: list[Path], base: str) -> list[Worktree]:
                 agent_status=by_ws.get(workspace, ("unknown", "-"))[0] if workspace else "unknown",
                 last_subject=run(["git", "-C", str(path), "log", "-1", "--format=%s"]),
                 last_commit_at=run(["git", "-C", str(path), "log", "-1", "--format=%cI"]),
-                checks=(shared(("checks", slug, pull.number), lambda: github.checks_green(slug, pull.number, pull.sha)[1] or "green")
-                        if pull and pull.state == "OPEN" else "none"),
+                # checks are one GitHub request per PR: `check_green` asks on first use, so
+                # status, inventory and prune pay nothing for a fact they never read
+                checks="",
             ))
     return rows
 
@@ -934,6 +935,10 @@ def order_plan(args: argparse.Namespace) -> list[tuple[int, str, PullRequest, bo
                 blockers.append("unreviewed: ocr missing")
             elif review != "current":
                 blockers.append(f"unreviewed: {review}")
+            # the same REVIEWING gate `step_for` holds a PR at REV with: a pass must not merge
+            # the PR a minion is still reviewing
+            if pull_marker(pull) == "REVIEWING":
+                blockers.append("reviewing")
             if pull.base in by_head:
                 blockers.append(f"stacked on {pull.base}")
             plan.append(
@@ -1017,19 +1022,28 @@ def short_title(wt: Worktree) -> str:
 
 
 def check_green(wt: Worktree) -> bool:
-    """Green means every check run on the PR head succeeded: the fact collect already read."""
+    """Green means every check run on the PR head succeeded; fetched on first use, once a pass."""
+    if not wt.pull or wt.pull.state != "OPEN":
+        return False
+    if not wt.checks:
+        wt.checks = shared(
+            ("checks", wt.slug, wt.pull.number, wt.pull.sha),
+            lambda: shared("github", Github).checks_green(wt.slug, wt.pull.number, wt.pull.sha)[1] or "green",
+        )
     return wt.checks == "green"
 
 
-def review_marker(wt: Worktree) -> str:
+def pull_marker(pull: PullRequest) -> str:
     """Whichever exact marker line comes last in the PR body: REVIEWING or REVIEW_CLEAR."""
-    if not wt.pull:
-        return ""
     found = ""
-    for line in wt.pull.body.splitlines():
+    for line in pull.body.splitlines():
         if line.strip() in {"REVIEWING", "REVIEW_CLEAR"}:
             found = line.strip()
     return found
+
+
+def review_marker(wt: Worktree) -> str:
+    return pull_marker(wt.pull) if wt.pull else ""
 
 
 def step_for(wt: Worktree, proposed: bool, hardened: bool) -> str:
@@ -1347,8 +1361,19 @@ def cmd_review(args: argparse.Namespace) -> int:
             if wt.pane in {"-", ""}:
                 # a prompt addressed to nobody would read as sent; `asks` skips the same way
                 continue
-            text_ = f"{level.upper()}: {message} (PR #{pull.number}, {wt.slug})"
-            print(f"herdr agent prompt {shlex.quote(wt.pane)} {shlex.quote(text_)}")
+            # argv, one shell word per shlex.quote: the message comes from an untrusted diff, so
+            # no character of it may ever reach a shell unquoted
+            argv = ["herdr", "agent", "prompt", wt.pane,
+                    f"{level.upper()}: {strip_control(message)} (PR #{pull.number}, {wt.slug})"]
+            print(" ".join(shlex.quote(word) for word in argv))
+
+CONTROL_RE = re.compile(r"[\x00-\x1f\x7f]")
+
+
+def strip_control(text: str) -> str:
+    """One line, no control bytes: review text is untrusted and ends up in a printed command."""
+    return CONTROL_RE.sub(" ", text).strip()
+
 
 
 
@@ -1460,7 +1485,7 @@ def stall_rows(args: argparse.Namespace) -> list[dict]:
             "commit_age": seconds_since(wt.last_commit_at),
             "dirty": wt.dirty,
             "pr": f"#{pull.number} {pull.state} {pull.mergeable}" if pull else "none",
-            "checks": wt.checks,
+            "checks": wt.checks or ("none" if not pull or pull.state != "OPEN" else ("green" if check_green(wt) else "not green")),
             "question": "yes" if IDLE_RE.match(tail) else "no",
             # the label verdict is evidence for the overlord's decision, never a rename trigger,
             # and it costs nothing unless a stall exists: no stall, no classifier call

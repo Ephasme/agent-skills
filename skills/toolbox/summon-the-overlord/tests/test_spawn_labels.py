@@ -660,5 +660,49 @@ class SecondReviewTests(unittest.TestCase):
                 o.cmd_review(argparse.Namespace(repo=[Path("/repo")], base="main"))
             self.assertEqual(o.review_state("o/n", pull), "missing")
 
+    def test_a_review_finding_can_never_execute_a_command(self):
+        """HIGH 1: review text is untrusted but is printed as a line the overlord runs."""
+        marker = Path(tempfile.mkdtemp()) / "pwned"
+        hostile = f"bug $(touch {marker}) and `touch {marker}` done"
+        with tempfile.TemporaryDirectory() as state:
+            review_dir = Path(state) / "review"
+            review_dir.mkdir(parents=True)
+            pull = o.PullRequest(number=13, state="OPEN", mergeable="MERGEABLE", merge_state="CLEAN",
+                                 draft=False, files=1, sha="c" * 40, head="h")
+            wt = o.Worktree(path=Path("/wt"), repo=Path("/repo"), branch="b", dirty=0, ahead=1,
+                            upstream="origin/b", slug="o/n", pull=pull, pane="p")
+            with patch.object(o, "REVIEW_DIR", review_dir), patch.object(o, "ocr_present", return_value=True), patch.object(
+                o, "collect", return_value=[wt]
+            ), patch.object(o, "plan_state", return_value=(False, False)), patch.object(
+                o, "step_for", return_value="REV"
+            ), patch.object(o, "run", return_value=""), patch.object(o, "ok", return_value=True), patch.object(
+                o, "findings", return_value=[("high", hostile)]
+            ), patch("sys.stdout", new_callable=io.StringIO) as out:
+                o.cmd_review(argparse.Namespace(repo=[Path("/repo")], base="main"))
+        line = next(row for row in out.getvalue().splitlines() if row.startswith("herdr agent prompt"))
+        stub = Path(tempfile.mkdtemp())
+        (stub / "herdr").write_text("#!/bin/sh\nprintf '%s\\n' \"$@\" > " + str(stub / "args") + "\n")
+        (stub / "herdr").chmod(0o755)
+        subprocess.run(["/bin/sh", "-c", line], env={**os.environ, "PATH": f"{stub}:{os.environ['PATH']}"}, check=False)
+        self.assertFalse(marker.exists(), "a finding executed a command")
+        self.assertIn("$(", (stub / "args").read_text())
+
+    def test_order_plan_holds_a_pr_under_review_out_of_the_merge(self):
+        """HIGH 2: a pass must not merge the PR its minion is still reviewing."""
+        pull = o.PullRequest(number=13, state="OPEN", mergeable="MERGEABLE", merge_state="CLEAN",
+                             draft=False, files=1, sha="d" * 40, head="b", base="main")
+        pull.body = "Looks fine\nREVIEWING\n"
+        with patch.object(o, "realm_repos", return_value=[Path("/repo")]), patch.object(
+            o, "repo_slug", return_value="o/n"
+        ), patch.object(o, "worktree_paths", return_value=[]), patch.object(
+            o, "ocr_present", return_value=True
+        ), patch.object(o, "review_state", return_value="current"), patch.object(o, "Github") as github:
+            github.return_value.open_pulls.return_value = [pull]
+            github.return_value.with_paths.side_effect = lambda _slug, found: found
+            github.return_value.checks_green.return_value = (True, "")
+            plan = o.order_plan(argparse.Namespace(repo=[], base="main"))
+        self.assertFalse(plan[0][3])
+        self.assertIn("reviewing", plan[0][4])
+
 if __name__ == "__main__":
     unittest.main()
