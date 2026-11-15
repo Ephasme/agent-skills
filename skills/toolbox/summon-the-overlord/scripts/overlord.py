@@ -66,8 +66,11 @@ CLASSIFIER_TIMEOUT = 30
 
 def model_policy() -> tuple[list[str], str]:
     models = read_yaml(CONFIG_FILE, "config").get("models") or {}
+    if not isinstance(models, dict):
+        # a hand-edited list instead of a mapping must not crash spawn, models or resume
+        models = {}
     allowed = [str(name) for name in (models.get("allowed") or CLASSIFIER_MODELS)]
-    default = str(models.get("default") or allowed[0])
+    default = str(models.get("default") or (allowed[0] if allowed else WORKER_MODEL))
     return allowed, default
 
 
@@ -245,13 +248,16 @@ def enter_plan_mode(pane: str) -> bool:
     A chord sent while the shell is still starting is swallowed, hence the retry: `spawn` must
     never hand feat work over in normal mode, where the minion implements before any plan.
     """
+    sent = False
     for _ in range(10):
         if "plan mode" in run(
             ["herdr", "pane", "read", pane, "--source", "recent", "--lines", "40"]
         ).lower():
             return True
-        # toggle only once plan mode is absent here: a blind chord on a slow banner turns it off
-        ok(["herdr", "agent", "send-keys", pane, PLAN_TOGGLE])
+        # one chord, then only watch: a second chord on a slow banner turns plan mode back off,
+        # which is the failure this loop exists to prevent
+        if not sent and ok(["herdr", "agent", "send-keys", pane, PLAN_TOGGLE]):
+            sent = True
         time.sleep(1)
     return False
 
@@ -351,8 +357,8 @@ def cmd_adopt(args: argparse.Namespace) -> int:
         print(f"{target}\t{path}\t{branch}\tadopted\t{relocate(path, places, agents, realm)}")
     if adopted:
         save_registry(entries)
-    print(f"\nowned worktrees: {len(entries)}")
-    return 0 if adopted or entries else 1
+    print(f"\nowned worktrees: {len([key for key in entries if key != 'next_name'])}")
+    return 0 if adopted or len(entries) > (1 if "next_name" in entries else 0) else 1
 
 
 def cmd_registry(args: argparse.Namespace) -> int:
@@ -974,13 +980,11 @@ def plan_hardened(path: Path) -> bool:
     return bool(shown) and shown == "\n".join(lines[:-1]).strip()
 
 
-def plan_state(wt: Worktree) -> tuple[bool, bool, str]:
-    proposed = (wt.path / PLAN_FILE).is_file()
-    hardened = plan_hardened(wt.path)
-    text = ""
-    if wt.pane not in {"-", ""}:
-        text = run(["herdr", "pane", "read", wt.pane, "--source", "recent", "--lines", "300"])
-    return proposed, hardened, text
+def plan_state(wt: Worktree) -> tuple[bool, bool]:
+    """(proposed, hardened), memoised: two git calls per worktree per table otherwise."""
+    return shared(("plan_state", str(wt.path.resolve())), lambda: (
+        (wt.path / PLAN_FILE).is_file(), plan_hardened(wt.path),
+    ))
 
 
 def short_title(wt: Worktree) -> str:
@@ -1114,10 +1118,10 @@ def cmd_mode(args: argparse.Namespace) -> int:
     print("#path\tmode\tstep\tevidence")
     overall = "ask"
     for wt in collect(args.repo, args.base):
-        proposed, hardened, pane_text = plan_state(wt)
-        text = recent_text(wt, args) + " " + pane_text
-        mode, chosen = pick_mode(wt, text, proposed)
-        step = step_for(wt, proposed, hardened, pane_text)
+        proposed, hardened = plan_state(wt)
+        pane_text = run(["herdr", "pane", "read", wt.pane, "--source", "recent", "--lines", "300"]) if wt.pane not in {"-", ""} else ""
+        mode, chosen = pick_mode(wt, recent_text(wt, args) + " " + pane_text.lower(), proposed)
+        step = step_for(wt, proposed, hardened)
         if mode != "ask" and step in {"IDLE", "DONE"}:
             step = chosen
         if mode == "feat" and overall in {"ask", "fast", "hotfix"}:
@@ -1179,7 +1183,7 @@ def cmd_rename(args: argparse.Namespace) -> int:
         workspace = label_self(own_pane) if args.apply or args.label_self else own_workspace()
         print(f"self\t{workspace or '-'}\t{own_pane}\t-\t-\t👁\t👁 OVERLORD")
     for wt in collect(args.repo, args.base):
-        proposed, hardened, _text = plan_state(wt)
+        proposed, hardened = plan_state(wt)
         step = step_for(wt, proposed, hardened)
         symbol = STEP_STYLE.get(step, ("•", "#888888"))[0]
         title = wt.title or short_title(wt)
@@ -1232,27 +1236,41 @@ def review_state(slug: str, pull: PullRequest) -> str:
 
 
 def severities(text: str) -> dict[str, int]:
-    """Findings per severity, from the review's own `"severity": "<level>"` fields."""
+    """Findings per severity: ocr writes `[bug · high]` in text and `"severity": "high"` in JSON."""
+    marks = re.findall(r'"severity"\s*:\s*"([a-z]+)"', text.lower())
+    marks += [level.lower() for level in re.findall(r"· (critical|high|medium|low)\]", text)]
     counts = {level: 0 for level in SEVERITIES}
-    for level in re.findall(r'"severity"\s*:\s*"([a-z]+)"', text.lower()):
+    for level in marks:
         if level in counts:
             counts[level] += 1
     return counts
 
 
 def findings(text: str) -> list[tuple[str, str]]:
-    """(severity, message) per finding, so each defect routes as one instruction."""
-    return [
+    """(severity, message) per finding, so each defect routes as one instruction.
+
+    ocr's own config decides text or JSON, so both shapes are read: JSON pair fields, and one
+    `[type · severity]` block per comment in text mode.
+    """
+    out = [
         (level.lower(), message.strip()[:300])
         for level, message in re.findall(
             r'"severity"\s*:\s*"([a-zA-Z]+)"[^}]*?"(?:message|title|body)"\s*:\s*"([^"]*)"', text
         )
         if level.lower() in SEVERITIES
     ]
+    for block in re.split(r"^─── ", text, flags=re.M)[1:]:
+        mark = re.search(r"· (critical|high|medium|low)\]", block)
+        body = block.split("\n", 1)[1] if "\n" in block else block
+        body = re.sub(r"^\[[^\]]*\]\s*", "", body)
+        if mark and body.strip():
+            out.append((mark.group(1).lower(), " ".join(body.split())[:300]))
+    return out
 
 
 def ocr_present() -> bool:
-    return bool(run(["which", "ocr"]))
+    """Memoised: a pass asks once per PR, and `which` is a fork each time."""
+    return bool(shared("ocr_present", lambda: run(["which", "ocr"])))
 
 
 def cmd_review(args: argparse.Namespace) -> int:
@@ -1264,7 +1282,7 @@ def cmd_review(args: argparse.Namespace) -> int:
     print("#repository\tpr\thead\tartifact\texit\tcritical\thigh\tmedium\tlow\treviewed\tstep")
     routed: list[str] = []
     for wt in collect(args.repo, args.base):
-        proposed, hardened, _text = plan_state(wt)
+        proposed, hardened = plan_state(wt)
         step = step_for(wt, proposed, hardened)
         if step not in {"REV", "MRG"}:
             continue
@@ -1282,10 +1300,13 @@ def cmd_review(args: argparse.Namespace) -> int:
             "--from", f"origin/{args.base}", "--to", pull.sha,
             "--repo", str(wt.path), "--output", str(artifact),
         ]
+        # a failed run must leave no marker: the previous artifact covers an older commit, and
+        # re-stamping it with the new sha would pass the gate on evidence about another head
+        artifact.unlink(missing_ok=True)
         code = 0 if ok(command, timeout=1800) else 1
         text = artifact.read_text(errors="replace") if artifact.exists() else ""
         counts = severities(text)
-        if artifact.exists():
+        if code == 0 and artifact.exists():
             artifact.write_text(f"<!-- reviewed: {pull.sha} -->\n{text}")
         for level, message in findings(text):
             if level != "low" and message:
@@ -1403,11 +1424,12 @@ def stall_rows(args: argparse.Namespace) -> list[dict[str, str]]:
     for wt in collect(args.repo, args.base):
         if wt.agent_status != "idle":
             continue
-        proposed, hardened, _text = plan_state(wt)
+        proposed, hardened = plan_state(wt)
         step = step_for(wt, proposed, hardened)
         if step not in STALLED_STEPS:
             continue
         tail = last_line(wt.pane)
+        verdict, _reason = classify(step, tail)
         pull = wt.pull
         rows.append({
             "name": wt.name,
@@ -1423,6 +1445,9 @@ def stall_rows(args: argparse.Namespace) -> list[dict[str, str]]:
             "pr": f"#{pull.number} {pull.state} {pull.mergeable}" if pull else "none",
             "checks": wt.checks,
             "question": "yes" if IDLE_RE.match(tail) else "no",
+            # the label verdict is evidence for the overlord's decision, never a rename trigger,
+            # and it costs nothing unless a stall exists: no stall, no classifier call
+            "label": verdict,
             "tail": tail or "-",
             "pane": wt.pane,
         })
@@ -1431,11 +1456,11 @@ def stall_rows(args: argparse.Namespace) -> list[dict[str, str]]:
 
 def show_stalls(args: argparse.Namespace) -> list[dict]:
     rows = stall_rows(args)
-    print("#name\tstep\ttitle\tidle_seconds\tlast_commit\tcommit_age\tdirty\tpr\tchecks\tquestion\ttail")
+    print("#name\tstep\ttitle\tidle_seconds\tlast_commit\tcommit_age\tdirty\tpr\tchecks\tquestion\tlabel\ttail")
     for row in rows:
         print("\t".join(str(row[key]) for key in (
             "name", "step", "title", "idle_seconds", "last_commit", "commit_age",
-            "dirty", "pr", "checks", "question", "tail",
+            "dirty", "pr", "checks", "question", "label", "tail",
         )))
     return rows
 
@@ -1457,6 +1482,9 @@ def alert_new(rows: list[dict]) -> None:
         alerted = json.loads(ALERT_FILE.read_text())
     except (OSError, json.JSONDecodeError):
         # one truncated file must not break every later pass: the worst case is a repeat alert
+        alerted = {}
+    if not isinstance(alerted, dict):
+        # `[]` or `3` parses fine and then raises on `key in alerted`: same guard as a bad decode
         alerted = {}
     live = {f"{row['name']}:{row['step']}" for row in rows}
     for row in rows:
@@ -1703,7 +1731,7 @@ def cmd_spawn(args: argparse.Namespace) -> int:
         print("worktree creation failed", file=sys.stderr)
         return 1
     entries = registry()
-    register_entry(entries, str(path.resolve()), {"repo": str(repo), "branch": branch, "mode": args.mode, "task": args.task})
+    register_entry(entries, str(path.resolve()), {"repo": str(repo), "branch": branch, "mode": args.mode, "task": args.task}, slug)
     save_registry(entries)
     label = paint(step, entries[str(path.resolve())]["name"], birth)
     workspace, minion = open_workspace(path, model)

@@ -169,8 +169,10 @@ class StallTests(unittest.TestCase):
     def rows(self, step: str, status: str = "idle") -> list[dict]:
         args = argparse.Namespace(repo=[Path("/repo")], base="main")
         with patch.object(o, "collect", return_value=[self.worktree(step, status)]), patch.object(
-            o, "plan_state", return_value=(True, step == "BUILD", "")
-        ), patch.object(o, "step_for", return_value=step), patch.object(o, "last_line", return_value="done?"):
+            o, "plan_state", return_value=(True, step == "BUILD")
+        ), patch.object(o, "step_for", return_value=step), patch.object(
+            o, "last_line", return_value="done?"
+        ), patch.object(o, "classify", return_value=("not_sure", "empty pane")):
             return o.stall_rows(args)
 
     def test_only_unfinished_steps_that_are_idle_stall(self):
@@ -499,6 +501,110 @@ class ReviewFixTests(unittest.TestCase):
         self.assertEqual(o.title_slug("Brief:"), "untitled")
         self.assertEqual(o.title_slug("task brief"), "untitled")
 
+
+class SecondReviewTests(unittest.TestCase):
+    """One test per finding open-code-review raised on head 331e366."""
+
+    def test_a_failed_review_leaves_no_stale_artifact(self):
+        with tempfile.TemporaryDirectory() as state:
+            review_dir = Path(state) / "review"
+            path = review_dir / "o-n-13.txt"
+            review_dir.mkdir(parents=True)
+            path.write_text("<!-- reviewed: old -->\n[]\n")
+            pull = o.PullRequest(number=13, state="OPEN", mergeable="MERGEABLE",
+                                 merge_state="CLEAN", draft=False, files=1, sha="a" * 40, head="b")
+            wt = o.Worktree(path=Path("/wt"), repo=Path("/repo"), branch="b", dirty=0, ahead=1,
+                            upstream="origin/b", slug="o/n", pull=pull, pane="p")
+            args = argparse.Namespace(repo=[Path("/repo")], base="main")
+            with patch.object(o, "REVIEW_DIR", review_dir), patch.object(o, "ocr_present", return_value=True), patch.object(
+                o, "collect", return_value=[wt]
+            ), patch.object(o, "plan_state", return_value=(False, False)), patch.object(
+                o, "step_for", return_value="REV"
+            ), patch.object(o, "ok", return_value=False), patch("sys.stdout", new_callable=io.StringIO):
+                o.cmd_review(args)
+            self.assertEqual(o.reviewed_sha(path), "")
+
+    def test_models_survives_a_list_instead_of_a_mapping(self):
+        with tempfile.TemporaryDirectory() as home:
+            config = Path(home) / "config.yaml"
+            config.write_text("models:\n  - deepseek/deepseek-v4.1-flash-1017\n")
+            with patch.object(o, "CONFIG_FILE", config):
+                self.assertEqual(o.model_policy(), (o.CLASSIFIER_MODELS, o.CLASSIFIER_MODELS[0]))
+
+    def test_alert_state_rejects_a_non_mapping_json_value(self):
+        with tempfile.TemporaryDirectory() as state:
+            alert_file = Path(state) / "alerted.json"
+            alert_file.write_text("[]")
+            with patch.object(o, "ALERT_FILE", alert_file), patch.object(o, "STATE_DIR", Path(state)), patch.object(
+                o, "ok", return_value=True
+            ):
+                o.alert_new([{
+                    "name": "m1", "step": "BUILD", "title": "t", "idle_seconds": 1,
+                    "last_commit": "s", "commit_age": 1, "dirty": 0, "pr": "none",
+                    "checks": "none", "question": "no", "tail": "-",
+                }])
+            self.assertEqual(json.loads(alert_file.read_text()), {"m1:BUILD": ["m1", "BUILD"]})
+
+    def test_plan_mode_toggles_at_most_once(self):
+        answers = iter(["", "", "plan mode"])
+        with patch.object(o, "run", side_effect=lambda *_a, **_k: next(answers, "plan mode")), patch.object(
+            o, "ok", return_value=True
+        ) as keystroke, patch.object(o.time, "sleep", return_value=None):
+            self.assertTrue(o.enter_plan_mode("p"))
+        self.assertEqual(keystroke.call_count, 1)
+
+    def test_plan_state_is_memoised_and_returns_two_values(self):
+        wt = o.Worktree(path=Path("/wt"), repo=Path("/repo"), branch="b", dirty=0, ahead=0,
+                        upstream="none", slug="", pull=None)
+        o._MEMO.clear()
+        with patch.object(o, "plan_hardened", return_value=True) as git:
+            first = o.plan_state(wt)
+            second = o.plan_state(wt)
+        self.assertEqual(len(first), 2)
+        self.assertEqual(first, second)
+        self.assertEqual(git.call_count, 1)
+
+    def test_ocr_present_is_memoised(self):
+        o._MEMO.clear()
+        with patch.object(o, "run", return_value="/usr/bin/ocr") as probe:
+            self.assertTrue(o.ocr_present())
+            self.assertTrue(o.ocr_present())
+        self.assertEqual(probe.call_count, 1)
+
+    def test_severities_read_the_text_report_shape(self):
+        text = ("─── f.py:1-2 ───\n[bug · high] broken\n─── g.py:3-4 ───\n"
+                "[style · low] naming\n─── h.py:5 ───\n[perf · medium] slow\n")
+        self.assertEqual(o.severities(text), {"critical": 0, "high": 1, "medium": 1, "low": 1})
+        self.assertEqual([level for level, _ in o.findings(text)], ["high", "low", "medium"])
+
+    def test_spawn_passes_the_requested_title_to_the_registry(self):
+        with tempfile.TemporaryDirectory() as state:
+            recorded: dict = {}
+
+            def capture(entries, path, meta, title=""):
+                recorded["title"] = title
+                entries[path] = {"name": "m1", "title": o.title_slug(title)}
+
+            args = argparse.Namespace(mode="fast", task="Job: something else", title="my-slug",
+                                      model="m", repo=[Path("/repo")], dest="/targets", base="main",
+                                      dry_run=False)
+            with patch.object(o, "PROMPTS", Path(state)), patch.object(o, "REGISTRY", Path(state) / "w.json"), patch.object(
+                o, "STATE_DIR", Path(state)
+            ), patch.object(o, "resolve_model", return_value=("m", "")), patch.object(
+                o, "handover", return_value="h"
+            ), patch.object(o, "credential_note", return_value=""), patch.object(
+                o, "register_entry", side_effect=capture
+            ), patch.object(o, "save_registry"), patch.object(o, "ok", return_value=True), patch.object(
+                o, "open_workspace", return_value=("w", "p")
+            ), patch.object(o, "herdr_apply", return_value=True), patch(
+                "sys.stdout", new_callable=io.StringIO
+            ), patch("sys.stderr", new_callable=io.StringIO):
+                o.cmd_spawn(args)
+            self.assertEqual(recorded["title"], "my-slug")
+
+    def test_adopt_counts_paths_not_the_counter(self):
+        entries = {"next_name": 2, "/a": {"name": "m1"}}
+        self.assertEqual(len([key for key in entries if key != "next_name"]), 1)
 
 if __name__ == "__main__":
     unittest.main()
