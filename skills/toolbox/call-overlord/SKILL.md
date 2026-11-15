@@ -82,7 +82,7 @@ of the pipeline disappears. Nothing is guessed to fill the gap.
 "$SKILL_DIR/scripts/overlord.py" preflight --apply   # install what brew can
 ```
 
-It checks git, gh, uv, python 3.11+, the GitHub token and herdr's availability, and installs the
+It checks git, gh, uv, python 3.11+, the gh logins and herdr's availability, and installs the
 absent Homebrew packages. The verdict is stored under `preflight:` in `~/.overlord/config.yaml` and
 reprinted on later runs, so a pass never re-probes: `--refresh` and `--apply` are the only ways to
 check again, and deleting that block does the same. A stored `ok` outlives a revoked token — the
@@ -101,11 +101,14 @@ discovery:
     - ~/code/perso
 ```
 
-`discover` lists each checkout directly under a root — its slug, its base branch, and whether this
-token can read it — and writes `~/.overlord/caches/discovery.yaml`. That cache serves passes for
-24 h, then a rescan replaces it; `discover --refresh` rescans now, and `--root DIR` scans a root the
-config does not name. A repository the token cannot read stays listed as `gh no`, so its pull
-requests are named as invisible instead of missing.
+`discover` lists each checkout directly under a root — its slug, its base branch, and the `account`
+that reaches it — and writes `~/.overlord/caches/discovery.yaml`. Who's who is settled there, once
+per repository: every gh login is tried, the one that can push wins over one that can only read, and
+the login is stored beside the slug so a pass never probes it again. A cache written before accounts
+were stored is rescanned, not trusted. The cache serves passes for 24 h, then a rescan replaces it;
+`discover --refresh` rescans now, and `--root DIR` scans a root the config does not name. A
+repository no account can read stays listed as `gh no`, so its pull requests are named as invisible
+instead of missing.
 
 A repository enters the realm when you name it with `--repo`, adopt it, spawn a job in it, or hold
 it open in herdr — the last without an `adopt`. `order` plans that set alone and names the rest as
@@ -208,13 +211,15 @@ Never rewrite another agent's plan file; the harden skill carries its own revisi
 `order` prints the merge plan for the realm: clusters of PRs whose files intersect, smallest file set
 first, a stacked PR after its base, and the blockers that hold each one back. Every open PR of every
 realm repository is listed, checked out locally or not; the `worktree` column names the local
-checkout or `-`, which is a PR to adopt a worktree for, not one to skip. Merge in that printed order.
+checkout or `-`, which is a PR to adopt a worktree for, not one to skip. The `account` column names
+the gh login that reaches that repository: gh holds one active account per host, so a command that
+omits it acts as the wrong login and 404s. Merge in that printed order.
 
 Ordering exists only to minimise conflicts: **every open PR of the realm ends merged.** A PR that is
 not `ready` yet is a job for the next pass, never a candidate to abandon.
 
 ```bash
-gh pr merge <n> -R <slug> --squash --delete-branch
+GH_TOKEN="$(gh auth token --user <account>)" gh pr merge <n> -R <slug> --squash --delete-branch
 ```
 
 `--merge` only where squash is forbidden. A failed merge is not a merge: read the error, act on it.

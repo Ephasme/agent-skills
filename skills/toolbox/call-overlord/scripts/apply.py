@@ -42,9 +42,25 @@ def repo_lock(name):
         return REPO_LOCKS.setdefault(name or "", threading.Lock())
 
 
-def sh(cmd, cwd=None):
-    proc = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True)
+def sh(cmd, cwd=None, env=None):
+    proc = subprocess.run(
+        cmd, cwd=cwd, capture_output=True, text=True,
+        env={**os.environ, **env} if env else None,
+    )
     return proc.returncode, proc.stdout.strip(), proc.stderr.strip()
+
+
+def gh_token(slug):
+    """The token of the gh login that reaches slug, or "" when the resolver is unavailable.
+
+    Who's who is settled by overlord's discovery. A standalone run of this script has no
+    httpx, so it keeps the active account, as before.
+    """
+    try:
+        from overlord import credential
+    except ImportError:
+        return ""
+    return credential(slug)[1]
 
 
 def load_plan(spec):
@@ -100,7 +116,11 @@ def repo_slug(path):
 
 def open_prs(slug, branch):
     """PRs on this branch name in any state, or None when gh cannot answer."""
-    code, out, _ = sh(["gh", "pr", "list", "-R", slug, "--head", branch, "--state", "all", "--json", "number,state,url"])
+    token = gh_token(slug)
+    code, out, _ = sh(
+        ["gh", "pr", "list", "-R", slug, "--head", branch, "--state", "all", "--json", "number,state,url"],
+        env={"GH_TOKEN": token} if token else None,
+    )
     if code != 0:
         return None
     try:
