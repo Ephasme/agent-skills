@@ -193,7 +193,10 @@ title or newest commit, and reports the same step as pane metadata so the status
 |`MRG`|⤵|`#98c379`|PR open, waiting to merge|
 |`DONE`|✔|`#7f8c8d`|merged, ready to prune|
 
-The overlord's own dot is an eye: it watches, it does not build.
+The overlord's own dot is an eye: it watches, it does not build. The overlord is the session that
+runs this skill, never a spawned agent or an extra pane: label its own pane `👁 OVERLORD` (herdr
+`pane rename` + `pane report-metadata` with source `overlord`) and never create a second pane to
+hold the overlord.
 
 ## Mail instead of polling
 
