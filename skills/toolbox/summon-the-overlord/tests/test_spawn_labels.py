@@ -606,5 +606,24 @@ class SecondReviewTests(unittest.TestCase):
         entries = {"next_name": 2, "/a": {"name": "m1"}}
         self.assertEqual(len([key for key in entries if key != "next_name"]), 1)
 
+    def test_a_failed_run_after_a_good_one_leaves_the_gate_closed(self):
+        """The exact high finding: artifact from sha A, failing run on sha B, review_state missing."""
+        with tempfile.TemporaryDirectory() as state:
+            review_dir = Path(state) / "review"
+            path = review_dir / "o-n-13.txt"
+            review_dir.mkdir(parents=True)
+            path.write_text(f"<!-- reviewed: {'a' * 40} -->\nold findings\n")
+            pull = o.PullRequest(number=13, state="OPEN", mergeable="MERGEABLE", merge_state="CLEAN",
+                                 draft=False, files=1, sha="b" * 40, head="h")
+            wt = o.Worktree(path=Path("/wt"), repo=Path("/repo"), branch="b", dirty=0, ahead=1,
+                            upstream="origin/b", slug="o/n", pull=pull, pane="p")
+            with patch.object(o, "REVIEW_DIR", review_dir), patch.object(o, "ocr_present", return_value=True), patch.object(
+                o, "collect", return_value=[wt]
+            ), patch.object(o, "plan_state", return_value=(False, False)), patch.object(
+                o, "step_for", return_value="REV"
+            ), patch.object(o, "ok", return_value=False), patch("sys.stdout", new_callable=io.StringIO):
+                o.cmd_review(argparse.Namespace(repo=[Path("/repo")], base="main"))
+            self.assertEqual(o.review_state("o/n", pull), "missing")
+
 if __name__ == "__main__":
     unittest.main()

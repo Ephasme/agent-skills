@@ -1021,7 +1021,7 @@ def review_marker(wt: Worktree) -> str:
     return found
 
 
-def step_for(wt: Worktree, proposed: bool, hardened: bool, pane_text: str = "") -> str:
+def step_for(wt: Worktree, proposed: bool, hardened: bool) -> str:
     """Select step from plan commit marker, git and PR facts only."""
     if wt.pull and wt.pull.state == "MERGED":
         return "DONE" if wt.dirty == 0 else "BUILD"
