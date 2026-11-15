@@ -1805,7 +1805,7 @@ def cmd_spawn(args: argparse.Namespace) -> int:
 
     step = "PLAN" if args.mode == "feat" else "BUILD"
     name = f"m{registry().get('next_name', 1)}"
-    birth = title_slug(slug)
+    birth = title or title_slug(slug)
     preview = paint(step, name, birth)
     print(f"#worktree\t{path}\nbranch\t{branch}\nmode\t{args.mode}\nmodel\t{model}\ntitle\t{birth}")
     if args.dry_run:

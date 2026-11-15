@@ -763,7 +763,10 @@ class SecondReviewTests(unittest.TestCase):
 
     def test_a_validated_title_is_kept_verbatim(self):
         self.assertEqual(o.title_slug("fix"), "untitled")
-        self.assertEqual(o.title_slug("one-two-three-four-five"), "one-two-three-four")
+        self.assertIn("title\tfix", dry_run("feat", title="fix"))
+        self.assertIn(
+            "would run\therdr pane rename <pane> 🗺 PLAN m1 fix", dry_run("feat", title="fix")
+        )
 
     def test_a_scalar_allowed_list_does_not_become_characters(self):
         with tempfile.TemporaryDirectory() as home:
