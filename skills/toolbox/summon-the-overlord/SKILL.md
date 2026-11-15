@@ -10,8 +10,7 @@ description: >-
   travail des agents") or starts a job in one of four modes: feat, fast, hotfix or ask.
 compatibility: >-
   Requires git, gh and the `overlord` binary on PATH; merging needs an authenticated gh. herdr is
-  optional: it adds agent state, and it is the only way to press a key in a pane or to
-  receive an agent's own report.
+  optional: it adds agent state, and it is the only way to press a key in a pane.
 disable-model-invocation: true
 ---
 
