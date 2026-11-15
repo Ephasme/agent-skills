@@ -75,12 +75,34 @@ of the pipeline disappears. Nothing is guessed to fill the gap.
 
 ```bash
 "$SKILL_DIR/scripts/overlord.py" preflight           # ok/absent per dependency
+"$SKILL_DIR/scripts/overlord.py" preflight --refresh # check again, then store the verdict
 "$SKILL_DIR/scripts/overlord.py" preflight --apply   # install what brew can
 ```
 
 It checks git, gh, uv, python 3.11+, the GitHub token and herdr's availability, and installs the
-absent Homebrew packages. Two things it cannot finish alone: `gh auth login` needs a human, and the
-Agent Mail project needs the `ensure_project` call from the mail section below.
+absent Homebrew packages. The verdict is stored under `preflight:` in `~/.overlord/config.yaml` and
+reprinted on later runs, so a pass never re-probes: `--refresh` and `--apply` are the only ways to
+check again, and deleting that block does the same. A stored `ok` outlives a revoked token — the
+GitHub API says so on the first request. Two things preflight cannot finish alone: `gh auth login`
+needs a human, and the Agent Mail project needs the `ensure_project` call from the mail section below.
+
+
+## Discovery: only the roots you name
+
+A pass covers `--repo`, the ownership registry, and the repositories discovery found. Nothing is
+found until `~/.overlord/config.yaml` names the directories to look in:
+
+```yaml
+discovery:
+  roots:
+    - ~/code/perso
+```
+
+`discover` lists each checkout directly under a root — its slug, its base branch, and whether this
+token can read it — and writes `~/.overlord/caches/discovery.yaml`. That cache serves passes for
+24 h, then a rescan replaces it; `discover --refresh` rescans now, and `--root DIR` scans a root the
+config does not name. A repository the token cannot read stays listed as `gh no`, so its pull
+requests are named as invisible instead of missing.
 
 
 ## Jobs: pick a mode first
@@ -147,9 +169,11 @@ where the registry is written but nothing moves.
 "$SKILL_DIR/scripts/overlord.py" prune --apply              # 7. drop the landed worktrees
 ```
 
-Each subcommand takes `--repo PATH` (repeatable, default the current directory) and `--base BRANCH`
-(default `main`). Top-level flags precede the subcommand: `overlord.py --repo PATH order`. After
-it argparse rejects them, and `overlord.py order --repo PATH` errors with unrecognized arguments.
+Each subcommand takes `--repo PATH` (repeatable) and `--base BRANCH` (default `main`). With no
+`--repo`, a pass covers the current directory when it is a checkout, plus every registry and
+discovered repository. Top-level flags precede the subcommand: `overlord.py --repo PATH order`.
+`survey`, `labels`, `relabel` and `verify` are dispatched before argparse, so they take those global
+flags as well as their own.
 
 ## Plans outrank the merge queue
 
@@ -166,7 +190,9 @@ Never rewrite another agent's plan file; the harden skill carries its own revisi
 ## Order by touched files, and merge everything
 
 `order` prints the merge plan: clusters of PRs whose files intersect, smallest file set first, a
-stacked PR after its base, and the blockers that hold each one back. Merge in that printed order.
+stacked PR after its base, and the blockers that hold each one back. Every open PR of every
+repository in scope is listed, checked out locally or not; the `worktree` column names the local
+checkout or `-`, which is a PR to adopt a worktree for, not one to skip. Merge in that printed order.
 
 Ordering exists only to minimise conflicts: **every open PR ends merged.** A PR that is not `ready`
 yet is a job for the next pass, never a candidate to abandon.

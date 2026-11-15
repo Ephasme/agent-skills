@@ -1,7 +1,7 @@
 #!/usr/bin/env -S uv run --script
 # /// script
 # requires-python = ">=3.11"
-# dependencies = ["httpx>=0.27"]
+# dependencies = ["httpx>=0.27", "pyyaml>=6"]
 # ///
 """Overlord helpers for landing worktree pull requests.
 
@@ -27,6 +27,7 @@ only way to press a key in a pane.
 from __future__ import annotations
 
 import argparse
+import importlib
 import json
 import os
 import re
@@ -34,15 +35,22 @@ import subprocess
 import sys
 import time
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from pathlib import Path
 
 import httpx
+import yaml
 
 STOP_FILE = Path(os.environ.get("LAND_WORK_STOP", f"{os.environ.get('TMPDIR', '/tmp')}/land-work-stop"))
 IDLE_MINUTES = 20
 ACTIVITY_FILE = Path(os.environ.get("TMPDIR", "/tmp")) / "overlord-last-active"
 STATE_DIR = Path(os.environ.get("XDG_STATE_HOME", Path.home() / ".local" / "state")) / "call-overlord"
 REGISTRY = STATE_DIR / "worktrees.json"
+OVERLORD_DIR = Path(os.environ.get("OVERLORD_HOME", Path.home() / ".overlord"))
+CONFIG_FILE = OVERLORD_DIR / "config.yaml"
+CACHE_DIR = OVERLORD_DIR / "caches"
+DISCOVERY_CACHE = CACHE_DIR / "discovery.yaml"
+DISCOVERY_TTL_HOURS = 24
 
 
 def registry() -> dict[str, dict[str, str]]:
@@ -67,6 +75,107 @@ def save_registry(entries: dict[str, dict[str, str]]) -> None:
     temporary = REGISTRY.with_suffix(".json.tmp")
     temporary.write_text(json.dumps(entries, indent=2, sort_keys=True))
     temporary.replace(REGISTRY)
+
+
+def read_yaml(path: Path, what: str) -> dict:
+    """A YAML state file: empty when absent, an error when unreadable.
+
+    A corrupt config or cache never reads as empty: discovery would silently rescan, and
+    preflight would forget that it already ran.
+    """
+    if not path.exists():
+        return {}
+    try:
+        data = yaml.safe_load(path.read_text()) or {}
+    except (OSError, yaml.YAMLError) as error:
+        raise SystemExit(f"{what} unreadable ({path}): {error}")
+    if not isinstance(data, dict):
+        raise SystemExit(f"{what} is not a mapping ({path})")
+    return data
+
+
+def write_yaml(path: Path, data: dict) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_suffix(path.suffix + ".tmp")
+    temporary.write_text(yaml.safe_dump(data, sort_keys=False))
+    temporary.replace(path)
+
+
+def stamp() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def config_roots() -> list[Path]:
+    """The directories discovery may scan, named in config.yaml: none unless the file says so."""
+    section = read_yaml(CONFIG_FILE, "config").get("discovery") or {}
+    roots = section.get("roots") or []
+    return [Path(os.path.expanduser(str(root))) for root in roots if str(root).strip()]
+
+
+def scan_roots(roots: list[Path]) -> dict[str, dict]:
+    """Every git checkout directly under a root, or the root itself: path -> slug, base, gh.
+
+    A repository whose slug the token cannot read keeps gh false instead of disappearing:
+    an invisible remote is a fact the report has to name.
+    """
+    github = Github()
+    found: dict[str, dict] = {}
+    for root in roots:
+        candidates = [root, *sorted(root.iterdir())] if root.is_dir() else [root]
+        for candidate in candidates:
+            if not candidate.is_dir():
+                continue
+            toplevel = run(["git", "-C", str(candidate), "rev-parse", "--show-toplevel"])
+            if not toplevel:
+                continue
+            path = Path(toplevel).resolve()
+            if str(path) in found:
+                continue
+            slug = repo_slug(path)
+            head = run(["git", "-C", str(path), "symbolic-ref", "--short", "refs/remotes/origin/HEAD"])
+            readable = bool(slug) and github.readable(slug)
+            found[str(path)] = {"slug": slug, "base": (head or "origin/main").removeprefix("origin/"), "gh": readable}
+    return found
+
+
+def refresh_discovery(roots: list[Path]) -> dict[str, dict]:
+    """Rescan the roots and replace the cache: the only writer of discovery.yaml."""
+    repos = scan_roots(roots)
+    write_yaml(
+        DISCOVERY_CACHE,
+        {"generated_at": stamp(), "ttl_hours": DISCOVERY_TTL_HOURS, "roots": [str(root) for root in roots], "repos": repos},
+    )
+    return repos
+
+
+def cache_age(cache: dict) -> float | None:
+    """Seconds since the cache was generated, None when it carries no readable stamp."""
+    try:
+        then = datetime.strptime(str(cache.get("generated_at") or ""), "%Y-%m-%dT%H:%M:%SZ")
+    except ValueError:
+        return None
+    return (datetime.now(timezone.utc) - then.replace(tzinfo=timezone.utc)).total_seconds()
+
+
+def discovery(refresh: bool = False) -> dict[str, dict]:
+    """Repositories discovery knows: the cache while it is fresh, a rescan once it expired.
+
+    No roots in config.yaml means no discovery at all, so a pass covers --repo and the
+    registry alone until the file names a directory to look in.
+    """
+    roots = config_roots()
+    if not roots:
+        return {}
+    cache = read_yaml(DISCOVERY_CACHE, "discovery cache")
+    age = cache_age(cache)
+    ttl = float(cache.get("ttl_hours") or DISCOVERY_TTL_HOURS) * 3600
+    if refresh or age is None or age > ttl or cache.get("repos") is None:
+        return refresh_discovery(roots)
+    return cache.get("repos") or {}
+
+
+def discovered() -> list[Path]:
+    return [Path(path) for path in discovery() if Path(path).is_dir()]
 
 
 def own_workspace() -> str:
@@ -349,6 +458,10 @@ class Github:
             return []
         return [pull_from_json(raw) for raw in response.json()]
 
+    def readable(self, slug: str) -> bool:
+        """Whether this token can see the repository at all: what makes its PRs invisible."""
+        return self.client.get(f"{API}/repos/{slug}").status_code == 200
+
     def detail(self, slug: str, number: int) -> PullRequest | None:
         response = self.client.get(f"{API}/repos/{slug}/pulls/{number}")
         if response.status_code != 200:
@@ -401,11 +514,21 @@ class Worktree:
     agent: str = "-"
     pane: str = "-"
     vcs: bool = True
+    linked: bool = False
 
 
 def registry_repos() -> list[Path]:
     """Repositories of adopted worktrees, so a target outside --repo is still overseen."""
     return sorted({Path(meta["repo"]) for meta in registry().values() if meta.get("repo") and Path(meta["repo"]).is_dir()})
+
+
+def scope_repos(repos: list[Path]) -> list[Path]:
+    """Repositories a pass covers: those named, plus every registry and discovered repository."""
+    found: dict[Path, None] = {}
+    for repo in [*repos, *registry_repos(), *discovered()]:
+        if repo.is_dir():
+            found.setdefault(repo.resolve(), None)
+    return sorted(found)
 
 
 def collect(repos: list[Path], base: str) -> list[Worktree]:
@@ -414,7 +537,7 @@ def collect(repos: list[Path], base: str) -> list[Worktree]:
     rows: list[Worktree] = []
     seen: set[Path] = set()
     registry_entries = registry()
-    repos = repos + [r for r in registry_repos() if r not in repos]
+    repos = scope_repos(repos)
     for repo in repos:
         if not run(["git", "-C", str(repo), "rev-parse", "--git-dir"]):
             print(f"not a git repository: {repo}", file=sys.stderr)
@@ -462,6 +585,7 @@ def collect(repos: list[Path], base: str) -> list[Worktree]:
                     pull=github.branch_pulls(slug).get(branch) if slug else None,
                     agent=agent,
                     pane=pane,
+                    linked=path.resolve() != repo.resolve(),
                 )
             )
     return rows
@@ -469,7 +593,7 @@ def collect(repos: list[Path], base: str) -> list[Worktree]:
 
 def landable(wt: Worktree) -> str:
     """Empty when landed or empty; otherwise why it still holds work."""
-    if not wt.vcs:
+    if not wt.vcs or not wt.linked:
         return ""
     if wt.dirty:
         return "dirty"
@@ -530,7 +654,13 @@ def cmd_status(args: argparse.Namespace) -> int:
     if remaining:
         return 1
     idle_minutes = (time.time() - ACTIVITY_FILE.stat().st_mtime) / 60 if ACTIVITY_FILE.exists() else 1e9
-    return 0 if idle_minutes >= args.idle_minutes else 1
+    if idle_minutes >= args.idle_minutes:
+        return 0
+    print(
+        f"waiting\t{int(idle_minutes)}m idle of {args.idle_minutes}m: nothing landable, nothing in flight",
+        file=sys.stderr,
+    )
+    return 1
 
 
 def clusters(pulls: list[PullRequest]) -> dict[int, int]:
@@ -562,17 +692,18 @@ def stack_depth(pull: PullRequest, by_head: dict[str, PullRequest]) -> int:
 
 def cmd_order(args: argparse.Namespace) -> int:
     github = Github()
-    plan: list[tuple[int, str, PullRequest, bool, str, int, int]] = []
-    for repo in args.repo:
+    plan: list[tuple[int, str, PullRequest, bool, str, int, int, str]] = []
+    for repo in scope_repos(args.repo):
         slug = repo_slug(repo)
         if not slug:
             continue
-        branches = {
-            run(["git", "-C", str(path), "rev-parse", "--abbrev-ref", "HEAD"])
-            for path in worktree_paths(repo)
-        }
-        pulls = [pull for pull in github.open_pulls(slug) if pull.head in branches]
-        pulls = [pull for pull in (github.detail(slug, pull.number) for pull in pulls) if pull]
+        checkouts: dict[str, Path] = {}
+        for path in worktree_paths(repo):
+            branch = run(["git", "-C", str(path), "rev-parse", "--abbrev-ref", "HEAD"])
+            checkouts.setdefault(branch, path)
+        # every open pull request counts, checked out locally or not: one whose worktree was
+        # pruned is still work this pass owes, not a pull request to abandon silently
+        pulls = [pull for pull in (github.detail(slug, pull.number) for pull in github.open_pulls(slug)) if pull]
         groups = clusters(pulls)
         by_head = {pull.head: pull for pull in pulls}
         for pull in pulls:
@@ -590,7 +721,7 @@ def cmd_order(args: argparse.Namespace) -> int:
                 (
                     len(pull.paths), slug, pull, not blockers,
                     "; ".join(b for b in blockers if b), groups[pull.number],
-                    stack_depth(pull, by_head),
+                    stack_depth(pull, by_head), str(checkouts.get(pull.head, "-")),
                 )
             )
 
@@ -598,11 +729,11 @@ def cmd_order(args: argparse.Namespace) -> int:
     # smallest diff first, then PR number
     plan.sort(key=lambda row: (row[6], row[5], row[0], row[2].number))
 
-    print("#rank\trepo\tpr\tbranch\tbase\tfiles\tcluster\tready\tblockers")
-    for index, (_files, slug, pull, ready, blocker, cluster, _depth) in enumerate(plan, start=1):
+    print("#rank\trepo\tpr\tbranch\tbase\tfiles\tcluster\tworktree\tready\tblockers")
+    for index, (_files, slug, pull, ready, blocker, cluster, _depth, worktree) in enumerate(plan, start=1):
         print(
             f"{index}\t{slug}\t{pull.number}\t{pull.head}\t{pull.base}\t"
-            f"{len(pull.paths)}\t{cluster}\t{'yes' if ready else 'no'}\t{blocker or '-'}"
+            f"{len(pull.paths)}\t{cluster}\t{worktree}\t{'yes' if ready else 'no'}\t{blocker or '-'}"
         )
     return 0
 STOP_WORDS = {
@@ -818,7 +949,7 @@ def cmd_plans(args: argparse.Namespace) -> int:
 def cmd_prune(args: argparse.Namespace) -> int:
     print("#path\tbranch\tpr\taction")
     for wt in collect(args.repo, args.base):
-        if not wt.vcs:
+        if not wt.vcs or not wt.linked:
             continue
         if not wt.pull or wt.pull.state != "MERGED" or wt.dirty or wt.agent in {"working", "blocked"}:
             continue
@@ -848,45 +979,88 @@ DEPENDENCIES = (
 )
 
 
-def cmd_preflight(args: argparse.Namespace) -> int:
-    """Check every dependency and configuration this skill needs; install what is missing."""
+def preflight_rows() -> tuple[list[dict[str, str]], list[str]]:
+    """Every check this skill needs, as rows a stored verdict can reprint unchanged."""
+    rows: list[dict[str, str]] = []
     missing: list[str] = []
-    print("#check\tstate\tfix")
-
     for name, command, fix in DEPENDENCIES:
         present = bool(run(["which", command]))
-        print(f"{name}\t{'ok' if present else 'missing'}\t{fix}")
+        rows.append({"check": name, "state": "ok" if present else "missing", "fix": fix})
         if not present:
             missing.append(name)
-            if args.apply:
-                run(["brew", "install", name])
 
     version = run(["python3", "-c", "import sys; print('%d.%d' % sys.version_info[:2])"]) or "0.0"
     major, _, minor = version.partition(".")
     new_enough = int(major or 0) > 3 or (int(major or 0) == 3 and int(minor or 0) >= 11)
-    print(f"python3\t{version}\t{'ok' if new_enough else 'needs 3.11+: brew install python@3.13'}")
+    rows.append(
+        {"check": "python3", "state": version, "fix": "ok" if new_enough else "needs 3.11+: brew install python@3.13"}
+    )
     if not new_enough:
         missing.append(f"python{version}")
 
     if run(["which", "gh"]):
         authed = ok(["gh", "auth", "status"])
-        print(f"gh auth\t{'ok' if authed else 'not logged in'}\tgh auth login")
+        rows.append({"check": "gh auth", "state": "ok" if authed else "not logged in", "fix": "gh auth login"})
         if not authed:
             missing.append("gh-auth")
     else:
-        print("gh auth\tunknown\tinstall gh first")
+        rows.append({"check": "gh auth", "state": "unknown", "fix": "install gh first"})
 
     herdr = bool(run(["which", "herdr"])) and os.environ.get("HERDR_ENV") == "1"
-    print(f"herdr\t{'ok' if herdr else 'optional, absent'}\tnothing: git and gh cover the work")
-
-    print("agent mail\tmanual\tensure_project + register_agent from the skill body")
-    print(f"token\t{'ok' if github_token() else 'missing'}\tgh auth login, or export GITHUB_TOKEN")
-    if not github_token():
+    rows.append({"check": "herdr", "state": "ok" if herdr else "optional, absent", "fix": "nothing: git and gh cover the work"})
+    rows.append({"check": "agent mail", "state": "manual", "fix": "ensure_project + register_agent from the skill body"})
+    token = "ok" if github_token() else "missing"
+    rows.append({"check": "token", "state": token, "fix": "gh auth login, or export GITHUB_TOKEN"})
+    if token == "missing":
         missing.append("github-token")
+    return rows, missing
 
-    if missing and args.apply:
-        print(f"still missing after install: {', '.join(missing)}", file=sys.stderr)
+
+def cmd_preflight(args: argparse.Namespace) -> int:
+    """Check every dependency once, then reprint the stored verdict until --refresh."""
+    config = read_yaml(CONFIG_FILE, "config")
+    cached = config.get("preflight") or {}
+    if cached and not (args.refresh or args.apply):
+        print(f"#cached\t{cached.get('checked_at', '?')}\tpreflight --refresh to re-check")
+        for row in cached.get("rows") or []:
+            print(f"{row.get('check', '?')}\t{row.get('state', '?')}\t{row.get('fix', '')}")
+        return 0 if not cached.get("missing") else 1
+
+    if args.apply:
+        for name, command, _fix in DEPENDENCIES:
+            if not run(["which", command]):
+                run(["brew", "install", name])
+
+    rows, missing = preflight_rows()
+    print("#check\tstate\tfix")
+    for row in rows:
+        print(f"{row['check']}\t{row['state']}\t{row['fix']}")
+    config["preflight"] = {"checked_at": stamp(), "ok": not missing, "rows": rows, "missing": missing}
+    write_yaml(CONFIG_FILE, config)
+    print(f"#stored\t{CONFIG_FILE}\tpreflight --refresh to re-check", file=sys.stderr)
+    if missing:
+        print(f"missing: {', '.join(missing)}", file=sys.stderr)
     return 0 if not missing else 1
+
+
+def cmd_discover(args: argparse.Namespace) -> int:
+    """The repositories under the configured roots, and whether this token can read them."""
+    roots = [Path(os.path.expanduser(root)) for root in args.root] or config_roots()
+    if not roots:
+        print("#path\tslug\tbase\tgh")
+        print(f"no roots: add discovery.roots to {CONFIG_FILE}", file=sys.stderr)
+        return 0
+    cache = read_yaml(DISCOVERY_CACHE, "discovery cache")
+    age = cache_age(cache)
+    ttl = float(cache.get("ttl_hours") or DISCOVERY_TTL_HOURS) * 3600
+    stale = args.refresh or age is None or age > ttl or cache.get("repos") is None
+    repos = refresh_discovery(roots) if stale else (cache.get("repos") or {})
+    print("#path\tslug\tbase\tgh")
+    for path, meta in sorted(repos.items()):
+        print(f"{path}\t{meta.get('slug') or '-'}\t{meta.get('base') or '-'}\t{'yes' if meta.get('gh') else 'no'}")
+    state = "rescanned" if stale else f"fresh, {int((age or 0) // 60)}m of {int(ttl // 60)}m"
+    print(f"#cache\t{state}\t{DISCOVERY_CACHE}", file=sys.stderr)
+    return 0
 
 
 
@@ -899,7 +1073,7 @@ def cmd_spawn(args: argparse.Namespace) -> int:
         print("spawn needs --task", file=sys.stderr)
         return 2
 
-    repo = args.repo[0]
+    repo = args.repo[0] if args.repo else Path.cwd()
     slug = "-".join(word for word in re.split(r"[^a-z0-9]+", args.task.lower()) if word and word not in STOP_WORDS)[:60] or "job"
     branch = f"worktree/{slug}"
     path = Path(args.dest).expanduser() / slug if args.dest else Path.home() / ".herdr" / "worktrees" / repo.name / slug
@@ -923,15 +1097,41 @@ def cmd_spawn(args: argparse.Namespace) -> int:
 
 
 BRIDGED = {"survey": "survey", "labels": "labels", "relabel": "apply", "verify": "verify"}
+GLOBAL_FLAGS = ("--repo", "--base")
+
+
+def bridged(argv: list[str]) -> tuple[str, list[str]] | None:
+    """(module, its own argv) when a bridged command is asked for, global flags dropped.
+
+    The helpers keep their own flags and know nothing of --repo or --base, so those are
+    removed here. Reading only argv[0] missed every call that puts a global flag first.
+    """
+    rest: list[str] = []
+    skip = False
+    for token in argv:
+        if skip:
+            skip = False
+            continue
+        if token in GLOBAL_FLAGS:
+            skip = True
+            continue
+        if token.startswith(tuple(flag + "=" for flag in GLOBAL_FLAGS)):
+            continue
+        rest.append(token)
+    index = next((position for position, token in enumerate(rest) if not token.startswith("-")), None)
+    if index is None or rest[index] not in BRIDGED:
+        return None
+    return BRIDGED[rest[index]], rest[:index] + rest[index + 1:]
 
 
 def main(argv: list[str]) -> int:
-    # the rename helpers keep their own flags, so they are dispatched before argparse
-    # ever sees them: no REMAINDER quirks, no separator to remember
-    if argv and argv[0] in BRIDGED:
-        import importlib
-
-        return importlib.import_module(BRIDGED[argv[0]]).main(argv[1:])
+    # the helpers keep their own flags, so they are dispatched before argparse ever sees
+    # them: their flags would be rejected, and the stubs below only exist for --help
+    hop = bridged(argv)
+    if hop:
+        module, module_args = hop
+        sys.dont_write_bytecode = True
+        return importlib.import_module(module).main(module_args)
     parser = argparse.ArgumentParser(description="Land worktree pull requests.")
     parser.add_argument("--repo", action="append", default=[], help="repository to inspect (repeatable)")
     parser.add_argument("--base", default="main", help="base branch for ahead counts")
@@ -966,8 +1166,13 @@ def main(argv: list[str]) -> int:
     reg.add_argument("--source-repo", default="", help="repository path the worktree came from")
     reg.add_argument("--rename-list", action="store_true", help="workspace, label and path of every owned worktree")
 
-    preflight = subs.add_parser("preflight", help="verify dependencies, install what is missing")
-    preflight.add_argument("--apply", action="store_true", help="install what is absent")
+    preflight = subs.add_parser("preflight", help="verify dependencies once, then reprint the verdict")
+    preflight.add_argument("--apply", action="store_true", help="install what is absent, then re-check")
+    preflight.add_argument("--refresh", action="store_true", help="re-check even when a verdict is stored")
+
+    discover = subs.add_parser("discover", help="repositories under the configured roots")
+    discover.add_argument("--refresh", action="store_true", help="rescan and replace the cache")
+    discover.add_argument("--root", action="append", default=[], help="scan this root instead of the configured ones")
 
     subs.add_parser("inventory", help="one row per worktree")
     subs.add_parser("order", help="merge plan for the open pull requests")
@@ -991,9 +1196,12 @@ def main(argv: list[str]) -> int:
     review.add_argument("--capture", default="", help="directory for the captures")
 
     args = parser.parse_args(argv)
-    args.repo = [Path(path) for path in args.repo] or [Path.cwd()]
+    args.repo = [Path(path).expanduser() for path in args.repo]
+    if not args.repo and run(["git", "-C", str(Path.cwd()), "rev-parse", "--git-dir"]):
+        args.repo = [Path.cwd()]
     handlers = {
         "preflight": cmd_preflight,
+        "discover": cmd_discover,
         "registry": cmd_registry,
         "adopt": cmd_adopt,
         "mode": cmd_mode,
