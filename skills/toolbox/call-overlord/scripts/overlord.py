@@ -458,9 +458,19 @@ def clusters(pulls: list[PullRequest]) -> dict[int, int]:
     return {pull.number: find(pull.number) for pull in pulls}
 
 
+def stack_depth(pull: PullRequest, by_head: dict[str, PullRequest]) -> int:
+    """How many pulls this one sits on inside the plan: its position in the stack."""
+    depth, seen = 0, set()
+    while pull.base in by_head and pull.base not in seen:
+        seen.add(pull.base)
+        pull = by_head[pull.base]
+        depth += 1
+    return depth
+
+
 def cmd_order(args: argparse.Namespace) -> int:
     github = Github()
-    plan: list[tuple[int, str, PullRequest, bool, str, int]] = []
+    plan: list[tuple[int, str, PullRequest, bool, str, int, int]] = []
     for repo in args.repo:
         slug = repo_slug(repo)
         if not slug:
@@ -472,7 +482,7 @@ def cmd_order(args: argparse.Namespace) -> int:
         pulls = [pull for pull in github.open_pulls(slug) if pull.head in branches]
         pulls = [pull for pull in (github.detail(slug, pull.number) for pull in pulls) if pull]
         groups = clusters(pulls)
-        heads = {pull.head for pull in pulls}
+        by_head = {pull.head: pull for pull in pulls}
         for pull in pulls:
             green, blocker = github.checks_green(slug, pull.number)
             blockers = []
@@ -482,17 +492,22 @@ def cmd_order(args: argparse.Namespace) -> int:
                 blockers.append(f"mergeable={pull.mergeable or 'unknown'}")
             if not green:
                 blockers.append(blocker)
-            if pull.base in heads:
+            if pull.base in by_head:
                 blockers.append(f"stacked on {pull.base}")
             plan.append(
-                (len(pull.paths), slug, pull, not blockers, "; ".join(b for b in blockers if b), groups[pull.number])
+                (
+                    len(pull.paths), slug, pull, not blockers,
+                    "; ".join(b for b in blockers if b), groups[pull.number],
+                    stack_depth(pull, by_head),
+                )
             )
 
-    # smallest diff first inside a cluster; a stacked pull stays behind its base
-    plan.sort(key=lambda row: (row[5], row[0], row[2].number))
+    # stack depth first so a stacked pull stays behind its base, then cluster,
+    # smallest diff first, then PR number
+    plan.sort(key=lambda row: (row[6], row[5], row[0], row[2].number))
 
     print("#rank\trepo\tpr\tbranch\tbase\tfiles\tcluster\tready\tblockers")
-    for index, (_files, slug, pull, ready, blocker, cluster) in enumerate(plan, start=1):
+    for index, (_files, slug, pull, ready, blocker, cluster, _depth) in enumerate(plan, start=1):
         print(
             f"{index}\t{slug}\t{pull.number}\t{pull.head}\t{pull.base}\t"
             f"{len(pull.paths)}\t{cluster}\t{'yes' if ready else 'no'}\t{blocker or '-'}"
