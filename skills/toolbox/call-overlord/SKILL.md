@@ -126,11 +126,11 @@ always `--kind omp` — never `claude`, `pi` or any other kind — and always st
 `--model`: this machine's omp config leaves every model role at `nothing`, so a worker started
 without one dies on its first request. `OVERLORD_MODEL` overrides the default
 (`omniroute/anthropic/claude-opus-4.5`). The handover is not the bare task: `spawn` reads
-`$SKILL_DIR/prompts/` and sends `preamble.md`, `work.md`, then the task, inserting `hotfix.md`
-between the rules and the task in `hotfix` mode so the repro is the first instruction the worker
-reads. A prompt file that is missing or empty stops
-`spawn` with the file named, rather than sending a shorter handover. Those files are runtime
-behaviour: edit them to change how a worker behaves, never as documentation.
+`$SKILL_DIR/prompts/` and sends `preamble.md`, then `hotfix.md` in `hotfix` mode, then `work.md`,
+then the task: the repro is the first thing the worker does, never after it starts implementing. A
+prompt file that is missing or empty stops `spawn` with the file named, rather than sending a
+shorter handover. Those files are runtime behaviour: edit them to change how a worker behaves, never
+as documentation.
 
 ## Reach: anywhere the tools work
 
@@ -240,24 +240,20 @@ GH_TOKEN="$(gh auth token --user <account>)" gh pr merge <n> -R <slug> --squash 
 
 ## Ask the owning agent
 
-Never edit another agent's branch.
+Never edit another agent's branch. `pass` prints the prompt each worktree owes, already worded: run
+those lines. Anything it cannot word — a defect found by `review`, a dialog an agent owns — is one
+instruction per message:
 
 ```bash
 herdr agent prompt <pane_id> "<instruction>"
 ```
 
-The prompt returns as soon as it is delivered. The owning agent answers when it is done, in this
-overlord's own pane, as described in "Report back": nothing here waits on a pane, and nothing here
-starts a background task to watch one.
+The prompt returns as soon as it is delivered; the answer arrives in this pane when the agent is
+done. Nothing here waits on a pane, and nothing starts a background task to watch one.
 
-`needs-check`/`needs-pr`: rebase if stale, run the repo gate, commit its way, push, then `gh pr
-create -R <slug> --base <base> --head <branch> --fill`. `conflicting`: send it
-`$SKILL_DIR/prompts/rebase.md` with the two refs, then gate and `git push --force-with-lease`.
-`agent_blocked` owns a dialog: report it, type nothing. `no-agent`: do the git work yourself and say
-so.
-
-Defects are chased with `$SKILL_DIR/prompts/review.md`: trace an input through the change, anchor
-each finding at `file:line`, fix at most twice.
+Conflicts: send `$SKILL_DIR/prompts/rebase.md` with `oldHead` and `newBase`, then gate and
+`git push --force-with-lease`. Defects: `$SKILL_DIR/prompts/review.md`. An agent blocked on a dialog
+owns it: report it, type nothing.
 
 ## Review by OCR, then chase the fixes
 

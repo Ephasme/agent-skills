@@ -1193,7 +1193,7 @@ def handover(mode: str, task: str, clause: str, note: str = "") -> str | None:
     A prompt file that is missing or empty is reported and returns None: the worker would
     otherwise start without the rules it is meant to obey.
     """
-    names = ["preamble", "work"] + (["hotfix"] if mode == "hotfix" else [])
+    names = ["preamble"] + (["hotfix"] if mode == "hotfix" else []) + ["work"]
     parts: list[str] = []
     for name in names:
         path = PROMPTS / f"{name}.md"

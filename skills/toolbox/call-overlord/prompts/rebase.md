@@ -1,15 +1,17 @@
-Resolve every conflicted file, keeping both sides' intent. Do not modify files that have no
-conflicts.
+Resolve every conflicted file keeping both sides' intent; leave unconflicted files untouched. Never
+delete what one side added just to apply: only genuinely incompatible changes supersede, and then
+name which and why. In `AGENTS.md` and `CLAUDE.md`, resolve the conflicts and change nothing else.
 
-Keep the content both sides introduced: never delete what one side added to make the rebase apply.
-Only where the two sides are genuinely mutually exclusive does one supersede the other, and then say
-which and why. Resolve conflicts in `AGENTS.md` and `CLAUDE.md` and make no other edit to them.
+Then find what git did not flag. `oldHead` and `newBase` come with the task; without them, after
+`git fetch`, `oldHead=$(git rev-parse HEAD)` and `newBase=origin/<base>`:
 
-Then look for the conflicts git did not flag: `git range-diff <oldBase>..<oldHead> <newBase>..HEAD`,
-and the upstream diff over this branch's files (`git diff <oldBase> <newBase> -- $(git diff
---name-only <newBase> HEAD)`). A renamed or removed symbol this branch still uses, a changed
-signature, logic upstream now also does, a colliding migration or config key — each is a finding to
-fix, not a rebase artifact.
+    oldBase=$(git merge-base "$newBase" "$oldHead")
+    git range-diff "$oldBase".."$oldHead" "$newBase"..HEAD
+    git diff "$oldBase" "$newBase" -- $(git diff --name-only "$newBase" HEAD)
+
+A symbol this branch still uses that upstream renamed or removed, a changed signature, logic
+upstream now also does, a colliding migration or config key: each is a finding to fix, not a rebase
+artifact.
 
 When both sides changed the same logic incompatibly and the task does not decide it, `git rebase
---abort` and report the question. Do not invent the intent.
+--abort` and report the question. Never invent intent.
