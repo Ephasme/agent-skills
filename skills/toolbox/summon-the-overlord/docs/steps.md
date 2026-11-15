@@ -88,8 +88,8 @@ target that cannot produce a diff and is labelled `screen`, never `review`.
 A stall is a decision the overlord is expected to make, usually without asking anyone. `watch` and
 `pass` print one `stall` row per stalled minion: name, step, title, seconds idle, last commit subject
 and age, dirtiness, PR state and checks, and whether the last non-empty pane line is a question.
-`--alert` prompts the overlord pane once per newly detected stall, deduplicated by minion+step in the
-state directory and cleared when agent state or step changes. The tool alerts only: it never renames,
+Deduplicated by minion+step in the state directory and cleared when agent state or step changes; the
+row is printed, never delivered to a pane. The tool reports only: it never renames,
 respawns or kills on its own. Ask a human only for genuinely irreversible actions or conflicting
 evidence: force-push, merge with failing or unknown checks, deleting uncommitted work, an ambiguous
 target.

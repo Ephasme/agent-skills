@@ -39,6 +39,10 @@ in one line, act on it. Ask only when no tool can reach the answer: a preference
 a credential, or an irreversible call nobody authorised. Never ask leave for what this skill tells
 you to do, and never ask a minion for a fact the tables already printed.
 
+Mail carries content, herdr starts turns. A minion reports by agent-mail; you read the inbox.
+`herdr agent prompt` is only for making a minion act now — dispatch, a rebase, a fix — never for a
+status you can read, and never into your own pane.
+
 `$SKILL_DIR` is notation, not a set variable: this skill's directory, the one holding this `SKILL.md`.
 Every fact and every ordering decision comes from the `overlord` binary: run it, read its
 output, act on it. Never re-derive what it computed, and never carry a list of handled items into the
@@ -54,8 +58,8 @@ overlord pass --dry-run   # the same report, changing nothing
 `pass` names the overlord's pane and workspace `👁 OVERLORD`, prints every table — preflight,
 inventory, mode, order, plans, rename, stalls — then does every step that needs no judgement: the
 plan keys (`--inject --approve`), `rename --apply`, the merge of each ready PR in the printed order
-as the account that reaches its repository, and `prune --apply`. It alerts one prompt per new stall,
-then ends with `## ask`: the prompt each minion still owes, already worded, one
+as the account that reaches its repository, and `prune --apply`. It ends with `## inbox`, the mail
+route, then `## ask`: the prompt each minion still owes, already worded, one
 `herdr agent prompt <pane> "…"` line each.
 
 That section is the model's whole job: run those lines, decide each stall, then read the tables for
@@ -71,7 +75,7 @@ overlord order       # merge plan for the open PRs
 overlord plans --inject --approve
 overlord rename --apply
 overlord review      # ocr over each PR diff; the artifact gates merges
-overlord watch       # the stall table; --alert prompts this pane
+overlord watch       # the stall table
 overlord status      # 0 when nothing is landable
 overlord prune --apply
 ```
@@ -217,10 +221,15 @@ instruction per message:
 herdr agent prompt <pane_id> "<instruction>"
 ```
 
-The prompt returns once delivered; the answer arrives in this pane as text when the minion is done.
-Nothing waits on a pane and nothing starts a background task to watch one. `spawn` bakes a `DONE
-<branch>: <outcome, commit sha, PR url, what it ran>` report into the handover, so a spawned minion
-reports itself once as its last action; a report beats pane text when the two disagree.
+The prompt returns once delivered; the report arrives by mail. `pass` prints the route as
+`## inbox`, one `#mail<TAB><project><TAB><agent>` line: read the project and the agent from it,
+never from memory. Once per session, `ensure_project(human_key "<project>")` then
+`register_agent(project_key "<project>", name "<agent>", program "omp", model "overlord",
+task_description "overlord")`. At the start of every pass, `fetch_inbox(project_key "<project>",
+agent_name "<agent>", unread_only true, include_bodies true)`: a subject beginning `<mN> DONE` is
+that minion's report, and it replaces asking the minion for one. If the mail tools are missing or
+the server refuses, say so once and carry on from the tables; never retry in a loop and never fall
+back to prompting a minion for its status.
 
 Conflicts: send `prompts/rebase.md` with `oldHead` and `newBase`, then gate and
 `git push --force-with-lease`. Defects: `prompts/review.md`. An agent blocked on a dialog owns it:
