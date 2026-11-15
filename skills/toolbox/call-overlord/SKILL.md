@@ -194,9 +194,9 @@ title or newest commit, and reports the same step as pane metadata so the status
 |`DONE`|✔|`#7f8c8d`|merged, ready to prune|
 
 The overlord's own dot is an eye: it watches, it does not build. The overlord is the session that
-runs this skill, never a spawned agent or an extra pane: label its own pane `👁 OVERLORD` (herdr
-`pane rename` + `pane report-metadata` with source `overlord`) and never create a second pane to
-hold the overlord.
+runs this skill, never a spawned agent or an extra pane: its pane is named `👁 OVERLORD`, no step
+and no title (`rename --apply` labels it from `HERDR_PANE_ID`), and a second pane must never be
+created to hold it.
 
 ## Mail instead of polling
 

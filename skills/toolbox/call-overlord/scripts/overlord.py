@@ -660,10 +660,10 @@ def cmd_rename(args: argparse.Namespace) -> int:
     print("#path\tworkspace\tpane\tstep\tsymbol\tlabel")
     own_pane = os.environ.get("HERDR_PANE_ID", "")
     if own_pane:
-        label = paint("SEE", "OVERLORD")
+        label = "👁 OVERLORD"
         run(["herdr", "pane", "rename", own_pane, label])
         run(["herdr", "pane", "report-metadata", "--source", "overlord", "--agent", label, own_pane])
-        print(f"self\t-\t{own_pane}\tSEE\t👁\t{label}")
+        print(f"self\t-\t{own_pane}\t-\t👁\t{label}")
     for wt in collect(args.repo, args.base):
         proposed, hardened, text = plan_state(wt)
         step = step_for(wt, proposed, hardened, text)
