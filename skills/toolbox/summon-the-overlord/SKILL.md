@@ -1,14 +1,13 @@
 ---
 name: summon-the-overlord
 description: >-
-  Drives every git worktree that holds a coding agent to a pushed branch, an open
-  pull request and a merge, deciding the merge order by the files each one touches,
-  and learns that each agent is done from the pane that agent messages, never by polling.
-  Use when the user asks to summon or call the overlord, land, merge, ship or unblock
-  worktree work, e.g. "land the worktree work", "merge the agents' PRs", "get every worktree
-  PR merged", "check if they are ready to commit and push", or in French "fusionne
-  les PR des worktrees", "fais atterrir le travail des agents". Also starts a job in
-  one of four modes: feat, fast, hotfix or ask.
+  Drives every git worktree that holds a coding agent to a pushed branch, an open pull request and a
+  merge, deciding the merge order by the files each one touches and learning that an agent is done
+  from its agent-mail report or from the `overlord watch --until-stall` job exiting, never by
+  polling, when the user asks to summon or call the overlord, land, merge, ship or unblock worktree
+  work ("land the worktree work", "merge the agents' PRs", "get every worktree PR merged", "check if
+  they are ready to commit and push", or in French "fusionne les PR des worktrees", "fais atterrir le
+  travail des agents") or starts a job in one of four modes: feat, fast, hotfix or ask.
 compatibility: >-
   Requires git, gh and the `overlord` binary on PATH; merging needs an authenticated gh. herdr is
   optional: it adds agent state, and it is the only way to press a key in a pane or to
