@@ -7,4 +7,3 @@ weak one. Then run the checks the change touches until they pass.
 Complete: commit on the current branch. Never amend, never commit to the base branch, never check
 out or touch another branch, never merge, never force-push. Push only when the task says to.
 
-End your report with what changed, what you ran, what is untested, and the risky spots.

@@ -3,16 +3,16 @@ name: call-overlord
 description: >-
   Drives every git worktree that holds a coding agent to a pushed branch, an open
   pull request and a merge, deciding the merge order by the files each one touches,
-  and coordinates the agents over a shared Agent Mail project instead of polling.
+  and learns that each agent is done from the pane that agent messages, never by polling.
   Use when the user asks to call the overlord, land, merge, ship or unblock worktree
   work, e.g. "land the worktree work", "merge the agents' PRs", "get every worktree
   PR merged", "check if they are ready to commit and push", or in French "fusionne
   les PR des worktrees", "fais atterrir le travail des agents". Also starts a job in
   one of four modes: fast, hotfix, feat or ask.
 compatibility: >-
-  Requires git, gh, uv and python 3.11+; merging needs an authenticated gh. The mail
-  protocol needs an Agent Mail MCP server reachable by every agent involved. herdr is
-  optional: it adds agent state and is the only way to press a key in a pane.
+  Requires git, gh, uv and python 3.11+; merging needs an authenticated gh. herdr is
+  optional: it adds agent state, and it is the only way to press a key in a pane or to
+  receive an agent's own report.
 disable-model-invocation: true
 ---
 
@@ -66,7 +66,7 @@ off, exactly:
 |branch, ahead, upstream, dirty count, PR state|absent: shown as `-`|
 |merge, rebase, readiness|not applicable: `status` never counts it as landable|
 |prune|never removes it|
-|rename, review, plans, mail, modes|unchanged: they only need herdr and the pane|
+|rename, review, plans, modes|unchanged: they only need herdr and the pane|
 
 The same target stays visible so its agent is still asked, reviewed and renamed — only the merge half
 of the pipeline disappears. Nothing is guessed to fill the gap.
@@ -83,8 +83,8 @@ It checks git, gh, uv, python 3.11+, the GitHub token and herdr's availability, 
 absent Homebrew packages. The verdict is stored under `preflight:` in `~/.overlord/config.yaml` and
 reprinted on later runs, so a pass never re-probes: `--refresh` and `--apply` are the only ways to
 check again, and deleting that block does the same. A stored `ok` outlives a revoked token — the
-GitHub API says so on the first request. Two things preflight cannot finish alone: `gh auth login`
-needs a human, and the Agent Mail project needs the `ensure_project` call from the mail section below.
+GitHub API says so on the first request. One thing preflight cannot finish alone: `gh auth login`
+needs a human.
 
 
 ## Discovery: only the roots you name
@@ -216,8 +216,12 @@ gh pr merge <n> -R <slug> --squash --delete-branch
 Never edit another agent's branch.
 
 ```bash
-herdr agent prompt <pane_id> "<instruction>" --wait --until idle --timeout 1800000
+herdr agent prompt <pane_id> "<instruction>"
 ```
+
+The prompt returns as soon as it is delivered. The owning agent answers when it is done, in this
+overlord's own pane, as described in "Report back": nothing here waits on a pane, and nothing here
+starts a background task to watch one.
 
 `needs-check`/`needs-pr`: rebase if stale, run the repo gate, commit its way, push, then `gh pr
 create -R <slug> --base <base> --head <branch> --fill`. `conflicting`: send it
@@ -259,23 +263,19 @@ runs this skill, never a spawned agent or an extra pane: `rename --apply` names 
 the workspace holding it `👁 OVERLORD` — from `HERDR_PANE_ID` and `HERDR_WORKSPACE_ID` — with no
 step and no title, and a second pane must never be created to hold it.
 
-## Mail instead of polling
+## Report back
 
-One Agent Mail project per repository, keyed by the **primary checkout** path — worktree paths would
-scatter into separate projects.
+The overlord never waits on a pane and never starts a background task to watch one. It sends its
+instruction and moves on; the answer arrives as text in its own pane, which it reads when its turn
+resumes:
 
-```text
-ensure_project   human_key: /path/to/primary/checkout
-register_agent   project_key: <same path>, program: omp, name: omitted
-send_message     project_key: <same path>, sender_name: <your name>, to: [...]
-fetch_inbox      project_key: <same path>, agent_name: <the name register_agent returned>
+```bash
+herdr agent prompt <overlord_pane> "DONE <branch>: <outcome, commit sha, PR url, what it ran>"
 ```
 
-`register_agent` returns the name it chose and `fetch_inbox` refuses a call without `agent_name`:
-keep that name, or every inbox read is a validation error. Per pass: ensure the project, register,
-message each live agent the project key and the four moments worth a message (PR open, needs
-rebase, blocked, merged), then drain your own inbox with `fetch_inbox` at the start and the end. A
-report beats pane text when they disagree; one message per decision.
+`spawn` bakes that clause into the handover with the overlord's pane id, so a spawned worker reports
+itself once, as its last action. Outside a spawned job the same line is the answer to any
+instruction: one message per decision, and a report beats pane text when the two disagree.
 
 ## Prune, then stop
 

@@ -1053,7 +1053,6 @@ def preflight_rows() -> tuple[list[dict[str, str]], list[str]]:
 
     herdr = bool(run(["which", "herdr"])) and os.environ.get("HERDR_ENV") == "1"
     rows.append({"check": "herdr", "state": "ok" if herdr else "optional, absent", "fix": "nothing: git and gh cover the work"})
-    rows.append({"check": "agent mail", "state": "manual", "fix": "ensure_project + register_agent from the skill body"})
     token = "ok" if github_token() else "missing"
     rows.append({"check": "token", "state": token, "fix": "gh auth login, or export GITHUB_TOKEN"})
     if token == "missing":
@@ -1109,8 +1108,21 @@ def cmd_discover(args: argparse.Namespace) -> int:
 
 
 
-def handover(mode: str, task: str) -> str | None:
-    """The text a worker starts from: preamble, mode prompts, task.
+def completion(branch: str, pane: str) -> str:
+    """The clause that makes a worker report itself, so the overlord waits on nothing."""
+    line = f"DONE {branch}: <outcome, commit sha, PR url, what you ran, anything unverified>"
+    return (
+        "When you are done, report it in the overlord's pane as your last action:\n"
+        f'`herdr agent prompt {pane} "{line}"`\n'
+        "Send it once, then stop: the overlord reads that line when its turn resumes and never waits "
+        "on you, so start no background job and poll nothing.\n"
+        f'Optional, so a human sees it too: `herdr notification show "DONE {branch}" '
+        '--body "<one line>" --sound done`.'
+    )
+
+
+def handover(mode: str, task: str, clause: str) -> str | None:
+    """The text a worker starts from: preamble, mode prompts, task, completion clause.
 
     A prompt file that is missing or empty is reported and returns None: the worker would
     otherwise start without the rules it is meant to obey.
@@ -1128,7 +1140,7 @@ def handover(mode: str, task: str) -> str | None:
             print(f"prompt file empty: {path}", file=sys.stderr)
             return None
         parts.append(text)
-    return "\n\n".join(parts + [task])
+    return "\n\n".join(parts + [task] + ([clause] if clause else []))
 
 
 def cmd_spawn(args: argparse.Namespace) -> int:
@@ -1139,14 +1151,20 @@ def cmd_spawn(args: argparse.Namespace) -> int:
     if not args.task:
         print("spawn needs --task", file=sys.stderr)
         return 2
-    text = handover(args.mode, args.task)
-    if text is None:
-        return 1
 
     repo = args.repo[0] if args.repo else Path.cwd()
     slug = "-".join(word for word in re.split(r"[^a-z0-9]+", args.task.lower()) if word and word not in STOP_WORDS)[:60] or "job"
     branch = f"worktree/{slug}"
     path = Path(args.dest).expanduser() / slug if args.dest else Path.home() / ".herdr" / "worktrees" / repo.name / slug
+    # The worker reports into this pane; without it there is no address to bake in, and a
+    # guessed one would send a completion line nowhere.
+    pane = os.environ.get("HERDR_PANE_ID", "")
+    if not pane:
+        print("#warning\tHERDR_PANE_ID unset: completion clause omitted", file=sys.stderr)
+    text = handover(args.mode, args.task, completion(branch, pane) if pane else "")
+    if text is None:
+        return 1
+
     print(f"#worktree\t{path}\nbranch\t{branch}\nmode\t{args.mode}")
     if args.dry_run:
         print(f"would run\tgit -C {repo} worktree add -b {branch} {path} origin/{args.base}")
@@ -1158,7 +1176,7 @@ def cmd_spawn(args: argparse.Namespace) -> int:
         entries[str(path.resolve())] = {"repo": str(repo), "branch": branch, "mode": args.mode, "task": args.task}
         save_registry(entries)
         print("next\tstart an agent in that path, then:")
-    print(f'\therdr agent prompt <pane> "{text}" --wait --until idle')
+    print(f'\therdr agent prompt <pane> "{text}"')
     return 0
 
 
