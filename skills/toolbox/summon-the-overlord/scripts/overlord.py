@@ -765,7 +765,9 @@ def landable(wt: Worktree) -> str:
     if wt.dirty:
         return "dirty"
     if wt.pull and wt.pull.state == "OPEN":
-        return "open-pr"
+        # a review of an older commit is evidence about that commit, never about this head
+        state = review_state(wt.slug, wt.pull)
+        return "open-pr" if state == "current" and ocr_present() else f"unreviewed: {state}"
     if wt.pull and wt.pull.state == "MERGED":
         return ""
     return "no-pr" if wt.ahead > 0 else ""
@@ -885,6 +887,11 @@ def order_plan(args: argparse.Namespace) -> list[tuple[int, str, PullRequest, bo
                 blockers.append(f"mergeable={pull.merge_state if pull.merge_state != '-' else 'unknown'}")
             if not green:
                 blockers.append(blocker)
+            review = review_state(slug, pull)
+            if not ocr_present():
+                blockers.append("unreviewed: ocr missing")
+            elif review != "current":
+                blockers.append(f"unreviewed: {review}")
             if pull.base in by_head:
                 blockers.append(f"stacked on {pull.base}")
             plan.append(
@@ -1015,7 +1022,7 @@ STEP_STYLE: dict[str, tuple[str, str]] = {
 }
 
 def paint(step: str, name: str, title: str) -> str:
-    """Stable label from stage and frozen registry identity."""
+    """`<symbol> <STEP> <name> <title>`: the label is the only place the id is rendered."""
     symbol, _colour = STEP_STYLE.get(step, ("•", "#888888"))
     return f"{symbol} {step} {name} {title}"[:64]
 
@@ -1141,25 +1148,116 @@ def cmd_rename(args: argparse.Namespace) -> int:
     return 0
 
 
+REVIEW_DIR = STATE_DIR / "review"
+REVIEWED_RE = re.compile(r"^<!-- reviewed: ([0-9a-f]{7,64}) -->$")
+SEVERITIES = ("critical", "high", "medium", "low")
+
+
+def review_path(slug: str, number: int) -> Path:
+    """Artifact path, identical in every implementation: <state>/review/<owner>-<repo>-<pr>.txt."""
+    return REVIEW_DIR / f"{slug.replace('/', '-')}-{number}.txt"
+
+
+def reviewed_sha(path: Path) -> str:
+    """The head sha an artifact covers: its first line, empty when absent or unreadable."""
+    try:
+        first = path.read_text(errors="replace").splitlines()[:1]
+    except OSError:
+        return ""
+    match = REVIEWED_RE.fullmatch(first[0]) if first else None
+    return match.group(1) if match else ""
+
+
+def review_state(slug: str, pull: PullRequest) -> str:
+    """`current`, `stale` or `missing`: a review of an older commit is evidence about it only."""
+    path = review_path(slug, pull.number)
+    covered = reviewed_sha(path)
+    if not covered:
+        return "missing"
+    return "current" if covered == pull.sha[:len(covered)] else "stale"
+
+
+def severities(text: str) -> dict[str, int]:
+    """Findings per severity, from the review's own `"severity": "<level>"` fields."""
+    counts = {level: 0 for level in SEVERITIES}
+    for level in re.findall(r'"severity"\s*:\s*"([a-z]+)"', text.lower()):
+        if level in counts:
+            counts[level] += 1
+    return counts
+
+
+def findings(text: str) -> list[tuple[str, str]]:
+    """(severity, message) per finding, so each defect routes as one instruction."""
+    return [
+        (level.lower(), message.strip()[:300])
+        for level, message in re.findall(
+            r'"severity"\s*:\s*"([a-zA-Z]+)"[^}]*?"(?:message|title|body)"\s*:\s*"([^"]*)"', text
+        )
+        if level.lower() in SEVERITIES
+    ]
+
+
+def ocr_present() -> bool:
+    return bool(run(["which", "ocr"]))
+
+
 def cmd_review(args: argparse.Namespace) -> int:
-    """Capture the screen of every worktree waiting on review, for a visual check."""
-    out_dir = Path(args.capture or (Path(os.environ.get("TMPDIR", "/tmp")) / "overlord-review"))
-    out_dir.mkdir(parents=True, exist_ok=True)
-    print("#path\tpane\tstep\tcapture")
+    """Review each PR's diff with the ocr CLI; the artifact gates every merge."""
+    if not ocr_present():
+        print("ocr\tmissing\tinstall the ocr CLI; no PR is landable without a review", file=sys.stderr)
+        return 1
+    REVIEW_DIR.mkdir(parents=True, exist_ok=True)
+    print("#repository\tpr\thead\tartifact\texit\tcritical\thigh\tmedium\tlow\treviewed\tstep")
+    routed: list[str] = []
     for wt in collect(args.repo, args.base):
-        proposed, hardened, text = plan_state(wt)
-        step = step_for(wt, proposed, hardened, text)
+        proposed, hardened, _text = plan_state(wt)
+        step = step_for(wt, proposed, hardened)
         if step not in {"REV", "MRG"}:
             continue
-        target = out_dir / f"{wt.path.name}-{step}.txt"
-        capture = ""
-        if wt.pane not in {"-", ""}:
-            capture = run(["herdr", "pane", "read", wt.pane, "--source", "visible", "--lines", "200", "--format", "ansi"])
-        if not capture:
-            capture = run(["git", "-C", str(wt.path), "diff", "--stat", f"origin/{args.base}...HEAD"])
-        target.write_text(capture or "empty capture\n")
-        print(f"{wt.path}\t{wt.pane}\t{step}\t{target}")
+        pull = wt.pull
+        if not pull or not wt.vcs:
+            capture = out_dir_capture(wt, args.base)
+            print(f"{wt.slug or '-'}\t{pull.number if pull else '-'}\t-\t{capture}\t0\t-\t-\t-\t-\t-\tscreen")
+            continue
+        run(["git", "-C", str(wt.path), "fetch", "--quiet", "origin", args.base, pull.head])
+        artifact = review_path(wt.slug, pull.number)
+        body = run(["git", "-C", str(wt.path), "log", "-1", "--format=%s", pull.sha]) or pull.head
+        command = [
+            "ocr", "review", "--audience", "agent", "--format", "json",
+            "--background", f"PR #{pull.number} on {wt.slug}: {body}"[:400],
+            "--from", f"origin/{args.base}", "--to", pull.sha,
+            "--repo", str(wt.path), "--output", str(artifact),
+        ]
+        code = 0 if ok(command, timeout=1800) else 1
+        text = artifact.read_text(errors="replace") if artifact.exists() else ""
+        counts = severities(text)
+        if artifact.exists():
+            artifact.write_text(f"<!-- reviewed: {pull.sha} -->\n{text}")
+        for level, message in findings(text):
+            if level != "low" and message:
+                routed.append((wt, pull, level, message))
+        print(
+            f"{wt.slug}\t{pull.number}\t{pull.sha[:12]}\t{artifact}\t{code}\t"
+            + "\t".join(str(counts[level]) for level in SEVERITIES)
+            + f"\t{reviewed_sha(artifact)[:12] or '-'}\t{step}"
+        )
+    if routed:
+        print("## findings")
+        for wt, pull, level, message in routed:
+            print(f'herdr agent prompt {wt.pane} "{level.upper()}: {message} (PR #{pull.number}, {wt.slug})"')
     return 0
+
+
+def out_dir_capture(wt: Worktree, base: str) -> Path:
+    """Screen fallback for a target that cannot produce a diff: never mistaken for a review."""
+    out_dir = Path(os.environ.get("TMPDIR", "/tmp")) / "overlord-review"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    target = out_dir / f"{wt.path.name}-screen.txt"
+    capture = ""
+    if wt.pane not in {"-", ""}:
+        capture = run(["herdr", "pane", "read", wt.pane, "--source", "visible", "--lines", "200", "--format", "ansi"])
+    target.write_text(capture or run(["git", "-C", str(wt.path), "diff", "--stat", f"origin/{base}...HEAD"]) or "empty\n")
+    return target
 
 
 def cmd_plans(args: argparse.Namespace) -> int:
@@ -1328,6 +1426,7 @@ DEPENDENCIES = (
     ("git", "git", "brew install git"),
     ("gh", "gh", "brew install gh"),
     ("uv", "uv", "brew install uv"),
+    ("ocr", "ocr", "install the open-code-review CLI: its artifact gates every merge"),
 )
 
 
@@ -1487,8 +1586,9 @@ def cmd_spawn(args: argparse.Namespace) -> int:
         return 1
 
     step = "PLAN" if args.mode == "feat" else "BUILD"
+    name = f"m{registry().get('next_name', 1)}"
     birth = title_slug(slug)
-    preview = paint(step, f"m{registry().get('next_name', 1)}", birth)
+    preview = paint(step, name, birth)
     print(f"#worktree\t{path}\nbranch\t{branch}\nmode\t{args.mode}\nmodel\t{model}\ntitle\t{birth}")
     if args.dry_run:
         print(f"would run\tgit -C {repo} worktree add -b {branch} {path} origin/{args.base}")
@@ -1582,6 +1682,11 @@ def cmd_pass(args: argparse.Namespace) -> int:
     and the model reads the last section only: the prompts still owed, already worded.
     """
     code = cmd_bootstrap(args)
+    print("## review")
+    if getattr(args, "dry_run", False):
+        print("would run\treview")
+    else:
+        cmd_review(args)
     print("## stalls")
     rows = show_stalls(args)
     if not getattr(args, "dry_run", False):
@@ -1740,8 +1845,7 @@ def main(argv: list[str]) -> int:
     rename.add_argument("--apply", action="store_true", help="do it instead of listing")
     rename.set_defaults(label_self=False)
 
-    review = subs.add_parser("review", help="capture the screen of worktrees awaiting review")
-    review.add_argument("--capture", default="", help="directory for the captures")
+    review = subs.add_parser("review", help="review each PR diff with ocr; the artifact gates the merge")
 
     watch = subs.add_parser("watch", help="stalls: idle minions whose step still implies work")
     watch.add_argument("--alert", action="store_true", help="prompt this pane once per new stall")

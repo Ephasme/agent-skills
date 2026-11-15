@@ -55,7 +55,7 @@ class SpawnOrderTests(unittest.TestCase):
             "--model test-model --plan test-model --smol test-model"
         ))
 
-    def test_dry_run_label_carries_allocated_name_and_frozen_title(self):
+    def test_birth_label_renders_name_once_before_the_title(self):
         self.assertIn(
             "would run\therdr pane rename <pane> 🗺 PLAN m1 prompt-spawn-labelling", dry_run("feat")
         )
@@ -63,10 +63,13 @@ class SpawnOrderTests(unittest.TestCase):
             "would run\therdr pane rename <pane> ⚒ BUILD m1 prompt-spawn-labelling", dry_run("fast")
         )
 
-    def test_title_flag_wins_and_leading_job_word_is_dropped(self):
-        self.assertIn("would run\therdr pane rename <pane> 🗺 PLAN m1 my-slug", dry_run("feat", title="my-slug"))
-        lines = dry_run("feat", task="Job: rust crate")
-        self.assertTrue(any("worktree add -b worktree/rust-crate " in line for line in lines))
+    def test_registry_title_carries_no_id_and_title_flag_is_the_slug(self):
+        lines = dry_run("feat", title="my-slug")
+        self.assertIn("title\tmy-slug", lines)
+        self.assertIn("would run\therdr pane rename <pane> 🗺 PLAN m1 my-slug", lines)
+        job = dry_run("feat", task="Job: rust crate")
+        self.assertIn("title\trust-crate", job)
+        self.assertTrue(any("worktree add -b worktree/rust-crate " in line for line in job))
 
     def test_invalid_title_is_refused(self):
         args = argparse.Namespace(
@@ -290,6 +293,78 @@ class InFlightTests(unittest.TestCase):
     def test_registered_entry_without_a_task_and_nothing_in_flight_is_idle(self):
         with patch.object(o, "registry", return_value={"/tmp/label-eval": {"name": "m5"}}):
             self.assertEqual(o.step_for(self.job(""), False, False), "IDLE")
+
+
+class ReviewGateTests(unittest.TestCase):
+    """A merge needs a review artifact covering the PR's current head sha."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.dir = Path(self.tmp.name)
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def pull(self, sha: str) -> o.PullRequest:
+        return o.PullRequest(
+            number=13, state="OPEN", mergeable="MERGEABLE", merge_state="CLEAN",
+            draft=False, files=3, sha=sha,
+        )
+
+    def write_artifact(self, slug: str, number: int, covered: str) -> Path:
+        path = self.dir / "review" / f"{slug.replace('/', '-')}-{number}.txt"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(f"<!-- reviewed: {covered} -->\n[]\n")
+        return path
+
+    def test_artifact_path_shape_is_owner_repo_pr(self):
+        with patch.object(o, "REVIEW_DIR", self.dir / "review"):
+            self.assertEqual(o.review_path("Ephasme/agent-skills", 13).name, "Ephasme-agent-skills-13.txt")
+
+    def test_missing_stale_and_current_artifacts(self):
+        with patch.object(o, "REVIEW_DIR", self.dir / "review"):
+            pull = self.pull("a" * 40)
+            self.assertEqual(o.review_state("o/n", pull), "missing")
+            self.write_artifact("o/n", 13, "b" * 40)
+            self.assertEqual(o.review_state("o/n", pull), "stale")
+            self.write_artifact("o/n", 13, "a" * 40)
+            self.assertEqual(o.review_state("o/n", pull), "current")
+
+    def test_artifact_without_a_header_covers_nothing(self):
+        artifact = self.dir / "plain.txt"
+        artifact.write_text("just findings\n")
+        self.assertEqual(o.reviewed_sha(artifact), "")
+
+    def test_open_pr_is_not_landable_without_a_current_review(self):
+        wt = o.Worktree(
+            path=Path("/wt"), repo=Path("/repo"), branch="b", dirty=0, ahead=1,
+            upstream="origin/b", slug="o/n", pull=self.pull("a" * 40), linked=True,
+        )
+        with patch.object(o, "REVIEW_DIR", self.dir / "review"), patch.object(o, "ocr_present", return_value=True):
+            self.assertEqual(o.landable(wt), "unreviewed: missing")
+            self.write_artifact("o/n", 13, "b" * 40)
+            self.assertEqual(o.landable(wt), "unreviewed: stale")
+            self.write_artifact("o/n", 13, "a" * 40)
+            self.assertEqual(o.landable(wt), "open-pr")
+
+    def test_missing_ocr_blocks_every_open_pr(self):
+        wt = o.Worktree(
+            path=Path("/wt"), repo=Path("/repo"), branch="b", dirty=0, ahead=1,
+            upstream="origin/b", slug="o/n", pull=self.pull("a" * 40), linked=True,
+        )
+        with patch.object(o, "REVIEW_DIR", self.dir / "review"), patch.object(o, "ocr_present", return_value=False):
+            self.write_artifact("o/n", 13, "a" * 40)
+            self.assertEqual(o.landable(wt), "unreviewed: current")
+
+    def test_severity_counts_and_routing_skip_low(self):
+        text = ('[{"severity":"critical","message":"drops the lock"},'
+                '{"severity":"low","message":"naming"},'
+                '{"severity":"high","message":"unbounded retry"}]')
+        self.assertEqual(o.severities(text), {"critical": 1, "high": 1, "medium": 0, "low": 1})
+        self.assertEqual(
+            o.findings(text),
+            [("critical", "drops the lock"), ("low", "naming"), ("high", "unbounded retry")],
+        )
 
 
 if __name__ == "__main__":

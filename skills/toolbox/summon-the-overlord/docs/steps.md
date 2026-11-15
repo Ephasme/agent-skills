@@ -1,8 +1,15 @@
 # Worktree steps
 
-A label is `<symbol> <STEP> <name> <frozen-title>`, built only from step facts and the registry
-identity recorded at birth. herdr's agent state stays in herdr: it is never copied into a label or a
-registry field.
+A label is `<symbol> <STEP> <name> <title>`, built only from step facts and the registry identity
+recorded at birth: `⚒ BUILD m2 feat-prompt-and-spawn-labelling`. Identity is the `name` field and the
+label is the only place it is rendered; registry titles never carry it. herdr's agent state stays in
+herdr: it is never copied into a label or a registry field.
+
+A pull request title is the one place the id appears in parentheses, appended by whoever opens the
+PR: `summon-the-overlord: enforced plan mode (m2)`, never twice.
+
+Slugs are tool-first, target second: `ocr-review-pr13`. Spawn derives the title from the task's first
+words; pass `--title` when the job is better named than its brief.
 
 ## Hardening marker
 
@@ -39,6 +46,23 @@ does the step move, to `HRD` without a current marker or to `BUILD` with one.
 and reopened comes back labelled with its directory name, and `rename` reads the registry identity
 through the live pane's directory, so the label returns without re-registering anything.
 
+## Review, and the merge gate
+
+A review is `ocr review --audience agent --background "<per-PR context>" --from <base> --to <head>
+--repo <checkout> --output <artifact>` over the diff, never a screenshot. The artifact path is
+`$XDG_STATE_HOME/summon-the-overlord/review/<owner>-<repo>-<pr>.txt`, and its first line is
+`<!-- reviewed: <head sha> -->`. That header is the whole cross-implementation contract: the tool
+that writes the artifact and the tool that gates the merge agree even when they are the Python
+toolbelt and the Rust port.
+
+A PR is landable only when an artifact exists and its header names the current head sha. An artifact
+for an older sha is stale, so the PR reads `unreviewed: stale` in `status` and `order`; a missing
+artifact reads `unreviewed: missing`. Without `ocr` on the machine, `preflight` reports the row as
+missing and every open PR stays unlandable rather than merging unreviewed.
+
+Findings above low go to the owning minion one instruction per defect, then the PR is re-reviewed at
+the new head sha and the new artifact replaces the old one. A screen capture survives only for a
+target that cannot produce a diff and is labelled `screen`, never `review`.
 
 ## Stalls
 

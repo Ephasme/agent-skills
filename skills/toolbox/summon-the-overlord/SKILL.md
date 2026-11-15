@@ -64,7 +64,7 @@ Each step runs alone when one answer is needed:
 "$SKILL_DIR/scripts/overlord.py" order       # merge plan for the open PRs
 "$SKILL_DIR/scripts/overlord.py" plans --inject --approve
 "$SKILL_DIR/scripts/overlord.py" rename --apply
-"$SKILL_DIR/scripts/overlord.py" review       # capture what awaits review
+"$SKILL_DIR/scripts/overlord.py" review       # ocr over each PR diff; the artifact gates merges
 "$SKILL_DIR/scripts/overlord.py" watch        # the stall table; --alert prompts this pane
 "$SKILL_DIR/scripts/overlord.py" status       # 0 when nothing is landable
 "$SKILL_DIR/scripts/overlord.py" prune --apply
@@ -219,12 +219,21 @@ Conflicts: send `prompts/rebase.md` with `oldHead` and `newBase`, then gate and
 `git push --force-with-lease`. Defects: `prompts/review.md`. An agent blocked on a dialog owns it:
 report it, type nothing.
 
-## Review by OCR, then chase the fixes
+## Review the diff, then chase the fixes
 
-`review` captures the visible screen of every worktree at `REV` or `MRG` — pane text is the OCR of
-the TUI — into `$TMPDIR/overlord-review/`. Read those captures, list what is broken, and message the
-owning agent one instruction per real defect. A clipped help line or a colour preference is not a
-defect. Nothing merges before the defects it reported are fixed.
+`review` runs the `ocr` CLI against each PR diff — `--audience agent`, a per-PR `--background`,
+`--from origin/<base> --to <head> --repo <checkout>` — and writes the artifact to
+`$XDG_STATE_HOME/summon-the-overlord/review/<owner>-<repo>-<pr>.txt`. Its first line is
+`<!-- reviewed: <head sha> -->`, and that line is the gate: a PR is landable only while the artifact
+names its current head sha. A newer head reads `unreviewed: stale`, and no artifact reads
+`unreviewed: missing`, in `status` and `order` alike. Without `ocr`, preflight reports it missing and
+every open PR stays unlandable.
+
+`review` prints one row per PR: repository, number, head, artifact, exit code, the four severity
+counts, and the sha the artifact actually covers. It ends with `## findings`, one prompt per defect
+above low, addressed to the owning minion. After those fixes, re-review: the new head sha needs its
+own artifact, which replaces the old one. Nothing merges on a review of an older commit. A screen
+capture survives only for a target that cannot produce a diff and is labelled `screen`.
 
 ## Labels and status dots
 
