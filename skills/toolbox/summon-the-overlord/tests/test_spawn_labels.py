@@ -790,10 +790,65 @@ class SecondReviewTests(unittest.TestCase):
             git("commit", "-qam", "marker")
             self.assertTrue(o.plan_hardened(path))
 
+    def test_a_multi_section_plan_preserves_interior_blank_lines(self):
+        with tempfile.TemporaryDirectory() as root:
+            path = Path(root)
+            git = lambda *a: subprocess.run(GIT + list(a), cwd=path, capture_output=True, text=True, check=True)
+            git("init", "-q", "-b", "main")
+            body = "# Goals\n\n## Constraints\n\n- keep order\n"
+            (path / "PLAN.md").write_text(body)
+            git("add", "PLAN.md")
+            git("commit", "-q", "-m", "plan")
+            sha = git("rev-parse", "HEAD").stdout.strip()
+            (path / "PLAN.md").write_text(body + f"<!-- hardened: {sha} -->\n")
+            git("commit", "-qam", "marker")
+            self.assertTrue(o.plan_hardened(path))
+
     def test_ocr_is_reported_but_not_brewed(self):
         installable = {name: flag for name, _command, _fix, flag in o.DEPENDENCIES}
         self.assertFalse(installable["ocr"])
         self.assertTrue(installable["git"])
 
+
+    def test_resume_keeps_plan_mode_failure_note_on_both_resume_paths(self):
+        record = {"agent_session": {"value": "/tmp/session.jsonl"}}
+        with patch.object(o, "resolve_model", return_value=("model", "")), patch.object(
+            o, "start_agent", return_value=True
+        ), patch.object(o, "registry", return_value={"/wt": {"mode": "adopted"}}), patch.object(
+            o.Path, "is_file", return_value=True
+        ), patch.object(o, "plan_hardened", return_value=False), patch.object(
+            o, "enter_plan_mode", return_value=False
+        ), patch.object(o, "ok", return_value=False):
+            result = o.resume_agent(record, "p", Path("/wt"))
+        self.assertEqual(result, "agent restarted, resume prompt failed, plan mode did not engage")
+        with patch.object(o, "resolve_model", return_value=("model", "")), patch.object(
+            o, "start_agent", return_value=True
+        ), patch.object(o, "registry", return_value={"/wt": {"mode": "adopted"}}), patch.object(
+            o.Path, "is_file", return_value=True
+        ), patch.object(o, "plan_hardened", return_value=False), patch.object(
+            o, "enter_plan_mode", return_value=False
+        ):
+            result = o.resume_agent({}, "p", Path("/wt"))
+        self.assertEqual(result, "agent restarted, no session file to resume, plan mode did not engage")
+
+    def test_empty_successful_ocr_run_returns_failure_and_no_review_marker(self):
+        with tempfile.TemporaryDirectory() as state:
+            review_dir = Path(state) / "review"
+            review_dir.mkdir(parents=True)
+            pull = o.PullRequest(number=13, state="OPEN", mergeable="MERGEABLE", merge_state="CLEAN",
+                                 draft=False, files=1, sha="f" * 40, head="h")
+            wt = o.Worktree(path=Path("/wt"), repo=Path("/repo"), branch="b", dirty=0, ahead=1,
+                            upstream="origin/b", slug="o/n", pull=pull, pane="p")
+
+            def writes_nothing(_argv, **_kwargs):
+                return True
+
+            with patch.object(o, "REVIEW_DIR", review_dir), patch.object(o, "ocr_present", return_value=True), patch.object(
+                o, "collect", return_value=[wt]
+            ), patch.object(o, "plan_state", return_value=(False, False)), patch.object(
+                o, "step_for", return_value="REV"
+            ), patch.object(o, "ok", side_effect=writes_nothing), patch("sys.stdout", new_callable=io.StringIO):
+                self.assertEqual(o.cmd_review(argparse.Namespace(repo=[Path("/repo")], base="main")), 1)
+            self.assertEqual(o.review_state("o/n", pull), "missing")
 if __name__ == "__main__":
     unittest.main()

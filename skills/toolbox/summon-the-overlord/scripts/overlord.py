@@ -305,10 +305,10 @@ def resume_agent(record: dict, pane: str, path: Path) -> str:
         plan_mode_note = ", plan mode did not engage"
     session = (record.get("agent_session") or {}).get("value", "")
     if not session:
-        return "agent restarted, no session file to resume"
+        return f"agent restarted, no session file to resume{plan_mode_note}"
     instruction = f"Your pane moved to a new workspace. Resume the session at {session} and carry on where you left off."
     if not ok(["herdr", "agent", "prompt", pane, instruction]):
-        return "agent restarted, resume prompt failed"
+        return f"agent restarted, resume prompt failed{plan_mode_note}"
     return f"agent resumed{plan_mode_note}"
 
 
@@ -992,20 +992,30 @@ def plan_hardened(path: Path) -> bool:
     if not plan.is_file():
         return False
     lines = plan.read_text(errors="replace").splitlines()
-    # the last non-empty line: a trailing blank line is whitespace, not a plan edit
-    kept = [line for line in lines if line.strip()]
-    match = HARDENED_RE.fullmatch(kept[-1].strip()) if kept else None
-    if not match:
+    # strip only blank lines after the marker; internal plan spacing is part of the committed text
+    end = len(lines)
+    while end and not lines[end - 1].strip():
+        end -= 1
+    marker = HARDENED_RE.fullmatch(lines[end - 1].strip()) if end else None
+    if not marker:
+        return False
+    plan_text = "\n".join(lines[:end - 1]).rstrip("\n")
+    if not plan_text.strip():
         return False
     if not run(["git", "-C", str(path), "rev-parse", "--git-dir"]):
         # an adopted plain directory has no commits to name: a present marker is all it can have
         return True
     if not run(["git", "-C", str(path), "ls-files", "--error-unmatch", PLAN_FILE]):
         return False
-    # both sides stripped so spacing never decides it, and an empty `git show` (unknown sha)
-    # must never read as a match
-    shown = run(["git", "-C", str(path), "show", f"{match.group(1)}:{PLAN_FILE}"]).strip()
-    return bool(shown) and shown == "\n".join(kept[:-1]).strip()
+    # Preserve interior blank lines exactly; `run()` strips stdout and cannot prove bytes.
+    try:
+        shown = subprocess.run(
+            ["git", "-C", str(path), "show", f"{marker.group(1)}:{PLAN_FILE}"],
+            capture_output=True, text=True, check=False,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return shown.returncode == 0 and bool(shown.stdout.strip()) and shown.stdout.rstrip("\n") == plan_text
 
 
 def plan_state(wt: Worktree) -> tuple[bool, bool]:
@@ -1373,12 +1383,13 @@ def cmd_review(args: argparse.Namespace) -> int:
         # a failed run must leave no marker: the previous artifact covers an older commit, and
         # re-stamping it with the new sha would pass the gate on evidence about another head
         artifact.unlink(missing_ok=True)
-        code = 0 if ok(command, timeout=1800) else 1
-        failures += 1 if code else 0
+        ocr_ok = ok(command, timeout=1800)
         text = artifact.read_text(errors="replace") if artifact.exists() else ""
+        has_evidence = bool(text.strip())
+        code = 0 if ocr_ok and has_evidence else 1
+        failures += 1 if code else 0
         counts = severities(text)
-        if code == 0 and artifact.exists() and text.strip():
-            # a zero-byte artifact is no evidence: the gate must stay closed
+        if code == 0:
             artifact.write_text(f"<!-- reviewed: {pull.sha} -->\n{text}")
         for level, message in findings(text):
             if level != "low" and message:
