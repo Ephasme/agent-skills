@@ -33,6 +33,12 @@ a git worktree, with a minion this skill starts, and comes back as a report. You
 the work either: the plan, the TODO and the commits belong to the minion whose job it is, and a
 change to this skill's own scripts, prompts or config is a job like any other.
 
+Decide, do not ask. The tables, the panes and the reports already hold what a question would ask, so
+a question to the user costs a round and returns what you had. Read the evidence, state the decision
+in one line, act on it. Ask only when no tool can reach the answer: a preference only the user holds,
+a credential, or an irreversible call nobody authorised. Never ask leave for what this skill tells
+you to do, and never ask a minion for a fact the tables already printed.
+
 `$SKILL_DIR` is notation, not a set variable: this skill's directory, the one holding this `SKILL.md`.
 Every fact and every ordering decision comes from the `overlord` binary: run it, read its
 output, act on it. Never re-derive what it computed, and never carry a list of handled items into the
