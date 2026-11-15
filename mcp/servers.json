@@ -51,6 +51,10 @@
       "CF-Access-Client-Secret": "${IMESSAGE_CF_ACCESS_CLIENT_SECRET}"
     }
   },
+  "linear": {
+    "type": "http",
+    "url": "https://mcp.linear.app/mcp"
+  },
   "medicap": {
     "type": "http",
     "url": "https://medicap.site/api/mcp"
