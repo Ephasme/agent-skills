@@ -289,7 +289,9 @@ def open_workspace(path: Path, model: str) -> tuple[str, str]:
 def resume_agent(record: dict, pane: str, path: Path) -> str:
     """Start the moved agent again and point it at the session file it lost."""
     model, refusal = resolve_model("")
-    if refusal or not start_agent(agent_name(path), pane, model):
+    if refusal:
+        return f"agent restart failed: {refusal}"
+    if not start_agent(agent_name(path), pane, model):
         return "agent restart failed"
     # adopt registers everything as "adopted", so the mode field never says feat here; the plan
     # itself does: a committed plan without a current marker means the hardening work is unfinished
@@ -922,7 +924,7 @@ def order_plan(args: argparse.Namespace) -> list[tuple[int, str, PullRequest, bo
         groups = clusters(pulls)
         by_head = {pull.head: pull for pull in pulls}
         for pull in pulls:
-            green, blocker = github.checks_green(slug, pull.number, pull.sha)
+            green, blocker = checks_for(github, slug, pull)
             blockers = []
             if pull.draft:
                 blockers.append("draft")
@@ -1022,15 +1024,21 @@ def short_title(wt: Worktree) -> str:
 
 
 def check_green(wt: Worktree) -> bool:
-    """Green means every check run on the PR head succeeded; fetched on first use, once a pass."""
+    """Green means every check run on the PR head succeeded; one memoised fact per pass."""
     if not wt.pull or wt.pull.state != "OPEN":
         return False
     if not wt.checks:
-        wt.checks = shared(
-            ("checks", wt.slug, wt.pull.number, wt.pull.sha),
-            lambda: shared("github", Github).checks_green(wt.slug, wt.pull.number, wt.pull.sha)[1] or "green",
-        )
+        green, blocker = checks_for(shared("github", Github), wt.slug, wt.pull)
+        wt.checks = "green" if green else (blocker or "not green")
     return wt.checks == "green"
+
+
+def checks_for(github, slug: str, pull: PullRequest) -> tuple[bool, str]:
+    """(green, blocker) for one PR, fetched once per pass: `order_plan` and `check_green` agree."""
+    return shared(
+        ("checks", slug, pull.number, pull.sha),
+        lambda: github.checks_green(slug, pull.number, pull.sha),
+    )
 
 
 def pull_marker(pull: PullRequest) -> str:
@@ -1075,7 +1083,7 @@ def step_for(wt: Worktree, proposed: bool, hardened: bool) -> str:
     return "PLAN" if wt.task else "IDLE"
 
 
-# symbol, colour and what the label says the worktree is doing
+
 STEP_STYLE: dict[str, tuple[str, str]] = {
     "IDLE": ("💤", "#56b6c2"),
     "PLAN": ("🗺", "#61afef"),
@@ -1088,9 +1096,14 @@ STEP_STYLE: dict[str, tuple[str, str]] = {
 }
 
 def paint(step: str, name: str, title: str, fact: str = "") -> str:
-    """`<symbol> <STEP> <name> <title> (<fact>)`, clamped to the width a rename accepts."""
+    """`<symbol> <STEP> <name> <title> (<fact>)`, the whole string clamped to 64 characters."""
     symbol, _colour = STEP_STYLE.get(step, ("•", "#888888"))
-    return f"{symbol} {step} {name} {title}"[:64] + (f" ({fact})" if fact else "")
+    suffix = f" ({fact})" if fact else ""
+    base = f"{symbol} {step} {name} {title}"
+    room = 64 - len(base) - len(suffix)
+    if room < 0:
+        base = base[: max(1, len(base) + room)]
+    return base + suffix
 
 
 def work_fact(wt: Worktree, step: str) -> str:
@@ -1226,7 +1239,7 @@ def cmd_rename(args: argparse.Namespace) -> int:
         print(f"{wt.path}\t{workspace or '-'}\t{pane or '-'}\t{wt.name}\t{step}\t{symbol}\t{label}")
         if not args.apply:
             continue
-        tokens = (f"step={step}", f"title={title}")
+        tokens = (f"step={step}", f"name={wt.name}", f"title={title}")
         if workspace:
             herdr_apply(["herdr", "workspace", "rename", workspace, label])
             for token in tokens:
@@ -1313,6 +1326,7 @@ def cmd_review(args: argparse.Namespace) -> int:
     REVIEW_DIR.mkdir(parents=True, exist_ok=True)
     print("#repository\tpr\thead\tartifact\texit\tcritical\thigh\tmedium\tlow\treviewed\tstep")
     routed: list[tuple[Worktree, PullRequest, str, str]] = []
+    failures = 0
     for wt in collect(args.repo, args.base):
         proposed, hardened = plan_state(wt)
         step = step_for(wt, proposed, hardened)
@@ -1343,6 +1357,7 @@ def cmd_review(args: argparse.Namespace) -> int:
         # re-stamping it with the new sha would pass the gate on evidence about another head
         artifact.unlink(missing_ok=True)
         code = 0 if ok(command, timeout=1800) else 1
+        failures += 1 if code else 0
         text = artifact.read_text(errors="replace") if artifact.exists() else ""
         counts = severities(text)
         if code == 0 and artifact.exists():
@@ -1366,7 +1381,7 @@ def cmd_review(args: argparse.Namespace) -> int:
             argv = ["herdr", "agent", "prompt", wt.pane,
                     f"{level.upper()}: {strip_control(message)} (PR #{pull.number}, {wt.slug})"]
             print(" ".join(shlex.quote(word) for word in argv))
-
+    return 1 if failures else 0
 CONTROL_RE = re.compile(r"[\x00-\x1f\x7f]")
 
 
@@ -1464,6 +1479,9 @@ def stall_rows(args: argparse.Namespace) -> list[dict]:
     """One row per minion that is idle while its step still implies work."""
     rows: list[dict] = []
     for wt in collect(args.repo, args.base):
+        if wt.name == "-":
+            # a stranger's worktree: no minion to name, so no stall row and no alert about "-"
+            continue
         if wt.agent_status != "idle":
             continue
         proposed, hardened = plan_state(wt)
@@ -1577,8 +1595,12 @@ def classify(step: str, pane_text: str) -> tuple[str, str]:
     if not command:
         return "not_sure", "no classifier client configured"
     try:
+        argv = shlex.split(command)
+    except ValueError as exc:
+        return "not_sure", f"classifier command unparseable: {exc}"
+    try:
         done = subprocess.run(
-            command.split(), input=classifier_prompt(step, text),
+            argv, input=classifier_prompt(step, text),
             capture_output=True, text=True, timeout=CLASSIFIER_TIMEOUT,
         )
     except (OSError, subprocess.SubprocessError) as exc:
@@ -1780,7 +1802,8 @@ def cmd_spawn(args: argparse.Namespace) -> int:
     entries = registry()
     register_entry(entries, str(path.resolve()), {"repo": str(repo), "branch": branch, "mode": args.mode, "task": args.task}, slug)
     save_registry(entries)
-    label = paint(step, entries[str(path.resolve())]["name"], birth)
+    identity = entries[str(path.resolve())]
+    label = paint(step, identity["name"], birth)
     workspace, minion = open_workspace(path, model)
     if not minion:
         print(f"worktree ready, no minion started in {workspace or 'herdr'}: start one there", file=sys.stderr)
@@ -1799,7 +1822,7 @@ def cmd_spawn(args: argparse.Namespace) -> int:
     for kind, target in ((("workspace", workspace), ("pane", minion))):
         if not target:
             continue
-        for token in (f"step={step}", f"title={birth}"):
+        for token in (f"step={step}", f"name={identity['name']}", f"title={birth}"):
             herdr_apply(["herdr", kind, "report-metadata", target, "--source", "overlord", "--token", token])
     return 0
 

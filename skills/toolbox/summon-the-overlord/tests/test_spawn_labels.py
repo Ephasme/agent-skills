@@ -704,5 +704,28 @@ class SecondReviewTests(unittest.TestCase):
         self.assertFalse(plan[0][3])
         self.assertIn("reviewing", plan[0][4])
 
+    def test_label_stays_within_the_length_a_rename_accepts(self):
+        fact = "PR #123 - m3"
+        label = o.paint("REV", "m8", "ocr-review-pr13-with-a-very-long-title-identifier", fact)
+        self.assertLessEqual(len(label), 64)
+        self.assertTrue(label.endswith(f"({fact})"), label)
+
+    def test_review_returns_non_zero_when_a_run_failed(self):
+        with tempfile.TemporaryDirectory() as state:
+            review_dir = Path(state) / "review"
+            review_dir.mkdir(parents=True)
+            pull = o.PullRequest(number=13, state="OPEN", mergeable="MERGEABLE", merge_state="CLEAN",
+                                 draft=False, files=1, sha="e" * 40, head="h")
+            wt = o.Worktree(path=Path("/wt"), repo=Path("/repo"), branch="b", dirty=0, ahead=1,
+                            upstream="origin/b", slug="o/n", pull=pull, pane="p")
+            with patch.object(o, "REVIEW_DIR", review_dir), patch.object(
+                o, "ocr_present", return_value=True
+            ), patch.object(o, "collect", return_value=[wt]), patch.object(
+                o, "plan_state", return_value=(False, False)
+            ), patch.object(o, "step_for", return_value="REV"), patch.object(
+                o, "ok", return_value=False
+            ), patch("sys.stdout", new_callable=io.StringIO):
+                self.assertEqual(o.cmd_review(argparse.Namespace(repo=[Path("/repo")], base="main")), 1)
+
 if __name__ == "__main__":
     unittest.main()
