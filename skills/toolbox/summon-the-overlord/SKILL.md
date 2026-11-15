@@ -227,7 +227,8 @@ never from memory. Once per session, `ensure_project(human_key "<project>")` the
 `register_agent(project_key "<project>", name "<agent>", program "omp", model "overlord",
 task_description "overlord")`. At the start of every pass, `fetch_inbox(project_key "<project>",
 agent_name "<agent>", unread_only true, include_bodies true)`: a subject beginning `<mN> DONE` is
-that minion's report, and it replaces asking the minion for one. If the mail tools are missing or
+that minion's report, and `<mN> BLOCKED` one that needs your decision; either replaces asking the
+minion for a status. If the mail tools are missing or
 the server refuses, say so once and carry on from the tables; never retry in a loop and never fall
 back to prompting a minion for its status.
 
