@@ -1743,7 +1743,7 @@ def cmd_spawn(args: argparse.Namespace) -> int:
         print(f"would run\therdr workspace create --cwd {path} --no-focus")
         print(f"would run\therdr agent start {agent_name(path)} --kind omp --pane <pane> -- --model {model} --plan {model} --smol {model}")
         if args.mode == "feat":
-            print(f"would run\therdr agent send-keys <pane> {PLAN_TOGGLE}")
+            print(f"would run\therdr pane send-keys <pane> {PLAN_TOGGLE} once the shell has printed")
             print("would run\tverify plan mode from the pane banner, fail the spawn otherwise")
         print("would run\therdr agent prompt <pane> <handover>")
         print(f"would run\therdr workspace rename <workspace> {preview}")

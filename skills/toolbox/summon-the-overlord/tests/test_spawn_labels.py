@@ -37,16 +37,17 @@ def dry_run(mode: str, task: str = "feat prompt and spawn labelling", title: str
 
 
 class SpawnOrderTests(unittest.TestCase):
-    def test_feat_starts_agent_then_toggles_plan_mode_then_prompts(self):
+    def test_feat_starts_agent_then_sends_the_pane_chord_then_prompts(self):
         lines = dry_run("feat")
-        verbs = [
-            line.split()[4] for line in lines
-            if line.startswith("would run\therdr agent ")
+        sequence = [
+            f"{words[3]} {words[4]}" for words in
+            (line.split() for line in lines if line.startswith("would run\therdr "))
+            if words[3] in {"agent", "pane"} and words[4] in {"start", "send-keys", "prompt"}
         ]
-        self.assertEqual(verbs, ["start", "send-keys", "prompt"])
+        self.assertEqual(sequence, ["agent start", "pane send-keys", "agent prompt"])
         started = next(line for line in lines if " agent start " in line)
         self.assertTrue(started.endswith("--model test-model --plan test-model --smol test-model"))
-        self.assertTrue(next(line for line in lines if "send-keys" in line).endswith("Alt+Shift+P"))
+        self.assertIn("Alt+Shift+P", next(line for line in lines if "send-keys" in line))
 
     def test_fast_starts_agent_then_prompts_without_plan_mode(self):
         lines = dry_run("fast")
