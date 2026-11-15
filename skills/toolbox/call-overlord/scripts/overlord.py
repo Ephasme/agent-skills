@@ -519,7 +519,7 @@ def cmd_order(args: argparse.Namespace) -> int:
     plan.sort(key=lambda row: (row[6], row[5], row[0], row[2].number))
 
     print("#rank\trepo\tpr\tbranch\tbase\tfiles\tcluster\tready\tblockers")
-    for index, (_files, slug, pull, ready, blocker, cluster) in enumerate(plan, start=1):
+    for index, (_files, slug, pull, ready, blocker, cluster, _depth) in enumerate(plan, start=1):
         print(
             f"{index}\t{slug}\t{pull.number}\t{pull.head}\t{pull.base}\t"
             f"{len(pull.paths)}\t{cluster}\t{'yes' if ready else 'no'}\t{blocker or '-'}"
