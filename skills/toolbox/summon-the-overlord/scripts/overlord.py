@@ -812,7 +812,9 @@ def landable(wt: Worktree) -> str:
     if wt.pull and wt.pull.state == "OPEN":
         # a review of an older commit is evidence about that commit, never about this head
         state = review_state(wt.slug, wt.pull)
-        return "open-pr" if state == "current" and ocr_present() else f"unreviewed: {state}"
+        if state == "current":
+            return "open-pr" if ocr_present() else "unreviewed: ocr missing"
+        return f"unreviewed: {state}"
     if wt.pull and wt.pull.state == "MERGED":
         return ""
     return "no-pr" if wt.ahead > 0 else ""
@@ -1066,6 +1068,13 @@ def step_for(wt: Worktree, proposed: bool, hardened: bool) -> str:
         if not check_green(wt) or review_marker(wt) == "REVIEWING":
             return "REV"
         return "MRG"
+    if not wt.vcs:
+        # no git, so no commits to move a plain target along: its plan file is the only evidence
+        if hardened:
+            return "BUILD"
+        if proposed:
+            return "HRD"
+        return "PLAN" if wt.task else "IDLE"
     committed_plan = bool(shared(
         ("plan_committed", str(wt.path.resolve())),
         lambda: run(["git", "-C", str(wt.path), "ls-files", "--error-unmatch", PLAN_FILE]),
@@ -1360,7 +1369,8 @@ def cmd_review(args: argparse.Namespace) -> int:
         failures += 1 if code else 0
         text = artifact.read_text(errors="replace") if artifact.exists() else ""
         counts = severities(text)
-        if code == 0 and artifact.exists():
+        if code == 0 and artifact.exists() and text.strip():
+            # a zero-byte artifact is no evidence: the gate must stay closed
             artifact.write_text(f"<!-- reviewed: {pull.sha} -->\n{text}")
         for level, message in findings(text):
             if level != "low" and message:
@@ -1489,12 +1499,14 @@ def stall_rows(args: argparse.Namespace) -> list[dict]:
         if step not in STALLED_STEPS:
             continue
         tail = last_line(wt.pane)
-        verdict, _reason = classify(step, tail)
+        dry = getattr(args, "dry_run", False)
+        # a dry run changes nothing and buys nothing: no classifier call, no gh request
+        verdict, _reason = ("skipped", "") if dry else classify(step, tail)
         pull = wt.pull
         rows.append({
             "name": wt.name,
             "step": step,
-            "title": wt.title or short_title(wt),
+            "title": wt.title or ("-" if dry else short_title(wt)),
             "idle_seconds": min(ages) if (ages := [age for age in (
                 seconds_since(pull.updated_at if pull else ""),
                 seconds_since(wt.last_commit_at),
@@ -1503,7 +1515,8 @@ def stall_rows(args: argparse.Namespace) -> list[dict]:
             "commit_age": seconds_since(wt.last_commit_at),
             "dirty": wt.dirty,
             "pr": f"#{pull.number} {pull.state} {pull.mergeable}" if pull else "none",
-            "checks": wt.checks or ("none" if not pull or pull.state != "OPEN" else ("green" if check_green(wt) else "not green")),
+            "checks": "skipped" if dry else (wt.checks or ("none" if not pull or pull.state != "OPEN"
+                                                           else ("green" if check_green(wt) else "not green"))),
             "question": "yes" if IDLE_RE.match(tail) else "no",
             # the label verdict is evidence for the overlord's decision, never a rename trigger,
             # and it costs nothing unless a stall exists: no stall, no classifier call
@@ -1592,7 +1605,7 @@ def classify(step: str, pane_text: str) -> tuple[str, str]:
     if text.startswith("<unreadable"):
         return "not_sure", "unreadable pane"
     command = os.environ.get("OVERLORD_CLASSIFIER_CMD", "")
-    if not command:
+    if not command.strip():
         return "not_sure", "no classifier client configured"
     try:
         argv = shlex.split(command)
@@ -1618,7 +1631,8 @@ def cmd_watch(args: argparse.Namespace) -> int:
         rows = show_stalls(args)
         if args.alert:
             alert_new(rows)
-        if args.once or not args.interval:
+        # `status --stop` writes the same file: a watch started for a loop ends with the loop
+        if args.once or not args.interval or consume_stop():
             return 0
         time.sleep(args.interval)
 

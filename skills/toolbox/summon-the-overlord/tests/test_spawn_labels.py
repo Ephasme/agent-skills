@@ -358,7 +358,8 @@ class ReviewGateTests(unittest.TestCase):
         )
         with patch.object(o, "REVIEW_DIR", self.dir / "review"), patch.object(o, "ocr_present", return_value=False):
             self.write_artifact("o/n", 13, "a" * 40)
-            self.assertEqual(o.landable(wt), "unreviewed: current")
+            # the artifact is current, so the honest blocker is the missing tool, not the review
+            self.assertEqual(o.landable(wt), "unreviewed: ocr missing")
 
     def test_severity_counts_and_routing_skip_low(self):
         text = ('[{"severity":"critical","message":"drops the lock"},'
@@ -726,6 +727,39 @@ class SecondReviewTests(unittest.TestCase):
                 o, "ok", return_value=False
             ), patch("sys.stdout", new_callable=io.StringIO):
                 self.assertEqual(o.cmd_review(argparse.Namespace(repo=[Path("/repo")], base="main")), 1)
+
+    def test_a_plain_directory_moves_past_plan(self):
+        base = dict(path=Path("/tmp/dir"), repo=Path("/tmp/dir"), branch="-", dirty=0, ahead=0,
+                    upstream="none", slug="", pull=None, vcs=False, name="m5", task="eval")
+        self.assertEqual(o.step_for(o.Worktree(**base), True, False), "HRD")
+        self.assertEqual(o.step_for(o.Worktree(**base), True, True), "BUILD")
+        self.assertEqual(o.step_for(o.Worktree(**base), False, False), "PLAN")
+        self.assertEqual(o.step_for(o.Worktree(**{**base, "task": ""}), False, False), "IDLE")
+
+    def test_an_empty_artifact_does_not_open_the_gate(self):
+        with tempfile.TemporaryDirectory() as state:
+            review_dir = Path(state) / "review"
+            review_dir.mkdir(parents=True)
+            pull = o.PullRequest(number=13, state="OPEN", mergeable="MERGEABLE", merge_state="CLEAN",
+                                 draft=False, files=1, sha="f" * 40, head="h")
+            wt = o.Worktree(path=Path("/wt"), repo=Path("/repo"), branch="b", dirty=0, ahead=1,
+                            upstream="origin/b", slug="o/n", pull=pull, pane="p")
+            artifact = review_dir / "o-n-13.txt"
+
+            def empty_run(_argv, **_kwargs):
+                artifact.write_text("")
+                return True
+
+            with patch.object(o, "REVIEW_DIR", review_dir), patch.object(
+                o, "ocr_present", return_value=True
+            ), patch.object(o, "collect", return_value=[wt]), patch.object(
+                o, "plan_state", return_value=(False, False)
+            ), patch.object(o, "step_for", return_value="REV"), patch.object(
+                o, "ok", side_effect=empty_run
+            ), patch("sys.stdout", new_callable=io.StringIO):
+                o.cmd_review(argparse.Namespace(repo=[Path("/repo")], base="main"))
+            self.assertEqual(o.review_state("o/n", pull), "missing")
+
 
 if __name__ == "__main__":
     unittest.main()
