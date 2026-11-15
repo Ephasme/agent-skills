@@ -28,25 +28,33 @@ def check():
         if not worktree.get("is_linked_worktree"):
             continue
         # Only targets: two primary checkouts of one repo share a name by design.
-        by_label.setdefault(ws.get("label"), []).append(ws["workspace_id"])
+        label = ws.get("label") or ""
+        if not label:
+            rows.append((ws["workspace_id"], "-", "-", "label missing"))
+            failures.append("%s: workspace has no label" % ws["workspace_id"])
+            continue
+        by_label.setdefault(label, []).append(ws["workspace_id"])
         path = worktree.get("checkout_path")
         if not path or not os.path.isdir(path):
-            rows.append((ws["workspace_id"], ws.get("label"), "-", "checkout missing"))
+            rows.append((ws["workspace_id"], label, "-", "checkout missing"))
             failures.append("%s: checkout missing (%s)" % (ws["workspace_id"], path))
             continue
         code, branch, _ = survey.git(path, "branch", "--show-current")
-        branch = branch.strip() if code == 0 and branch.strip() else "-"
-        if labels.is_generated(ws.get("label")):
+        branch = branch.strip() if code == 0 else ""
+        if not branch:
+            note = "no branch (detached or git failed)"
+            failures.append("%s: cannot read branch in %s" % (ws["workspace_id"], path))
+        elif labels.is_generated(label):
             note = "placeholder label"
             failures.append("%s: label is herdr's placeholder" % ws["workspace_id"])
-        elif branch != "worktree/" + ws["label"] and not labels.is_generated(branch):
+        elif branch != "worktree/" + label and not labels.is_generated(branch):
             note = "branch is a chosen name"
-        elif branch != "worktree/" + ws["label"]:
+        elif branch != "worktree/" + label:
             note = "branch still placeholder"
-            failures.append("%s: branch %s not worktree/%s" % (ws["workspace_id"], branch, ws["label"]))
+            failures.append("%s: branch %s not worktree/%s" % (ws["workspace_id"], branch, label))
         else:
             note = "ok"
-        rows.append((ws["workspace_id"], ws.get("label"), branch, note))
+        rows.append((ws["workspace_id"], label, branch or "-", note))
 
     duplicates = {label: ids for label, ids in by_label.items() if len(ids) > 1}
     for label, ids in duplicates.items():

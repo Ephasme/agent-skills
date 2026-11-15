@@ -17,9 +17,9 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess
 from pathlib import Path
-import re
 import sys
 import threading
 import time
@@ -57,12 +57,26 @@ def load_plan(spec):
     else:
         with open(spec) as handle:
             data = json.load(handle)
-    pairs = list(data.items()) if isinstance(data, dict) else [(row["workspace_id"], row["label"]) for row in data]
-    seen = {}
+    if isinstance(data, dict):
+        pairs = list(data.items())
+    elif isinstance(data, list):
+        if any(not isinstance(row, dict) or "workspace_id" not in row or "label" not in row for row in data):
+            sys.exit("plan list entries must be objects with workspace_id and label")
+        pairs = [(row["workspace_id"], row["label"]) for row in data]
+    else:
+        sys.exit("plan must be a JSON object or a list of workspace_id/label objects")
+    seen, seen_ws = {}, set()
     for workspace_id, label in pairs:
+        if not isinstance(workspace_id, str) or not workspace_id:
+            sys.exit("plan workspace ids must be non-empty strings")
+        if workspace_id in seen_ws:
+            sys.exit("plan lists workspace %s more than once: each may appear once" % workspace_id)
+        if not isinstance(label, str):
+            sys.exit("plan label for %s must be a string" % workspace_id)
         if label in seen:
             sys.exit("plan gives %s the same label as %s: labels must be distinct" % (workspace_id, seen[label]))
         seen[label] = workspace_id
+        seen_ws.add(workspace_id)
     return pairs
 
 
@@ -153,8 +167,11 @@ def decide(entry, label, dry):
     if code != 0:
         out["reason"] = "git fetch origin %s failed: %s" % (old, err.strip())
         return out
-    code, behind, _ = survey.git(path, "rev-list", "--count", "HEAD..@{u}")
-    if code == 0 and behind.strip().isdigit() and int(behind) > 0:
+    code, behind, err = survey.git(path, "rev-list", "--count", "HEAD..@{u}")
+    if code != 0 or not behind.strip().isdigit():
+        out["reason"] = "cannot compare with upstream: %s" % (err or behind or "unknown")
+        return out
+    if int(behind) > 0:
         out["reason"] = "behind upstream by %s commits" % behind.strip()
         return out
 
@@ -167,11 +184,12 @@ def decide(entry, label, dry):
         return out
     code, _, err = survey.git(path, "push", "-u", "origin", new)
     if code != 0:
-        out.update(new=None, reason="push -u failed, old remote kept: %s" % err)
+        survey.git(path, "branch", "-m", old)
+        out.update(new=None, reason="push -u failed, local name rolled back: %s" % err)
         return out
     code, _, err = survey.git(path, "push", "origin", "--delete", old)
     if code != 0:
-        out.update(new=new, pushed=True, reason="old remote kept, delete failed: %s" % err)
+        out.update(new=new, pushed=True, reason="branch moved, old remote kept (delete failed): %s" % err)
         return out
     out.update(new=new, pushed=True, deleted_remote=True, reason="no PR, not behind")
     return out
@@ -179,17 +197,22 @@ def decide(entry, label, dry):
 
 def notify(entry, decision, dry):
     """Tell a running agent its branch moved, then check the broadcast landed."""
-    if not decision["deleted_remote"]:
+    if not decision["new"]:
         return "not needed"
     running = [pane for pane in entry["panes"] if pane["agent_status"] == "working"]
     if not running:
         return "no running agent"
     code, sha, _ = survey.git(entry["checkout"], "rev-parse", "--short", "HEAD")
     sha = sha.strip() if code == 0 else "HEAD"
+    if decision["deleted_remote"]:
+        remote = "upstream origin/%s at %s; old remote branch %s deleted" % (decision["new"], sha, decision["old"])
+    elif decision["pushed"]:
+        remote = "pushed origin/%s at %s; old remote branch %s kept" % (decision["new"], sha, decision["old"])
+    else:
+        remote = "local branch only (no upstream)"
     text = (
-        "branch %s -> %s; upstream origin/%s at %s; old remote branch %s deleted; "
-        "broadcast this to every subagent via write agent://all; never push the old name"
-        % (decision["old"], decision["new"], decision["new"], sha, decision["old"])
+        "branch %s -> %s; %s; broadcast this to every subagent via write agent://all; never push the old name"
+        % (decision["old"], decision["new"], remote)
     )
     if dry:
         return "would send to %s" % ", ".join(pane["pane_id"] for pane in running)
@@ -242,17 +265,16 @@ def table(rows):
     return "\n".join(out)
 
 
-def apply_one(entry, label, dry):
+def apply_one(entry, label, dry, no_notify):
     if entry["label"] != label and not dry:
         survey.herdr("workspace", "rename", entry["workspace_id"], label)
     with repo_lock(entry.get("repo")):
         decision = decide(entry, label, dry)
+    if no_notify:
+        return decision, "skipped"
     return decision, notify(entry, decision, dry)
 
 
-STEP_LABEL = re.compile(
-    r"^(?:\U0001F441|\U0001F5FA|\U0001F6E1|\u2692|\U0001F50D|\u27F3|\u2935|\u2714)\s+(SEE|PLAN|HRD|WORK|REV|REB|MRG|DONE)\b"
-)
 
 def herdr_json(*args):
     """Ask herdr for JSON; the caller's environment decides which session answers."""
@@ -262,18 +284,23 @@ def herdr_json(*args):
     return json.loads(done.stdout)["result"]
 
 
-REGISTRY = Path.home() / ".local" / "state" / "call-overlord" / "worktrees.json"
+REGISTRY = Path(os.environ.get("XDG_STATE_HOME", Path.home() / ".local" / "state")) / "call-overlord" / "worktrees.json"
 
 
 def owned_paths():
     """Worktrees the overlord registers as its own; empty when it has spawned none."""
-    try:
-        return {str(Path(path)) for path in json.loads(REGISTRY.read_text())}
-    except (OSError, json.JSONDecodeError):
+    if not REGISTRY.exists():
         return set()
+    try:
+        data = json.loads(REGISTRY.read_text())
+    except (OSError, json.JSONDecodeError) as error:
+        raise SystemExit("registry unreadable (%s): %s" % (REGISTRY, error))
+    if not isinstance(data, dict):
+        raise SystemExit("registry is not an object (%s)" % REGISTRY)
+    return {str(Path(path)) for path in data}
 
 def drop_foreign(plan):
-    """Keep only plans whose workspace carries a step label: the overlord's own worktrees."""
+    """Keep only plans whose workspace the overlord registered as its own."""
     owned = owned_paths()
     paths = {(ws.get("worktree") or {}).get("checkout_path", ""): ws["workspace_id"] for ws in herdr_json("workspace", "list")["workspaces"]}
     keep = {ws for path, ws in paths.items() if str(Path(path).resolve()) in owned}
@@ -291,25 +318,34 @@ def main(argv=None):
     parser.add_argument("--json", default="herdr-applied.json", help="where to write the outcome")
     parser.add_argument("--apply", action="store_true", help="actually change herdr and git")
     parser.add_argument("--no-notify", action="store_true", help="skip the message to running agents")
-    parser.add_argument("--only-mine", action="store_true", help="only worktrees the overlord maintains (step-prefixed label)")
+    parser.add_argument("--only-mine", action="store_true", help="only worktrees the overlord registered")
     args = parser.parse_args(argv)
     dry = not args.apply
 
     with open(args.state) as handle:
         state = {entry["workspace_id"]: entry for entry in json.load(handle)["targets"]}
     plan = load_plan(args.plan)
+    if args.only_mine:
+        plan = list(drop_foreign(dict(plan)).items())
 
     problems = []
     for workspace_id, label in plan:
         if workspace_id not in state:
             problems.append("%s: not a linked-worktree target in %s" % (workspace_id, args.state))
+            continue
+        entry = state[workspace_id]
+        if entry.get("error"):
+            problems.append("%s: survey incomplete: %s" % (workspace_id, entry["error"]))
         for problem in labels.problems(label):
             problems.append("%s -> %s: %s" % (workspace_id, label, problem))
     if problems:
         sys.exit("plan refused:\n  " + "\n  ".join(problems))
+    if not plan:
+        print("empty plan: nothing to apply")
+        return 0
 
     with ThreadPoolExecutor(max_workers=min(8, len(plan))) as pool:
-        jobs = [(workspace_id, label, entry, pool.submit(apply_one, entry, label, dry))
+        jobs = [(workspace_id, label, entry, pool.submit(apply_one, entry, label, dry, args.no_notify))
                 for workspace_id, label in plan for entry in [state[workspace_id]]]
         results = [(workspace_id, label, entry, job.result()) for workspace_id, label, entry, job in jobs]
 

@@ -35,7 +35,9 @@ def is_generated(name):
 
 def problems(label):
     """Every reason this label cannot be used, in the order it was checked."""
-    if not label or not label.strip():
+    if not isinstance(label, str):
+        return ["empty label" if not label else "label is %s, not a string" % type(label).__name__]
+    if not label.strip():
         return ["empty label"]
     label = label.strip()
     out = []
@@ -55,6 +57,9 @@ def problems(label):
 
 
 def main(argv):
+    if not argv:
+        print("usage: labels.py <label>...", file=sys.stderr)
+        return 2
     bad = 0
     for label in argv:
         found = problems(label)
