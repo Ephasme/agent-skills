@@ -17,6 +17,8 @@ from __future__ import annotations
 
 import argparse
 import json
+from pathlib import Path
+import re
 import subprocess
 import sys
 import threading
@@ -248,6 +250,32 @@ def apply_one(entry, label, dry):
     return decision, notify(entry, decision, dry)
 
 
+STEP_LABEL = re.compile(
+    r"^(?:\U0001F441|\U0001F5FA|\U0001F6E1|\u2692|\U0001F50D|\u27F3|\u2935|\u2714)\s+(SEE|PLAN|HRD|WORK|REV|REB|MRG|DONE)\b"
+)
+
+REGISTRY = Path.home() / ".local" / "state" / "call-overlord" / "worktrees.json"
+
+
+def owned_paths():
+    """Worktrees the overlord registers as its own; empty when it has spawned none."""
+    try:
+        return {str(Path(path)) for path in json.loads(REGISTRY.read_text())}
+    except (OSError, json.JSONDecodeError):
+        return set()
+
+def drop_foreign(plan):
+    """Keep only plans whose workspace carries a step label: the overlord's own worktrees."""
+    owned = owned_paths()
+    paths = {(ws.get("worktree") or {}).get("checkout_path", ""): ws["workspace_id"] for ws in herdr_json("workspace", "list")["workspaces"]}
+    keep = {ws for path, ws in paths.items() if str(Path(path).resolve()) in owned}
+    kept = {ws: label for ws, label in plan.items() if ws in keep}
+    for ws in plan:
+        if ws not in kept:
+            print("skip %s: not registered as an overlord worktree" % ws, file=sys.stderr)
+    return kept
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("plan", help="JSON plan — {workspace_id: label} — as a file path or inline JSON")
@@ -255,6 +283,7 @@ def main(argv=None):
     parser.add_argument("--json", default="herdr-applied.json", help="where to write the outcome")
     parser.add_argument("--apply", action="store_true", help="actually change herdr and git")
     parser.add_argument("--no-notify", action="store_true", help="skip the message to running agents")
+    parser.add_argument("--only-mine", action="store_true", help="only worktrees the overlord maintains (step-prefixed label)")
     args = parser.parse_args(argv)
     dry = not args.apply
 

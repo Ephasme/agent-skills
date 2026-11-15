@@ -41,6 +41,56 @@ import httpx
 STOP_FILE = Path(os.environ.get("LAND_WORK_STOP", f"{os.environ.get('TMPDIR', '/tmp')}/land-work-stop"))
 IDLE_MINUTES = 20
 ACTIVITY_FILE = Path(os.environ.get("TMPDIR", "/tmp")) / "overlord-last-active"
+STATE_DIR = Path(os.environ.get("XDG_STATE_HOME", Path.home() / ".local" / "state")) / "call-overlord"
+REGISTRY = STATE_DIR / "worktrees.json"
+
+
+def registry() -> dict[str, dict[str, str]]:
+    """The worktrees this overlord owns: path -> repo, branch, mode, task, created_at."""
+    try:
+        return json.loads(REGISTRY.read_text())
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+
+def save_registry(entries: dict[str, dict[str, str]]) -> None:
+    STATE_DIR.mkdir(parents=True, exist_ok=True)
+    REGISTRY.write_text(json.dumps(entries, indent=2, sort_keys=True))
+
+
+def cmd_registry(args: argparse.Namespace) -> int:
+    entries = registry()
+    if args.path:
+        for path in entries:
+            print(path)
+        return 0
+    if args.add:
+        entries = registry()
+        for path in args.add:
+            entries[str(Path(path).expanduser().resolve())] = {"repo": args.source_repo or "", "task": args.task or ""}
+        save_registry(entries)
+        print(f"registered {len(args.add)} path(s)")
+        return 0
+    if args.remove:
+        entries = registry()
+        for path in args.remove:
+            entries.pop(str(Path(path).expanduser().resolve()), None)
+        save_registry(entries)
+        print(f"removed {len(args.remove)} path(s)")
+        return 0
+    if args.rename_list:
+        by_path, _by_ws = herdr_facts()
+        labels = {
+            (ws.get("worktree") or {}).get("checkout_path", ""): ws.get("label", "")
+            for ws in json.loads(run(["herdr", "workspace", "list"]) or "{}").get("result", {}).get("workspaces", [])
+        } if os.environ.get("HERDR_ENV") == "1" else {}
+        print("#workspace\tlabel\tpath")
+        for path, meta in sorted(entries.items()):
+            workspace = by_path.get(str(Path(path).resolve()), "-")
+            print(f"{workspace}\t{labels.get(path, meta.get('task', ''))[:40]}\t{path}")
+        return 0
+    print(json.dumps(entries, indent=2, sort_keys=True))
+    return 0
 LEGACY_STOP = Path(os.environ.get("TMPDIR", "/tmp")) / "merge-agents-stop"
 PLAN_FILE = "PLAN.md"
 HARDEN = "/skill:harden-plan"
@@ -532,6 +582,9 @@ def cmd_prune(args: argparse.Namespace) -> int:
         if not args.apply:
             continue
         run(["git", "-C", str(wt.repo), "worktree", "remove", "--force", str(wt.path)])
+        entries = registry()
+        entries.pop(str(wt.path), None)
+        save_registry(entries)
         run(["git", "-C", str(wt.repo), "branch", "-D", wt.branch])
         if wt.pane not in {"-", ""}:
             _by_path, by_ws = herdr_facts()
@@ -613,9 +666,23 @@ def cmd_spawn(args: argparse.Namespace) -> int:
         print("worktree creation failed", file=sys.stderr)
         return 1
     handover = " ".join(part for part in (probe, args.task) if part)
+    if not args.dry_run:
+        entries = registry()
+        entries[str(path)] = {"repo": str(repo), "branch": branch, "mode": args.mode, "task": args.task}
+        save_registry(entries)
     print("next\tstart an agent in that path, then:")
     print(f'\therdr agent prompt <pane> "{handover}" --wait --until idle')
     return 0
+
+
+def delegated(module: str):
+    """Run one of the integrated rename helpers by importing it beside this file."""
+    import importlib
+
+    def handler(args: argparse.Namespace) -> int:
+        return importlib.import_module(module).main(args.rest)
+
+    return handler
 
 
 def main(argv: list[str]) -> int:
@@ -628,6 +695,23 @@ def main(argv: list[str]) -> int:
     spawn.add_argument("--mode", default="feat", help="fast, hotfix or feat")
     spawn.add_argument("--task", default="", help="what the worker should do")
     spawn.add_argument("--dry-run", action="store_true", help="print instead of creating")
+
+    for name, module, help_text in (
+        ("survey", "survey", "survey every worktree: branch, commits, panes"),
+        ("labels", "labels", "check labels against the naming rules"),
+        ("relabel", "apply", "rename workspaces and move their branches"),
+        ("verify", "verify", "verify labels after a pass"),
+    ):
+        sub = subs.add_parser(name, help=help_text)
+        sub.add_argument("rest", nargs=argparse.REMAINDER, help="arguments for the helper")
+
+    reg = subs.add_parser("registry", help="the worktrees this overlord owns")
+    reg.add_argument("--path", action="store_true", help="one path per line")
+    reg.add_argument("--add", nargs="*", default=[], help="register these worktree paths")
+    reg.add_argument("--remove", nargs="*", default=[], help="forget these worktree paths")
+    reg.add_argument("--task", default="", help="what the worktree is for")
+    reg.add_argument("--source-repo", default="", help="repository path the worktree came from")
+    reg.add_argument("--rename-list", action="store_true", help="workspace, label and path of every owned worktree")
 
     preflight = subs.add_parser("preflight", help="verify dependencies, install what is missing")
     preflight.add_argument("--apply", action="store_true", help="install what is absent")
@@ -657,6 +741,11 @@ def main(argv: list[str]) -> int:
     args.repo = [Path(path) for path in args.repo] or [Path.cwd()]
     handlers = {
         "preflight": cmd_preflight,
+        "registry": cmd_registry,
+        "survey": delegated("survey"),
+        "labels": delegated("labels"),
+        "relabel": delegated("apply"),
+        "verify": delegated("verify"),
         "spawn": cmd_spawn,
         "inventory": cmd_inventory,
         "order": cmd_order,
