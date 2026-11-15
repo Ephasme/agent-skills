@@ -98,10 +98,18 @@ def registry() -> dict[str, dict[str, str]]:
     return data
 
 
+HEADER_WORDS = {"job", "task", "brief"}
+
+
 def title_slug(source: str) -> str:
-    words = [word for word in re.split(r"[^a-z0-9]+", source.lower()) if word]
-    kept = [word for word in words if word not in STOP_WORDS][:4]
-    return "-".join(kept) or "untitled"
+    """Four kebab words: header labels (`Job:`, `Brief:`) and their words never reach a title."""
+    kept: list[str] = []
+    for token in source.split():
+        clean = token.strip(".:,;!?()[]{}").lower()
+        if token.endswith(":") or clean in HEADER_WORDS or clean in STOP_WORDS:
+            continue
+        kept.extend(word for word in re.split(r"[^a-z0-9]+", clean) if word)
+    return "-".join(kept[:4]) or "untitled"
 
 
 def register_entry(entries: dict, path: str, meta: dict, title: str = "") -> None:
@@ -1665,12 +1673,7 @@ def cmd_spawn(args: argparse.Namespace) -> int:
     if title and not re.fullmatch(r"[a-z0-9]+(-[a-z0-9]+)*", title):
         print("--title must be lowercase letters, digits and single hyphens", file=sys.stderr)
         return 2
-    if title:
-        slug = title
-    else:
-        words = [word for word in re.split(r"\s+", args.task) if word and not word.endswith(":")]
-        words = [word for word in words if word.lower().strip(".:,;!?()[]{}") not in {"job", "task", "brief"}]
-        slug = "-".join(word for word in re.split(r"[^a-z0-9]+", " ".join(words).lower()) if word and word not in STOP_WORDS)[:60] or "job"
+    slug = title or (title_slug(args.task)[:60] if title_slug(args.task) != "untitled" else "job")
     branch = f"worktree/{slug}"
     path = Path(args.dest).expanduser() / slug if args.dest else Path.home() / ".herdr" / "worktrees" / repo.name / slug
     pane = os.environ.get("HERDR_PANE_ID", "")

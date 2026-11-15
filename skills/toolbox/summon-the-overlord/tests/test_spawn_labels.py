@@ -493,6 +493,12 @@ class ReviewFixTests(unittest.TestCase):
                          "⤵ MRG m7 overlord-panel-rows (PR #2 · merged)")
         self.assertEqual(label("PLAN", None), "🗺 PLAN m8 ocr-review-pr13")
 
+    def test_title_slug_drops_headers_and_header_words(self):
+        # reconciled from m1's install-copy tests: the header label never reaches a title
+        self.assertEqual(o.title_slug("Job: rewrite the overlord toolbelt"), "rewrite-overlord-toolbelt")
+        self.assertEqual(o.title_slug("Brief:"), "untitled")
+        self.assertEqual(o.title_slug("task brief"), "untitled")
+
 
 if __name__ == "__main__":
     unittest.main()
