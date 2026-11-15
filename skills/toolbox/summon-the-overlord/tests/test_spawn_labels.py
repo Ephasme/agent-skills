@@ -469,5 +469,25 @@ class ReviewFixTests(unittest.TestCase):
                     "checks": "none", "question": "no", "tail": "-",
                 }])
             self.assertEqual(json.loads(alert_file.read_text()), {"m1:BUILD": ["m1", "BUILD"]})
+
+    def test_label_carries_the_pr_fact_or_nothing(self):
+        def label(pull):
+            wt = o.Worktree(path=Path("/wt"), repo=Path("/repo"), branch="b", dirty=0, ahead=1,
+                             upstream="origin/b", slug="o/n", pull=pull, name="m8",
+                             title="ocr-review-pr13")
+            return o.paint("REV", wt.name, wt.title, o.work_fact(wt))
+
+        open_pull = o.PullRequest(number=13, state="OPEN", mergeable="MERGEABLE",
+                                  merge_state="CLEAN", draft=False, files=1)
+        merged = o.PullRequest(number=13, state="MERGED", mergeable="UNKNOWN",
+                               merge_state="UNKNOWN", draft=False, files=1)
+        self.assertEqual(label(open_pull), "🔍 REV m8 ocr-review-pr13 (PR #13)")
+        self.assertEqual(label(merged), "🔍 REV m8 ocr-review-pr13 (DONE)")
+        self.assertEqual(label(None), "🔍 REV m8 ocr-review-pr13")
+        self.assertEqual(o.work_fact(o.Worktree(path=Path("/wt"), repo=Path("/repo"), branch="-",
+                                                dirty=0, ahead=0, upstream="none", slug="",
+                                                pull=None, name="m5", title="t", task="x")), "")
+
+
 if __name__ == "__main__":
     unittest.main()

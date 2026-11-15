@@ -1043,10 +1043,17 @@ STEP_STYLE: dict[str, tuple[str, str]] = {
     "DONE": ("✔", "#7f8c8d"),
 }
 
-def paint(step: str, name: str, title: str) -> str:
-    """`<symbol> <STEP> <name> <title>`: the left panel prints this label verbatim."""
+def paint(step: str, name: str, title: str, fact: str = "") -> str:
+    """`<symbol> <STEP> <name> <title> (<fact>)`: no fact means no parentheses at all."""
     symbol, _colour = STEP_STYLE.get(step, ("•", "#888888"))
-    return f"{symbol} {step} {name} {title}"[:64]
+    return f"{symbol} {step} {name} {title}" + (f" ({fact})" if fact else "")
+
+
+def work_fact(wt: Worktree) -> str:
+    """One fact about the minion's work: its merged outcome, else the PR it is on, else nothing."""
+    if not wt.pull or not wt.pull.number:
+        return ""
+    return "DONE" if wt.pull.state == "MERGED" else f"PR #{wt.pull.number}"
 
 
 BUG_WORDS = ("fix", "bug", "crash", "broken", "regression", "panic", "error", "flake", "hotfix")
@@ -1155,7 +1162,7 @@ def cmd_rename(args: argparse.Namespace) -> int:
         step = step_for(wt, proposed, hardened)
         symbol = STEP_STYLE.get(step, ("•", "#888888"))[0]
         title = wt.title or short_title(wt)
-        label = paint(step, wt.name, title)
+        label = paint(step, wt.name, title, work_fact(wt))
         live_workspace, live_pane = places.get(str(wt.path.resolve()), ("", ""))
         workspace = by_path.get(str(wt.path.resolve()), "") or live_workspace
         pane = wt.pane if wt.pane not in {"-", ""} else live_pane

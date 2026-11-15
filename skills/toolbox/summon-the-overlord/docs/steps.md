@@ -1,14 +1,19 @@
 # Worktree steps
 
-A label is `<symbol> <STEP> <name> <title>`, built only from step facts and the registry identity
-recorded at birth: `⚒ WORK m1 overlord-rust-port`. The left panel prints that workspace label
-verbatim; the agent panel prints the `step`, `name` and `title` tokens, which carry the same content
-with no parentheses. herdr's agent state stays in herdr: it is never copied into a label or a
-registry field.
+A left-panel label is `<symbol> <STEP> <name> <title>` and may end with one parenthesised fact about
+that minion's work: `🔍 REV m8 ocr-review-pr13 (PR #13)` while reviewing, `✔ DONE m8 ocr-review-pr13
+(DONE)` once merged. `rename` composes the fact from worktree facts, preferring a merged PR (`DONE`),
+then the open PR number (`PR #13`), and nothing at all when there is no PR — never `()`. The minion's
+id never goes in there: the name already sits in the label. Never in a label, a pane token or a
+registry title.
+
+The agent panel reads the `step`, `name` and `title` tokens, published bare, so it shows
+`REV · m8 · ocr-review-pr13`. herdr's agent state stays in herdr: it is never copied into a label or
+a registry field.
 
 The minion id in parentheses belongs to one place only, the pull request title, appended by the
-minion that opens it: `summon-the-overlord: enforced plan mode (m2)`. Never in a label, a pane token
-or a registry title.
+minion that owns that PR: `summon-the-overlord: enforced plan mode (m2)`. Owner, not the author of
+the last commit.
 
 Slugs are tool-first, target second: `ocr-review-pr13`. Spawn derives the title from the task's first
 words; pass `--title` when the job is better named than its brief.
