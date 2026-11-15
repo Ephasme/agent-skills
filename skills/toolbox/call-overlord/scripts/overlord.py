@@ -126,12 +126,12 @@ def config_roots() -> list[Path]:
 
 
 def scan_roots(roots: list[Path]) -> dict[str, dict]:
-    """Every git checkout directly under a root, or the root itself: path -> slug, base, gh.
+    """Every git checkout directly under a root, or the root itself: path -> slug, base, account, gh.
 
-    A repository whose slug the token cannot read keeps gh false instead of disappearing:
-    an invisible remote is a fact the report has to name.
+    Who's who is settled here, once per repository: the account that can push to it, else one
+    that can read it, else none. A slug no account reaches keeps gh false instead of
+    disappearing: an invisible remote is a fact the report has to name.
     """
-    github = shared("github", Github)
     found: dict[str, dict] = {}
     for root in roots:
         candidates = [root, *sorted(root.iterdir())] if root.is_dir() else [root]
@@ -146,8 +146,13 @@ def scan_roots(roots: list[Path]) -> dict[str, dict]:
                 continue
             slug = repo_slug(path)
             head = run(["git", "-C", str(path), "symbolic-ref", "--short", "refs/remotes/origin/HEAD"])
-            readable = bool(slug) and github.readable(slug)
-            found[str(path)] = {"slug": slug, "base": (head or "origin/main").removeprefix("origin/"), "gh": readable}
+            login, _token, readable = credential(slug) if slug else ("-", "", False)
+            found[str(path)] = {
+                "slug": slug,
+                "base": (head or "origin/main").removeprefix("origin/"),
+                "gh": readable,
+                "account": login,
+            }
     return found
 
 
@@ -170,6 +175,11 @@ def cache_age(cache: dict) -> float | None:
     return (datetime.now(timezone.utc) - then.replace(tzinfo=timezone.utc)).total_seconds()
 
 
+def placed(repos: dict) -> bool:
+    """Whether every cached entry names its account: a cache from before who's who was stored is stale."""
+    return all(isinstance(meta, dict) and "account" in meta for meta in repos.values())
+
+
 def discovery(refresh: bool = False) -> dict[str, dict]:
     """Repositories discovery knows: the cache while it is fresh, a rescan once it expired.
 
@@ -182,9 +192,10 @@ def discovery(refresh: bool = False) -> dict[str, dict]:
     cache = read_yaml(DISCOVERY_CACHE, "discovery cache")
     age = cache_age(cache)
     ttl = float(cache.get("ttl_hours") or DISCOVERY_TTL_HOURS) * 3600
-    if refresh or age is None or age > ttl or cache.get("repos") is None:
+    repos = cache.get("repos")
+    if refresh or age is None or age > ttl or not isinstance(repos, dict) or not placed(repos):
         return refresh_discovery(roots)
-    return cache.get("repos") or {}
+    return repos
 
 
 def discovered() -> list[Path]:
@@ -344,9 +355,12 @@ HARDEN = "/skill:harden-plan"
 API = "https://api.github.com"
 
 
-def run(cmd: list[str], cwd: Path | None = None, timeout: int = 120) -> str:
+def run(cmd: list[str], cwd: Path | None = None, timeout: int = 120, env: dict[str, str] | None = None) -> str:
     try:
-        done = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True, timeout=timeout)
+        done = subprocess.run(
+            cmd, cwd=cwd, capture_output=True, text=True, timeout=timeout,
+            env={**os.environ, **env} if env else None,
+        )
     except (OSError, subprocess.SubprocessError):
         return ""
     return done.stdout.strip() if done.returncode == 0 else ""
@@ -360,11 +374,89 @@ def ok(cmd: list[str], timeout: int = 60) -> bool:
         return False
 
 
-def github_token() -> str:
+def gh_accounts() -> list[tuple[str, str, bool]]:
+    """(login, token, active) for every account gh is logged into, the active one first.
+
+    gh holds one active account per host, so a pass that spans two organisations picks
+    per repository instead of switching the machine's account under the user.
+    """
+    return shared("gh_accounts", _gh_accounts)
+
+
+def _gh_accounts() -> list[tuple[str, str, bool]]:
+    try:
+        hosts = json.loads(run(["gh", "auth", "status", "--json", "hosts"]) or "{}").get("hosts") or {}
+    except json.JSONDecodeError:
+        return []
+    found = [
+        (entry.get("login", ""), bool(entry.get("active")))
+        for entries in hosts.values()
+        for entry in entries
+        if entry.get("state") == "success" and entry.get("login")
+    ]
+    found.sort(key=lambda row: not row[1])
+    rows: list[tuple[str, str, bool]] = []
+    for login, active in found:
+        if token := run(["gh", "auth", "token", "--user", login]):
+            rows.append((login, token, active))
+    return rows
+
+
+def repo_access(slug: str, token: str) -> dict:
+    """The repository object when this token can see it, else empty."""
+    headers = {"Accept": "application/vnd.github+json"}
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    try:
+        response = httpx.get(f"{API}/repos/{slug}", headers=headers, timeout=20)
+    except httpx.HTTPError:
+        return {}
+    return response.json() if response.status_code == 200 else {}
+
+
+_CREDENTIAL: dict[str, tuple[str, str, bool]] = {}
+
+
+def credential(slug: str) -> tuple[str, str, bool]:
+    """(login, token, readable) for one repository: an account that can push wins, else one that can read.
+
+    The account discovery stored is tried first, so a pass costs no probe on a repository
+    discovery already placed. An explicit GITHUB_TOKEN or GH_TOKEN pins every repository to it.
+    """
     for name in ("GITHUB_TOKEN", "GH_TOKEN"):
         if token := os.environ.get(name):
-            return token
-    return run(["gh", "auth", "token"])
+            return "-", token, True
+    if slug in _CREDENTIAL:
+        return _CREDENTIAL[slug]
+    stored = stored_account(slug)
+    accounts = gh_accounts()
+    ordered = [row for row in accounts if row[0] == stored] + [row for row in accounts if row[0] != stored]
+    fallback: tuple[str, str, bool] = ("-", "", False)
+    for login, token, _active in ordered:
+        repo = repo_access(slug, token)
+        if not repo:
+            continue
+        if (repo.get("permissions") or {}).get("push"):
+            _CREDENTIAL[slug] = (login, token, True)
+            return _CREDENTIAL[slug]
+        fallback = fallback if fallback[2] else (login, token, True)
+    _CREDENTIAL[slug] = fallback
+    return fallback
+
+
+def stored_account(slug: str) -> str:
+    """The login discovery recorded for this slug: discovery is where who's who lives."""
+    return shared("stored_accounts", _stored_accounts).get(slug, "")
+
+
+def _stored_accounts() -> dict[str, str]:
+    """Read from the cache file, never from discovery(): a rescan calls credential itself."""
+    cache = read_yaml(DISCOVERY_CACHE, "discovery cache")
+    return {
+        meta["slug"]: meta.get("account", "")
+        for meta in (cache.get("repos") or {}).values()
+        if isinstance(meta, dict) and meta.get("slug") and meta.get("account")
+    }
 
 
 def repo_slug(path: Path) -> str:
@@ -444,18 +536,25 @@ def pull_from_json(pull: dict) -> PullRequest:
 class Github:
     def __init__(self) -> None:
         headers = {"Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28"}
-        token = github_token()
-        if token:
-            headers["Authorization"] = f"Bearer {token}"
         self.client = httpx.Client(headers=headers, timeout=30)
         self.pulls: dict[str, dict[str, PullRequest]] = {}
+
+    def get(self, slug: str, path: str = "", **params) -> httpx.Response:
+        """One request as the account that reaches this repository, so two orgs fit in one pass."""
+        _login, token, _readable = credential(slug)
+        headers = {"Authorization": f"Bearer {token}"} if token else {}
+        return self.client.get(f"{API}/repos/{slug}{path}", params=params, headers=headers)
+
+    def account(self, slug: str) -> str:
+        """The login this pass acts as on that repository: what a gh command has to be told."""
+        return credential(slug)[0]
 
     def branch_pulls(self, slug: str) -> dict[str, PullRequest]:
         """branch -> its most relevant PR: an open one wins over merged or closed."""
         if slug in self.pulls:
             return self.pulls[slug]
         found: dict[str, PullRequest] = {}
-        response = self.client.get(f"{API}/repos/{slug}/pulls", params={"state": "all", "per_page": 100, "sort": "updated"})
+        response = self.get(slug, "/pulls", state="all", per_page=100, sort="updated")
         if response.status_code != 200:
             print(f"github: {slug}: {response.status_code} {response.text[:120]}", file=sys.stderr)
             self.pulls[slug] = found
@@ -469,19 +568,19 @@ class Github:
         return found
 
     def open_pulls(self, slug: str) -> list[PullRequest]:
-        response = self.client.get(f"{API}/repos/{slug}/pulls", params={"state": "open", "per_page": 100})
+        response = self.get(slug, "/pulls", state="open", per_page=100)
         if response.status_code != 200:
             print(f"github: {slug}: {response.status_code} {response.text[:120]}", file=sys.stderr)
             return []
         return [pull_from_json(raw) for raw in response.json()]
 
     def readable(self, slug: str) -> bool:
-        """Whether this token can see the repository at all: what makes its PRs invisible."""
-        return self.client.get(f"{API}/repos/{slug}").status_code == 200
+        """Whether an account here can see the repository at all: what makes its PRs invisible."""
+        return self.get(slug).status_code == 200
 
     def with_paths(self, slug: str, pull: PullRequest) -> PullRequest:
         """The pull request with its touched files: one request, not a second fetch of the row."""
-        files = self.client.get(f"{API}/repos/{slug}/pulls/{pull.number}/files", params={"per_page": 100})
+        files = self.get(slug, f"/pulls/{pull.number}/files", per_page=100)
         if files.status_code == 200:
             pull.paths = [item.get("filename", "") for item in files.json() if item.get("filename")]
         return pull
@@ -490,7 +589,7 @@ class Github:
         sha = sha or self.head_sha(slug, number)
         if not sha:
             return False, "unknown: head sha unavailable"
-        response = self.client.get(f"{API}/repos/{slug}/commits/{sha}/check-runs")
+        response = self.get(slug, f"/commits/{sha}/check-runs")
         if response.status_code != 200:
             return False, f"unknown: check-runs {response.status_code}"
         runs = response.json().get("check_runs", [])
@@ -509,7 +608,7 @@ class Github:
         return True, ""
 
     def head_sha(self, slug: str, number: int) -> str:
-        response = self.client.get(f"{API}/repos/{slug}/pulls/{number}")
+        response = self.get(slug, f"/pulls/{number}")
         if response.status_code != 200:
             return ""
         return (response.json().get("head") or {}).get("sha", "")
@@ -786,10 +885,10 @@ def cmd_order(args: argparse.Namespace) -> int:
     # smallest diff first, then PR number
     plan.sort(key=lambda row: (row[6], row[5], row[0], row[2].number))
 
-    print("#rank\trepo\tpr\tbranch\tbase\tfiles\tcluster\tworktree\tready\tblockers")
+    print("#rank\trepo\taccount\tpr\tbranch\tbase\tfiles\tcluster\tworktree\tready\tblockers")
     for index, (_files, slug, pull, ready, blocker, cluster, _depth, worktree) in enumerate(plan, start=1):
         print(
-            f"{index}\t{slug}\t{pull.number}\t{pull.head}\t{pull.base}\t"
+            f"{index}\t{slug}\t{github.account(slug)}\t{pull.number}\t{pull.head}\t{pull.base}\t"
             f"{len(pull.paths)}\t{cluster}\t{worktree}\t{'yes' if ready else 'no'}\t{blocker or '-'}"
         )
     outside = sorted(
@@ -824,7 +923,11 @@ def short_title(wt: Worktree) -> str:
     """Four kebab words at most: the PR title, else the newest commit subject."""
     source = ""
     if wt.pull and wt.pull.number and wt.slug:
-        source = run(["gh", "pr", "view", str(wt.pull.number), "-R", wt.slug, "--json", "title", "--jq", ".title"])
+        _login, token, _readable = credential(wt.slug)
+        source = run(
+            ["gh", "pr", "view", str(wt.pull.number), "-R", wt.slug, "--json", "title", "--jq", ".title"],
+            env={"GH_TOKEN": token} if token else None,
+        )
     if not source:
         source = run(["git", "-C", str(wt.path), "log", "-1", "--format=%s"])
     words = [word for word in re.split(r"[^a-z0-9]+", source.lower()) if word]
@@ -1100,7 +1203,9 @@ def preflight_rows() -> tuple[list[dict[str, str]], list[str]]:
 
     herdr = bool(run(["which", "herdr"])) and os.environ.get("HERDR_ENV") == "1"
     rows.append({"check": "herdr", "state": "ok" if herdr else "optional, absent", "fix": "nothing: git and gh cover the work"})
-    token = "ok" if github_token() else "missing"
+    pinned = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN") or ""
+    logins = [login for login, _token, _active in gh_accounts()]
+    token = ", ".join(logins) or ("env token" if pinned else "missing")
     rows.append({"check": "token", "state": token, "fix": "gh auth login, or export GITHUB_TOKEN"})
     if token == "missing":
         missing.append("github-token")
@@ -1144,11 +1249,21 @@ def cmd_discover(args: argparse.Namespace) -> int:
     cache = read_yaml(DISCOVERY_CACHE, "discovery cache")
     age = cache_age(cache)
     ttl = float(cache.get("ttl_hours") or DISCOVERY_TTL_HOURS) * 3600
-    stale = args.refresh or age is None or age > ttl or cache.get("repos") is None
-    repos = refresh_discovery(roots) if stale else (cache.get("repos") or {})
-    print("#path\tslug\tbase\tgh")
+    repos = cache.get("repos")
+    stale = (
+        args.refresh
+        or age is None
+        or age > ttl
+        or not isinstance(repos, dict)
+        or not placed(repos)
+    )
+    repos = refresh_discovery(roots) if stale else repos
+    print("#path\tslug\tbase\tgh\taccount")
     for path, meta in sorted(repos.items()):
-        print(f"{path}\t{meta.get('slug') or '-'}\t{meta.get('base') or '-'}\t{'yes' if meta.get('gh') else 'no'}")
+        print(
+            f"{path}\t{meta.get('slug') or '-'}\t{meta.get('base') or '-'}\t"
+            f"{'yes' if meta.get('gh') else 'no'}\t{meta.get('account') or '-'}"
+        )
     state = "rescanned" if stale else f"fresh, {int((age or 0) // 60)}m of {int(ttl // 60)}m"
     print(f"#cache\t{state}\t{DISCOVERY_CACHE}", file=sys.stderr)
     return 0
@@ -1168,8 +1283,23 @@ def completion(branch: str, pane: str) -> str:
     )
 
 
-def handover(mode: str, task: str, clause: str) -> str | None:
-    """The text a worker starts from: preamble, mode prompts, task, completion clause.
+def credential_note(repo: Path) -> str:
+    """The line that keeps a worker's gh calls on the account that reaches its repository."""
+    slug = repo_slug(repo)
+    if not slug:
+        return ""
+    login, _token, _readable = credential(slug)
+    active = next((name for name, _token, is_active in gh_accounts() if is_active), "")
+    if not login or login == "-" or login == active:
+        return ""
+    return (
+        f"GitHub: {slug} answers to the `{login}` gh account, not the active one. Prefix every gh "
+        f'call with `GH_TOKEN="$(gh auth token --user {login})"`, or gh acts as `{active}` and 404s.'
+    )
+
+
+def handover(mode: str, task: str, clause: str, note: str = "") -> str | None:
+    """The text a worker starts from: preamble, mode prompts, credential note, task, completion clause.
 
     A prompt file that is missing or empty is reported and returns None: the worker would
     otherwise start without the rules it is meant to obey.
@@ -1187,7 +1317,7 @@ def handover(mode: str, task: str, clause: str) -> str | None:
             print(f"prompt file empty: {path}", file=sys.stderr)
             return None
         parts.append(text)
-    return "\n\n".join(parts + [task] + ([clause] if clause else []))
+    return "\n\n".join(parts + ([note] if note else []) + [task] + ([clause] if clause else []))
 
 
 def cmd_spawn(args: argparse.Namespace) -> int:
@@ -1208,7 +1338,7 @@ def cmd_spawn(args: argparse.Namespace) -> int:
     pane = os.environ.get("HERDR_PANE_ID", "")
     if not pane:
         print("#warning\tHERDR_PANE_ID unset: completion clause omitted", file=sys.stderr)
-    text = handover(args.mode, args.task, completion(branch, pane) if pane else "")
+    text = handover(args.mode, args.task, completion(branch, pane) if pane else "", credential_note(repo))
     if text is None:
         return 1
 
