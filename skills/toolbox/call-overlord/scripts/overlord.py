@@ -314,17 +314,26 @@ class Worktree:
     pane: str = "-"
 
 
+def registry_repos() -> list[Path]:
+    """Repositories of adopted worktrees, so a target outside --repo is still overseen."""
+    return sorted({Path(meta["repo"]) for meta in registry().values() if meta.get("repo") and Path(meta["repo"]).is_dir()})
+
+
 def collect(repos: list[Path], base: str) -> list[Worktree]:
     github = Github()
     by_path, by_ws = herdr_facts()
     rows: list[Worktree] = []
+    seen: set[Path] = set()
+    repos = repos + [r for r in registry_repos() if r not in repos]
     for repo in repos:
         if not run(["git", "-C", str(repo), "rev-parse", "--git-dir"]):
             print(f"not a git repository: {repo}", file=sys.stderr)
             continue
-        for path in worktree_paths(repo):
-            if not path.is_dir():
+        registry_paths = {Path(path) for path in registry()}
+        for path in worktree_paths(repo) + [p for p in registry_paths if p.parent.parent == repo.parent or True]:
+            if not path.is_dir() or path in seen:
                 continue
+            seen.add(path)
             branch = run(["git", "-C", str(path), "rev-parse", "--abbrev-ref", "HEAD"]) or "-"
             status = run(["git", "-C", str(path), "status", "--porcelain"])
             dirty = len([line for line in status.splitlines() if line.strip()])
@@ -753,7 +762,7 @@ def cmd_spawn(args: argparse.Namespace) -> int:
     repo = args.repo[0]
     slug = "-".join(word for word in re.split(r"[^a-z0-9]+", args.task.lower()) if word and word not in STOP_WORDS)[:60] or "job"
     branch = f"worktree/{slug}"
-    path = Path.home() / ".herdr" / "worktrees" / repo.name / slug
+    path = Path(args.dest).expanduser() / slug if args.dest else Path.home() / ".herdr" / "worktrees" / repo.name / slug
     probe = "First write the failing test or a scripted repro for: " + args.task if args.mode == "hotfix" else ""
     print(f"#worktree\t{path}\nbranch\t{branch}\nmode\t{args.mode}")
     if args.dry_run:
@@ -802,6 +811,7 @@ def main(argv: list[str]) -> int:
     spawn.add_argument("--mode", default="feat", help="fast, hotfix or feat")
     spawn.add_argument("--task", default="", help="what the worker should do")
     spawn.add_argument("--dry-run", action="store_true", help="print instead of creating")
+    spawn.add_argument("--dest", default="", help="parent directory for the worktree (default ~/.herdr/worktrees/<repo>)")
 
     for name, help_text in (
         ("survey", "survey every worktree: branch, commits, panes"),

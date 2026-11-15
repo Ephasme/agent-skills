@@ -72,6 +72,21 @@ Agent Mail project needs the `ensure_project` call from the mail section below.
 `overlord.py spawn --mode fast|hotfix --task "<what to build>"` creates the worktree and starts the
 worker; without `--task` the script prints the command it would run.
 
+## Reach: anywhere the tools work
+
+A target is a path, not a repo in this directory tree. `--repo PATH` accepts any checkout, and every
+path in the ownership registry is scanned as well, so an adopted worktree in another repository or
+another disk is overseen without naming its repo. `spawn --dest DIR` puts a new worktree wherever the
+job belongs instead of under `~/.herdr/worktrees/<repo>`.
+
+Compatibility is the only limit: a target needs git for its facts, `gh` for its pull request, and
+herdr in `HERDR_ENV=1` for the parts that press a key or read a screen. Where herdr is absent those
+steps are skipped and reported as skipped, never guessed.
+
+The rename tool obeys the same rule: it renames any workspace or worktree the overlord requires —
+registry-owned only — wherever it lives, and refuses anything it does not own, rather than inferring
+ownership from a label.
+
 ## Takeover: worktrees the overlord did not create
 
 ```bash
