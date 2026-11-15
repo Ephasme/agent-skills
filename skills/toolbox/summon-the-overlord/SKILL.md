@@ -60,18 +60,20 @@ herdr pane rename "$HERDR_PANE_ID" "👁 OVERLORD"
 The mail route is the project `$XDG_STATE_HOME/summon-the-overlord` (`~/.local/state/…` by
 default), agent `PinkAnchor`: minion reports land there. Nothing reads it at the start.
 
-Then the watcher:
+Then the watcher, as a background job of this session with no deadline — it may sit for hours:
 
 ```bash
-overlord watch --detach
+overlord watch --until-stall
 ```
 
-`watcher already running (pid N)` is the converged answer, not a failure: the watcher is up, carry
-on.
+When a minion stalls the job exits, its output arrives as a follow-up, and that follow-up is the
+wake. Re-arm the job after acting on it.
 
-It belongs to the ceremony because it is what decides when there is work: it sweeps every 120 s and
-prompts this pane once per newly stalled minion, so a minion that finishes, blocks or dies reaches
-the overlord without polling.
+The job belongs to the ceremony because it is what decides when there is work: it sweeps every
+120 s, so a minion that finishes, blocks or dies reaches the overlord without polling.
+
+A job owns the wake rather than a daemon writing into the pane: the session already delivers a
+job's output as a follow-up, so nothing is typed at the overlord and no lock has to be trusted.
 
 Nothing else belongs to the start: no table, no `preflight`, no `rename`, no plan inject or approve,
 no merge, no prune, no workspace or agent opened, adopted, resumed or restarted, nothing typed into
@@ -286,8 +288,8 @@ whose label names `OVERLORD`, so `rename` never relabels it.
 
 ## Stalls are decisions
 
-`watch --once` prints one sweep and exits; `--stop` ends the watcher the start step left running;
-`--interval N` changes that watcher's cadence.
+`watch --until-stall` is the job above, which prints the sweep that ended it; `watch --once` prints
+one sweep and exits; `--interval N` sets the cadence.
 
 A minion whose herdr state is `idle` while its step still implies work is stalled: `HRD`, `BUILD`,
 `REV`, `REB`, `MRG`. `PLAN` and `DONE` while idle are normal. A stall row carries name, step, title,
@@ -301,9 +303,8 @@ renames, respawns or kills by itself.
 
 `prune --apply` removes worktrees whose PR merged and whose tree is clean, deletes their local branch
 (`-D`: a squash merge puts the commits outside the base) and closes the herdr workspace. An agent
-still `working` or `blocked` is never pruned. `status --stop` ends a loop; a run with nothing
-landable exits 0 only after 20 minutes with no active worktree (`--idle-minutes N` changes it), and
-exits 1 while work is in flight.
+still `working` or `blocked` is never pruned. `status` exits 0 once nothing is landable and the realm
+has been idle for 20 minutes (`--idle-minutes N` changes it), and 1 while work is in flight.
 
 ## Report
 
