@@ -48,19 +48,39 @@ Every fact and every ordering decision comes from the `overlord` binary: run it,
 output, act on it. Never re-derive what it computed, and never carry a list of handled items into the
 next pass.
 
-## Run the pass
+## Start: name yourself, then wait
+
+A session's first move is two labels, before anything the user asks:
+
+```bash
+herdr workspace rename "$HERDR_WORKSPACE_ID" "👁 OVERLORD"
+herdr pane rename "$HERDR_PANE_ID" "👁 OVERLORD"
+```
+
+Nothing else belongs to the start: no table, no `pass`, no `preflight`, no `rename`, no plan inject
+or approve, no merge, no prune, no watcher, no workspace or agent opened, adopted, resumed or
+restarted, nothing typed into a pane, no minion prompted. `rename` skips a workspace whose label
+names `OVERLORD`, so these two commands are also what keeps this session out of its own relabel
+pass.
+
+The mail route is the project `$XDG_STATE_HOME/summon-the-overlord` (`~/.local/state/…` by
+default), agent `PinkAnchor`: minion reports land there. Nothing reads it at the start.
+
+Then wait for the user's instruction. Nothing starts before it.
+
+## Run a pass
 
 ```bash
 overlord pass             # the whole pass, in one process
 overlord pass --dry-run   # the same report, changing nothing
 ```
 
-`pass` names the overlord's pane and workspace `👁 OVERLORD`, prints every table — preflight,
-inventory, mode, order, plans, rename, stalls — then does every step that needs no judgement: the
-plan keys (`--inject --approve`), `rename --apply`, the merge of each ready PR in the printed order
-as the account that reaches its repository, and `prune --apply`. It ends with `## inbox`, the mail
-route, then `## ask`: the prompt each minion still owes, already worded, one
-`herdr agent prompt <pane> "…"` line each.
+`pass` never opens a session: run it when the user asks for a pass, or when a decision needs the
+whole realm in one process. It prints every table — preflight, inventory, mode, order, plans,
+rename, stalls — then does every step that needs no judgement: the plan keys (`--inject --approve`),
+`rename --apply`, the merge of each ready PR in the printed order as the account that reaches its
+repository, and `prune --apply`. It ends with `## inbox`, the mail route, then `## ask`: the prompt
+each minion still owes, already worded, one `herdr agent prompt <pane> "…"` line each.
 
 That section is the model's whole job: run those lines, decide each stall, then read the tables for
 what a failure means. Never invent a prompt the script already worded.
@@ -68,7 +88,6 @@ what a failure means. Never invent a prompt the script already worded.
 Each step runs alone when one answer is needed:
 
 ```bash
-overlord bootstrap   # every read-only table
 overlord inventory   # one row per worktree
 overlord mode        # which mode each worktree is in
 overlord order       # merge plan for the open PRs
@@ -172,11 +191,11 @@ is an error, not an empty list.
 Adoption is a takeover, prune included: the herdr workspace holding that path is closed, a `working`
 agent with it, and the path reopens as a workspace of its own below the overlord
 (`workspace create --cwd`). herdr refuses `worktree open --workspace` across repositories, so it is
-never used, and a target is never a tab or a nested workspace under the overlord. The agent the close
-killed restarts in the new pane from the session file `agent list` reported and is prompted to
-resume it; a failed restart or prompt is reported, never retried silently. The `realm` column says
-which happened: `<held>→<new>, agent resumed`, `opened <ws>, no agent`, `in realm <ws>`,
-`kept: <ws> refused to close`, `no herdr: not moved` (registry written, nothing moved).
+never used, and a target is never a tab or a nested workspace under the overlord. Adoption registers
+a path and opens nothing an agent could talk to: the agent the close killed is not started, resumed
+or restarted, and no session file is replayed. The `realm` column says which happened:
+`opened <ws>, no agent`, `in realm <ws>`, `kept: <ws> refused to close`, `no herdr: not moved`
+(registry written, nothing moved).
 
 ## Plans outrank the merge queue
 
@@ -221,16 +240,15 @@ instruction per message:
 herdr agent prompt <pane_id> "<instruction>"
 ```
 
-The prompt returns once delivered; the report arrives by mail. `pass` prints the route as
-`## inbox`, one `#mail<TAB><project><TAB><agent>` line: read the project and the agent from it,
-never from memory. Once per session, `ensure_project(human_key "<project>")` then
-`register_agent(project_key "<project>", name "<agent>", program "omp", model "overlord",
-task_description "overlord")`. At the start of every pass, `fetch_inbox(project_key "<project>",
-agent_name "<agent>", unread_only true, include_bodies true)`: a subject beginning `<mN> DONE` is
-that minion's report, and `<mN> BLOCKED` one that needs your decision; either replaces asking the
-minion for a status. If the mail tools are missing or
-the server refuses, say so once and carry on from the tables; never retry in a loop and never fall
-back to prompting a minion for its status.
+The prompt returns once delivered; the report arrives by mail, at the route the start step named.
+`pass` prints that route too, as `## inbox`, one `#mail<TAB><project><TAB><agent>` line. Once per
+session, `ensure_project(human_key "$XDG_STATE_HOME/summon-the-overlord")` then
+`register_agent(project_key …, name "PinkAnchor", program "omp", model "overlord",
+task_description "overlord")`. At the start of every pass, `fetch_inbox(project_key …, agent_name
+"PinkAnchor", unread_only true, include_bodies true)`. A subject beginning `<mN> DONE` is that
+minion's report, and `<mN> BLOCKED` one that needs your decision; either replaces asking the minion
+for a status. If the mail tools are missing or the server refuses, say so once and carry on from the
+tables; never retry in a loop and never fall back to prompting a minion for its status.
 
 Conflicts: send `prompts/rebase.md` with `oldHead` and `newBase`, then gate and
 `git push --force-with-lease`. Defects: `prompts/review.md`. An agent blocked on a dialog owns it:
@@ -276,8 +294,9 @@ plan file exists and is committed: `rename` and `watch` never fight the birth la
 The label carries no colour: herdr renders it literally, so a hex code is visible text. The dot
 beside a workspace is herdr's status icon for that workspace's agent; the overlord's own is an eye,
 because it watches and does not build. The overlord is the session running this skill, never a
-spawned agent and never an extra pane: `rename --apply` names its pane and workspace `👁 OVERLORD`
-from `HERDR_PANE_ID` and `HERDR_WORKSPACE_ID`, with no step and no title.
+spawned agent and never an extra pane, and it is the start step that names it `👁 OVERLORD` from
+`HERDR_PANE_ID` and `HERDR_WORKSPACE_ID`, with no step and no title. `rename` skips any workspace
+whose label names `OVERLORD`, so no pass relabels it.
 
 ## Stalls are decisions
 
