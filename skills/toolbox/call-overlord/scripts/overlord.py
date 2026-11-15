@@ -536,8 +536,42 @@ def registry_repos() -> list[Path]:
     return sorted({Path(meta["repo"]) for meta in registry().values() if meta.get("repo") and Path(meta["repo"]).is_dir()})
 
 
+def herdr_open_repos() -> set[Path]:
+    """Repository roots holding a live pane: a checkout the user put in herdr themselves."""
+    return shared("herdr_open_repos", _herdr_open_repos)
+
+
+def _herdr_open_repos() -> set[Path]:
+    if os.environ.get("HERDR_ENV") != "1":
+        return set()
+    try:
+        panes = json.loads(run(["herdr", "pane", "list"]) or "{}")
+    except json.JSONDecodeError:
+        return set()
+    repos: set[Path] = set()
+    for pane in panes.get("result", {}).get("panes", []):
+        for key in ("foreground_cwd", "cwd"):
+            cwd = pane.get(key) or ""
+            if not cwd:
+                continue
+            common = run(["git", "-C", cwd, "rev-parse", "--path-format=absolute", "--git-common-dir"])
+            if common:
+                repos.add(Path(common).parent if Path(common).name == ".git" else Path(common))
+    return repos
+
+
+def realm_repos(named: list[Path]) -> list[Path]:
+    """Repositories a pass may act on: named, adopted, or open in herdr.
+
+    Discovery only enumerates checkouts, so a repository it finds is listed and left alone:
+    nothing outside the realm is rebased, merged or pruned.
+    """
+    found = {Path(repo).expanduser().resolve() for repo in [*named, *registry_repos(), *herdr_open_repos()]}
+    return sorted(repo for repo in found if repo.is_dir())
+
+
 def scope_repos(repos: list[Path]) -> list[Path]:
-    """Repositories a pass covers: those named, plus every registry and discovered repository."""
+    """Repositories a pass reports on: named, registry and discovered ones. Acting uses `realm_repos`."""
     found: dict[Path, None] = {}
     for repo in [*repos, *registry_repos(), *discovered()]:
         if repo.is_dir():
@@ -659,7 +693,9 @@ def cmd_status(args: argparse.Namespace) -> int:
         return 0
     if consume_stop():
         return 0
-    rows = collect(args.repo, args.base)
+    # realm only: a pass never waits on a repository it may not touch
+    realm = {repo.resolve() for repo in realm_repos(args.repo)}
+    rows = [wt for wt in collect(args.repo, args.base) if wt.repo.resolve() in realm]
     # a pass with work in flight keeps a loop alive; once nothing is landable, only
     # a quiet spell stops it, so a worker mid-turn is never cut off
     if any(landable(wt) or wt.agent == "working" for wt in rows):
@@ -712,8 +748,9 @@ def stack_depth(pull: PullRequest, by_head: dict[str, PullRequest]) -> int:
 
 def cmd_order(args: argparse.Namespace) -> int:
     github = shared("github", Github)
+    realm = realm_repos(args.repo)
     plan: list[tuple[int, str, PullRequest, bool, str, int, int, str]] = []
-    for repo in scope_repos(args.repo):
+    for repo in realm:
         slug = repo_slug(repo)
         if not slug:
             continue
@@ -755,6 +792,11 @@ def cmd_order(args: argparse.Namespace) -> int:
             f"{index}\t{slug}\t{pull.number}\t{pull.head}\t{pull.base}\t"
             f"{len(pull.paths)}\t{cluster}\t{worktree}\t{'yes' if ready else 'no'}\t{blocker or '-'}"
         )
+    outside = sorted(
+        {slug for slug in (repo_slug(repo) for repo in scope_repos(args.repo) if repo.resolve() not in set(realm)) if slug}
+    )
+    if outside:
+        print(f"#note\tnot in realm, not planned: {', '.join(outside)}")
     return 0
 STOP_WORDS = {
     "feat", "fix", "chore", "docs", "refactor", "test", "tests", "the", "a", "an", "and",
@@ -993,7 +1035,12 @@ def cmd_plans(args: argparse.Namespace) -> int:
 
 def cmd_prune(args: argparse.Namespace) -> int:
     print("#path\tbranch\tpr\taction")
+    registered = {str(Path(path).resolve()) for path in registry()}
     for wt in collect(args.repo, args.base):
+        # the registry is the only source of ownership: a worktree this overlord never
+        # adopted or spawned is not its to delete
+        if str(wt.path.resolve()) not in registered:
+            continue
         if not wt.vcs or not wt.linked:
             continue
         if not wt.pull or wt.pull.state != "MERGED" or wt.dirty or wt.agent in {"working", "blocked"}:
