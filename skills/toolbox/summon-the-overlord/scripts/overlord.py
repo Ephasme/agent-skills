@@ -31,6 +31,7 @@ import importlib
 import json
 import os
 import re
+import shlex
 import subprocess
 import sys
 import time
@@ -48,11 +49,46 @@ STATE_DIR = Path(os.environ.get("XDG_STATE_HOME", Path.home() / ".local" / "stat
 REGISTRY = STATE_DIR / "worktrees.json"
 OVERLORD_DIR = Path(os.environ.get("OVERLORD_HOME", Path.home() / ".overlord"))
 CONFIG_FILE = OVERLORD_DIR / "config.yaml"
-PROMPTS = Path(__file__).resolve().parent.parent / "prompts"
+PROMPTS = Path(os.environ.get("OVERLORD_PROMPTS", Path(__file__).resolve().parent.parent / "prompts"))
 # `herdr agent start` takes the model on its own command line: this machine's config.yml
 # leaves every modelRole at `nothing`, so an agent started without one dies on its first
-# request with a 400 naming the value.
+# request with a 400 naming the value. Roles are per-machine config, so an override wins.
 WORKER_MODEL = os.environ.get("OVERLORD_MODEL", "omniroute/anthropic/claude-opus-4.5")
+HARDENED_RE = re.compile(r"^<!-- hardened: ([0-9a-f]{40,64}) -->$")
+PLAN_TOGGLE = "Alt+Shift+P"
+
+
+# Classifier pair chosen on error direction and cost, not on an accuracy win: the intervals
+# overlap (batch 0.960 [0.902-0.984] against Mini's 0.890 [0.814-0.937]), DeepSeek halves the
+# silent false-updated rate (11 against 22 per 1000) and costs 11.6 against 95.6 micro-USD.
+CLASSIFIER_MODELS = ["deepseek/deepseek-v4.1-flash-1017", "openai/gpt-5-mini"]
+CLASSIFIER_TIMEOUT = 30
+# the worker model stays the spawn default: the classifier pair is allowed, not preferred
+DEFAULT_ALLOWED = [WORKER_MODEL, *CLASSIFIER_MODELS]
+
+
+def model_policy() -> tuple[list[str], str]:
+    models = read_yaml(CONFIG_FILE, "config").get("models") or {}
+    if not isinstance(models, dict):
+        # a hand-edited list instead of a mapping must not crash spawn, models or resume
+        models = {}
+    configured = models.get("allowed")
+    if not isinstance(configured, list) or not configured:
+        # a scalar would iterate into characters and refuse every model with "use one of: o, p…"
+        configured = DEFAULT_ALLOWED
+    allowed = [str(name) for name in configured]
+    configured_default = str(models.get("default") or WORKER_MODEL)
+    # a custom allow-list excluding the worker model must still have a usable default
+    default = configured_default if configured_default in allowed else allowed[0]
+    return allowed, default
+
+
+def resolve_model(requested: str) -> tuple[str, str]:
+    allowed, default = model_policy()
+    model = requested or default
+    if allowed and model not in allowed:
+        return "", f"model {model!r} is not allowed; use one of: {', '.join(allowed)}"
+    return model, ""
 
 
 def registry() -> dict[str, dict[str, str]]:
@@ -69,7 +105,63 @@ def registry() -> dict[str, dict[str, str]]:
         raise SystemExit(f"registry unreadable ({REGISTRY}): {error}")
     if not isinstance(data, dict):
         raise SystemExit(f"registry is not an object ({REGISTRY})")
+    if backfill_names(data):
+        save_registry(data)
     return data
+
+
+HEADER_WORDS = {"job", "task", "brief"}
+
+
+def title_slug(source: str) -> str:
+    """Four kebab words: header labels (`Job:`, `Brief:`) and their words never reach a title."""
+    kept: list[str] = []
+    for token in source.split():
+        clean = token.strip(".:,;!?()[]{}").lower()
+        if token.endswith(":") or clean in HEADER_WORDS or clean in STOP_WORDS:
+            continue
+        kept.extend(word for word in re.split(r"[^a-z0-9]+", clean) if word)
+    return "-".join(kept[:4]) or "untitled"
+
+
+def register_entry(entries: dict, path: str, meta: dict, title: str = "") -> None:
+    """Register a path, or update the fields a caller supplied: identity is never reassigned."""
+    known = entries.get(path)
+    if known is not None:
+        # callers omit unknown fields; supplied empty values are deliberate clears
+        known.update(meta)
+        if title:
+            known["title"] = title[:64]
+        return
+    meta["name"] = f"m{entries.get('next_name', 1)}"
+    entries["next_name"] = int(entries.get("next_name", 1)) + 1
+    meta["title"] = (title or title_slug(meta.get("task", "") or Path(path).name))[:64]
+    entries[path] = meta
+
+def registry_paths(entries: dict) -> dict[str, dict]:
+    """Entries keyed by worktree path; next_name is allocator bookkeeping, never a path."""
+    return {key: value for key, value in entries.items() if key != "next_name" and isinstance(value, dict)}
+
+
+def backfill_names(entries: dict) -> bool:
+    changed = False
+    if "next_name" not in entries:
+        numbers = [int(meta["name"][1:]) for meta in registry_paths(entries).values()
+                   if isinstance(meta.get("name"), str) and re.fullmatch(r"m[1-9][0-9]*", meta["name"])]
+        entries["next_name"] = max(numbers, default=0) + 1
+        changed = True
+    for path, meta in sorted(registry_paths(entries).items()):
+        if "name" not in meta:
+            meta["name"] = f"m{entries['next_name']}"
+            entries["next_name"] += 1
+            changed = True
+        if "title" not in meta:
+            source = meta.get("task", "")
+            if not source and meta.get("kind") == "git":
+                source = run(["git", "-C", path, "log", "-1", "--format=%s"])
+            meta["title"] = title_slug(source or Path(path).name)
+            changed = True
+    return changed
 
 
 def save_registry(entries: dict[str, dict[str, str]]) -> None:
@@ -154,50 +246,73 @@ def herdr_places() -> dict[str, list[str]]:
 
 
 def agent_name(path: Path) -> str:
-    """A live agent name herdr accepts: [a-z][a-z0-9_-]{0,31}, from the checkout name."""
+    """A live herdr identity: the registered minion name, else the checkout slug."""
+    meta = registry().get(str(path.resolve()))
+    if meta and meta.get("name"):
+        return meta["name"]
     slug = re.sub(r"[^a-z0-9-]+", "-", path.name.lower()).strip("-") or "adopted"
     return (slug if slug[:1].isalpha() else f"a-{slug}")[:32].rstrip("-") or "adopted"
 
 
-def start_agent(name: str, pane: str) -> bool:
-    """Oh My Pi, never another kind, with the model it must be given to run at all.
+def enter_plan_mode(pane: str) -> bool:
+    """Toggle omp plan mode with its own keybinding, then prove it took from the pane banner.
 
-    A fresh workspace's shell needs a moment before it accepts a program, so the start is
-    retried while it is refused, and a start that succeeds is never issued twice.
+    A chord sent while the shell is still starting is swallowed, hence the retry: `spawn` must
+    never hand feat work over in normal mode, where the minion implements before any plan.
     """
+    # one chord only: a second one on a slow banner turns plan mode back off. It is re-sent
+    # solely while the pane is still blank, the case where a starting shell swallowed it.
+    sent = False
+    for _ in range(20):
+        banner = run(["herdr", "pane", "read", pane, "--source", "recent", "--lines", "40"])
+        if "plan mode" in banner.lower():
+            return True
+        if not sent and banner.strip() and ok(["herdr", "pane", "send-keys", pane, PLAN_TOGGLE]):
+            sent = True
+        time.sleep(1)
+    return False
+
+
+def start_agent(name: str, pane: str, model: str) -> bool:
+    """Start omp with explicit main, plan and smol models; nothing is never inherited."""
     for _ in range(10):
-        if ok(["herdr", "agent", "start", name, "--kind", "omp", "--pane", pane, "--", "--model", WORKER_MODEL], timeout=120):
+        if ok(["herdr", "agent", "start", name, "--kind", "omp", "--pane", pane, "--", "--model", model, "--plan", model, "--smol", model], timeout=120):
             return True
         time.sleep(1)
     return False
 
 
-def open_workspace(path: Path) -> tuple[str, str]:
-    """A plain herdr workspace on this checkout, with a worker started in its root pane.
-
-    herdr's own worktree workspaces are never used: they claim the checkout and the branch,
-    which this skill manages itself. Returns (workspace, pane), either empty on failure.
-    """
+def open_workspace(path: Path, model: str) -> tuple[str, str]:
+    """Open a plain herdr workspace on this checkout and start its minion."""
     created = herdr_json(["herdr", "workspace", "create", "--cwd", str(path), "--no-focus"])
     pane = (created.get("root_pane") or {}).get("pane_id", "")
     workspace = ((created.get("workspace") or {}).get("workspace_id")
                  or (created.get("root_pane") or {}).get("workspace_id", ""))
     if not pane:
         return workspace, ""
-    return workspace, (pane if start_agent(agent_name(path), pane) else "")
+    return workspace, (pane if start_agent(agent_name(path), pane, model) else "")
 
 
 def resume_agent(record: dict, pane: str, path: Path) -> str:
     """Start the moved agent again and point it at the session file it lost."""
-    if not start_agent(agent_name(path), pane):
+    model, refusal = resolve_model("")
+    if refusal:
+        return f"agent restart failed: {refusal}"
+    if not start_agent(agent_name(path), pane, model):
         return "agent restart failed"
+    # adopt registers everything as "adopted", so the mode field never says feat here; the plan
+    # itself does. A failed chord is reported, but the session resume below still runs: that
+    # minion has work to pick up and no prompt would leave it with none.
+    plan_mode_note = ""
+    if (path / PLAN_FILE).is_file() and not plan_hardened(path) and not enter_plan_mode(pane):
+        plan_mode_note = ", plan mode did not engage"
     session = (record.get("agent_session") or {}).get("value", "")
     if not session:
-        return "agent restarted, no session file to resume"
+        return f"agent restarted, no session file to resume{plan_mode_note}"
     instruction = f"Your pane moved to a new workspace. Resume the session at {session} and carry on where you left off."
     if not ok(["herdr", "agent", "prompt", pane, instruction]):
-        return "agent restarted, resume prompt failed"
-    return "agent resumed"
+        return f"agent restarted, resume prompt failed{plan_mode_note}"
+    return f"agent resumed{plan_mode_note}"
 
 
 def relocate(path: Path, places: dict[str, list[str]], agents: dict[str, dict], realm: str) -> str:
@@ -252,25 +367,29 @@ def cmd_adopt(args: argparse.Namespace) -> int:
             print(f"{target}\t{path}\t{branch}\talready owned\t-")
             continue
         kind = "git" if toplevel else "dir"
-        entries[resolved] = {"repo": str(repo), "branch": branch, "mode": "adopted", "task": args.task, "kind": kind}
+        meta = {"repo": str(repo), "branch": branch, "mode": "adopted", "task": args.task, "kind": kind}
+        title = args.task or (run(["git", "-C", str(path), "log", "-1", "--format=%s"]) if toplevel else "") or path.name
+        register_entry(entries, resolved, meta, title)
+        save_registry(entries)
         adopted += 1
         print(f"{target}\t{path}\t{branch}\tadopted\t{relocate(path, places, agents, realm)}")
-    if adopted:
-        save_registry(entries)
-    print(f"\nowned worktrees: {len(entries)}")
-    return 0 if adopted or entries else 1
+    print(f"\nowned worktrees: {len(registry_paths(entries))}")
+    return 0 if adopted or registry_paths(entries) else 1
 
 
 def cmd_registry(args: argparse.Namespace) -> int:
     entries = registry()
     if args.path:
-        for path in entries:
+        for path in registry_paths(entries):
             print(path)
         return 0
     if args.add:
-        entries = registry()
         for path in args.add:
-            entries[str(Path(path).expanduser().resolve())] = {"repo": args.source_repo or "", "task": args.task or ""}
+            resolved = str(Path(path).expanduser().resolve())
+            register_entry(entries, resolved, {
+                "repo": args.source_repo or "", "task": args.task or "",
+                "pr_owner": args.pr_owner or "",
+            })
         save_registry(entries)
         print(f"registered {len(args.add)} path(s)")
         return 0
@@ -289,7 +408,7 @@ def cmd_registry(args: argparse.Namespace) -> int:
             if (ws.get("worktree") or {}).get("checkout_path")
         } if os.environ.get("HERDR_ENV") == "1" else {}
         print("#workspace\tlabel\tpath")
-        for path, meta in sorted(entries.items()):
+        for path, meta in sorted(registry_paths(entries).items()):
             workspace = by_path.get(str(Path(path).resolve()), "-")
             print(f"{workspace}\t{labels.get(str(Path(path).resolve()), meta.get('task', ''))[:40]}\t{path}")
         return 0
@@ -448,6 +567,8 @@ class PullRequest:
     base: str = ""
     sha: str = ""
     paths: list[str] = field(default_factory=list)
+    updated_at: str = ""
+    body: str = ""
 
 
 def pull_from_json(pull: dict) -> PullRequest:
@@ -463,6 +584,8 @@ def pull_from_json(pull: dict) -> PullRequest:
         head=((pull.get("head") or {}).get("ref") or ""),
         base=((pull.get("base") or {}).get("ref") or ""),
         sha=((pull.get("head") or {}).get("sha") or ""),
+        updated_at=str(pull.get("updated_at") or pull.get("merged_at") or ""),
+        body=str(pull.get("body") or ""),
     )
 
 
@@ -561,11 +684,19 @@ class Worktree:
     pane: str = "-"
     vcs: bool = True
     linked: bool = False
+    name: str = "-"
+    title: str = ""
+    agent_status: str = "unknown"
+    last_subject: str = ""
+    last_commit_at: str = ""
+    checks: str = "none"
+    task: str = ""
+    pr_owner: str = ""
 
 
 def registry_repos() -> list[Path]:
     """Repositories of adopted worktrees, so a target outside --repo is still overseen."""
-    return sorted({Path(meta["repo"]) for meta in registry().values() if meta.get("repo") and Path(meta["repo"]).is_dir()})
+    return sorted({Path(meta["repo"]) for key, meta in registry().items() if key != "next_name" and meta.get("repo") and Path(meta["repo"]).is_dir()})
 
 
 def herdr_open_repos() -> set[Path]:
@@ -600,9 +731,13 @@ def realm_repos(named: list[Path]) -> list[Path]:
 
 
 def collect(repos: list[Path], base: str) -> list[Worktree]:
-    """One row per worktree, read once per pass: every table below shares these facts."""
+    """One row per worktree, read once per pass: every table below shares these facts.
+
+    Always a list, empty when nothing is in the realm: every caller iterates the result.
+    """
     key = ("collect", tuple(sorted(str(Path(repo).expanduser().resolve()) for repo in repos)), base)
-    return shared(key, lambda: _collect(repos, base))
+    rows = shared(key, lambda: _collect(repos, base))
+    return rows if isinstance(rows, list) else []
 
 
 def _collect(repos: list[Path], base: str) -> list[Worktree]:
@@ -610,32 +745,37 @@ def _collect(repos: list[Path], base: str) -> list[Worktree]:
     by_path, by_ws = herdr_facts()
     rows: list[Worktree] = []
     seen: set[Path] = set()
-    registry_entries = registry()
+    identities = {
+        str(Path(path).resolve()): meta
+        for path, meta in registry_paths(registry()).items()
+    }
     repos = realm_repos(repos)
     for repo in repos:
         if not run(["git", "-C", str(repo), "rev-parse", "--git-dir"]):
             print(f"not a git repository: {repo}", file=sys.stderr)
             continue
-        registry_paths = {Path(path) for path in registry_entries}
+        registered_paths = {Path(path) for path in identities}
         registered = {
             Path(path)
-            for path, meta in registry_entries.items()
+            for path, meta in identities.items()
             if meta.get("repo") and Path(meta["repo"]).resolve() == repo.resolve()
         }
-        for path in sorted(registry_paths):
+        for path in sorted(registered_paths):
             if path in seen or not path.is_dir():
                 continue
             if run(["git", "-C", str(path), "rev-parse", "--git-dir"]):
                 continue
             seen.add(path)
             workspace = by_path.get(str(path.resolve()), "")
+            meta = identities.get(str(path.resolve()), {})
             agent, pane = by_ws.get(workspace, ("-", "-")) if workspace else ("-", "-")
-            rows.append(
-                Worktree(
-                    path=path, repo=path, branch="-", dirty=0, ahead=0, upstream="none",
-                    slug="", pull=None, agent=agent, pane=pane, vcs=False,
-                )
-            )
+            rows.append(Worktree(
+                path=path, repo=path, branch="-", dirty=0, ahead=0, upstream="none",
+                slug="", pull=None, agent=agent, pane=pane, vcs=False,
+                name=meta.get("name", "-"), title=meta.get("title", ""),
+                task=str(meta.get("task") or ""), pr_owner=str(meta.get("pr_owner") or ""),
+                agent_status=by_ws.get(workspace, ("unknown", "-"))[0] if workspace else "unknown",
+            ))
         for path in worktree_paths(repo) + sorted(registered):
             if not path.is_dir() or path in seen:
                 continue
@@ -646,22 +786,24 @@ def _collect(repos: list[Path], base: str) -> list[Worktree]:
             ahead_text = run(["git", "-C", str(path), "rev-list", "--count", f"origin/{base}..HEAD"])
             slug = repo_slug(path)
             workspace = by_path.get(str(path.resolve()), "")
+            meta = identities.get(str(path.resolve()), {})
             agent, pane = by_ws.get(workspace, ("-", "-")) if workspace else ("-", "-")
-            rows.append(
-                Worktree(
-                    path=path,
-                    repo=repo,
-                    branch=branch,
-                    dirty=dirty,
-                    ahead=int(ahead_text) if ahead_text.isdigit() else 0,
-                    upstream=run(["git", "-C", str(path), "rev-parse", "--abbrev-ref", "@{u}"]) or "none",
-                    slug=slug,
-                    pull=github.branch_pulls(slug).get(branch) if slug else None,
-                    agent=agent,
-                    pane=pane,
-                    linked=path.resolve() != repo.resolve(),
-                )
-            )
+            pull = github.branch_pulls(slug).get(branch) if slug else None
+            rows.append(Worktree(
+                path=path, repo=repo, branch=branch, dirty=dirty,
+                ahead=int(ahead_text) if ahead_text.isdigit() else 0,
+                upstream=run(["git", "-C", str(path), "rev-parse", "--abbrev-ref", "@{u}"]) or "none",
+                slug=slug, pull=pull,
+                agent=agent, pane=pane, linked=path.resolve() != repo.resolve(),
+                name=meta.get("name", "-"), title=meta.get("title", ""),
+                task=str(meta.get("task") or ""), pr_owner=str(meta.get("pr_owner") or ""),
+                agent_status=by_ws.get(workspace, ("unknown", "-"))[0] if workspace else "unknown",
+                last_subject=run(["git", "-C", str(path), "log", "-1", "--format=%s"]),
+                last_commit_at=run(["git", "-C", str(path), "log", "-1", "--format=%cI"]),
+                # checks are one GitHub request per PR: `check_green` asks on first use, so
+                # status, inventory and prune pay nothing for a fact they never read
+                checks="",
+            ))
     return rows
 
 
@@ -672,7 +814,11 @@ def landable(wt: Worktree) -> str:
     if wt.dirty:
         return "dirty"
     if wt.pull and wt.pull.state == "OPEN":
-        return "open-pr"
+        # a review of an older commit is evidence about that commit, never about this head
+        state = review_state(wt.slug, wt.pull)
+        if state == "current":
+            return "open-pr" if ocr_present() else "unreviewed: ocr missing"
+        return f"unreviewed: {state}"
     if wt.pull and wt.pull.state == "MERGED":
         return ""
     return "no-pr" if wt.ahead > 0 else ""
@@ -784,7 +930,7 @@ def order_plan(args: argparse.Namespace) -> list[tuple[int, str, PullRequest, bo
         groups = clusters(pulls)
         by_head = {pull.head: pull for pull in pulls}
         for pull in pulls:
-            green, blocker = github.checks_green(slug, pull.number, pull.sha)
+            green, blocker = checks_for(github, slug, pull)
             blockers = []
             if pull.draft:
                 blockers.append("draft")
@@ -792,6 +938,15 @@ def order_plan(args: argparse.Namespace) -> list[tuple[int, str, PullRequest, bo
                 blockers.append(f"mergeable={pull.merge_state if pull.merge_state != '-' else 'unknown'}")
             if not green:
                 blockers.append(blocker)
+            review = review_state(slug, pull)
+            if not ocr_present():
+                blockers.append("unreviewed: ocr missing")
+            elif review != "current":
+                blockers.append(f"unreviewed: {review}")
+            # the same REVIEWING gate `step_for` holds a PR at REV with: a pass must not merge
+            # the PR a minion is still reviewing
+            if pull_marker(pull) == "REVIEWING":
+                blockers.append("reviewing")
             if pull.base in by_head:
                 blockers.append(f"stacked on {pull.base}")
             plan.append(
@@ -823,20 +978,49 @@ STOP_WORDS = {
 }
 
 
-def plan_state(wt: Worktree) -> tuple[bool, bool, str]:
-    """(proposed, hardened, pane text). A plan file counts, and so does the pane banner."""
-    return shared(("plan_state", str(wt.path), wt.pane), lambda: _plan_state(wt))
+def plan_hardened(path: Path) -> bool:
+    """True when PLAN.md's last line names the commit holding exactly this plan text.
+
+    The marker is `<!-- hardened: <sha> -->`, the sha of the plan commit. Appending the marker
+    commits once more, so the sha cannot name the commit that carries the marker: it names the
+    commit whose PLAN.md equals the current file without that last line. Any later edit of the
+    plan makes the marker stale, which is what sends the worktree back to HRD.
+    """
+    plan = path / PLAN_FILE
+    if not plan.is_file():
+        return False
+    lines = plan.read_text(errors="replace").splitlines()
+    # strip only blank lines after the marker; internal plan spacing is part of the committed text
+    end = len(lines)
+    while end and not lines[end - 1].strip():
+        end -= 1
+    marker = HARDENED_RE.fullmatch(lines[end - 1].strip()) if end else None
+    if not marker:
+        return False
+    plan_text = "\n".join(lines[:end - 1]).rstrip("\n")
+    if not plan_text.strip():
+        return False
+    if not run(["git", "-C", str(path), "rev-parse", "--git-dir"]):
+        # an adopted plain directory has no commits to name: a present marker is all it can have
+        return True
+    if not run(["git", "-C", str(path), "ls-files", "--error-unmatch", PLAN_FILE]):
+        return False
+    # Preserve interior blank lines exactly; `run()` strips stdout and cannot prove bytes.
+    try:
+        shown = subprocess.run(
+            ["git", "-C", str(path), "show", f"{marker.group(1)}:{PLAN_FILE}"],
+            capture_output=True, text=True, check=False,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return shown.returncode == 0 and bool(shown.stdout.strip()) and shown.stdout.rstrip("\n") == plan_text
 
 
-def _plan_state(wt: Worktree) -> tuple[bool, bool, str]:
-    proposed = (wt.path / PLAN_FILE).is_file()
-    hardened = False
-    text = ""
-    if wt.pane not in {"-", ""}:
-        text = run(["herdr", "pane", "read", wt.pane, "--source", "recent", "--lines", "300"]).lower()
-        hardened = "harden-plan" in text
-        proposed = proposed or "plan ready for review" in text or "exit plan mode" in text or "plan mode" in text
-    return proposed, hardened, text
+def plan_state(wt: Worktree) -> tuple[bool, bool]:
+    """(proposed, hardened), memoised: two git calls per worktree per table otherwise."""
+    return shared(("plan_state", str(wt.path.resolve())), lambda: (
+        (wt.path / PLAN_FILE).is_file(), plan_hardened(wt.path),
+    ))
 
 
 def short_title(wt: Worktree) -> str:
@@ -857,47 +1041,110 @@ def short_title(wt: Worktree) -> str:
     return "-".join(kept) or "untitled"
 
 
-def step_for(wt: Worktree, proposed: bool, hardened: bool, pane_text: str) -> str:
-    """The one stage this worktree is at, from landed back to looking around."""
-    if not wt.vcs:
-        if proposed and not hardened:
-            return "HRD"
-        if proposed and hardened:
-            return "REV"
-        return "PLAN" if "plan mode" in pane_text else "WORK"
+def check_green(wt: Worktree) -> bool:
+    """Green means every check run on the PR head succeeded; one memoised fact per pass."""
+    if not wt.pull or wt.pull.state != "OPEN":
+        return False
+    if not wt.checks:
+        green, blocker = checks_for(shared("github", Github), wt.slug, wt.pull)
+        wt.checks = "green" if green else (blocker or "not green")
+    return wt.checks == "green"
+
+
+def checks_for(github, slug: str, pull: PullRequest) -> tuple[bool, str]:
+    """(green, blocker) for one PR, fetched once per pass: `order_plan` and `check_green` agree."""
+    return shared(
+        ("checks", slug, pull.number, pull.sha),
+        lambda: github.checks_green(slug, pull.number, pull.sha),
+    )
+
+
+def pull_marker(pull: PullRequest) -> str:
+    """Whichever exact marker line comes last in the PR body: REVIEWING or REVIEW_CLEAR."""
+    found = ""
+    for line in pull.body.splitlines():
+        if line.strip() in {"REVIEWING", "REVIEW_CLEAR"}:
+            found = line.strip()
+    return found
+
+
+def review_marker(wt: Worktree) -> str:
+    return pull_marker(wt.pull) if wt.pull else ""
+
+
+def step_for(wt: Worktree, proposed: bool, hardened: bool) -> str:
+    """Select step from plan commit marker, git and PR facts only."""
     if wt.pull and wt.pull.state == "MERGED":
-        return "DONE"
-    if wt.pull and wt.pull.draft:
-        return "WORK"
+        return "DONE" if wt.dirty == 0 else "BUILD"
     if wt.pull and wt.pull.state == "OPEN":
-        return "REB" if wt.pull.merge_state == "DIRTY" else "MRG"
-    if proposed and not hardened:
-        return "HRD"
-    if proposed and hardened:
-        return "REV"
-    if "plan mode" in pane_text:
+        if wt.pull.merge_state == "DIRTY":
+            return "REB"
+        if wt.pull.draft:
+            return "BUILD"
+        if not check_green(wt) or review_marker(wt) == "REVIEWING":
+            return "REV"
+        return "MRG"
+    if not wt.vcs:
+        # no git, so no commits to move a plain target along: its plan file is the only evidence
+        if hardened:
+            return "BUILD"
+        if proposed:
+            return "HRD"
+        return "PLAN" if wt.task else "IDLE"
+    committed_plan = bool(shared(
+        ("plan_committed", str(wt.path.resolve())),
+        lambda: run(["git", "-C", str(wt.path), "ls-files", "--error-unmatch", PLAN_FILE]),
+    ))
+    if proposed and not committed_plan:
         return "PLAN"
-    if wt.dirty or wt.ahead > 0:
-        return "WORK"
-    return "IDLE"
+    if committed_plan and not hardened:
+        return "HRD"
+    if committed_plan and hardened:
+        return "BUILD"
+    if wt.ahead > 0 or wt.dirty:
+        return "BUILD"
+    # A registry entry carrying a task is a job in flight even with no git: IDLE means nothing
+    # started and nothing in flight, so it excludes every entry that has one.
+    return "PLAN" if wt.task else "IDLE"
 
 
-# symbol, colour and what the label says the worktree is doing
+
 STEP_STYLE: dict[str, tuple[str, str]] = {
     "IDLE": ("💤", "#56b6c2"),
     "PLAN": ("🗺", "#61afef"),
     "HRD": ("🛡", "#c678dd"),
-    "WORK": ("⚒", "#e5c07b"),
+    "BUILD": ("⚒", "#e5c07b"),
     "REV": ("🔍", "#d19a66"),
     "REB": ("⟳", "#c678dd"),
     "MRG": ("⤵", "#98c379"),
     "DONE": ("✔", "#7f8c8d"),
 }
 
-def paint(step: str, title: str) -> str:
-    """The visible label. Colour is herdr's config, never text: a hex code in a label is noise."""
+def paint(step: str, name: str, title: str, fact: str = "") -> str:
+    """`<symbol> <STEP> <name> <title> (<fact>)`, the whole string clamped to 64 characters."""
     symbol, _colour = STEP_STYLE.get(step, ("•", "#888888"))
-    return f"{symbol} {step} {title}"[:64]
+    suffix = f" ({fact})" if fact else ""
+    base = f"{symbol} {step} {name} {title}"
+    room = 64 - len(base) - len(suffix)
+    if room < 0:
+        base = base[: max(1, len(base) + room)]
+    return base + suffix
+
+
+def work_fact(wt: Worktree, step: str) -> str:
+    """The `()` block: `PR #<n>` in any step, the owner only in REV, `· merged` once merged.
+
+    The owner is written to the registry by whichever minion opened the PR: every PR carries the
+    human account, so `gh` cannot say it, and it is never read off the current worktree. A reviewer
+    is the one who needs it, hence REV only; an unknown owner prints `?`.
+    """
+    if not wt.pull or not wt.pull.number:
+        return ""
+    if wt.pull.state == "MERGED":
+        return f"PR #{wt.pull.number} · merged"
+    if step == "REV":
+        return f"PR #{wt.pull.number} - {wt.pr_owner or '?'}"
+    return f"PR #{wt.pull.number}"
 
 
 BUG_WORDS = ("fix", "bug", "crash", "broken", "regression", "panic", "error", "flake", "hotfix")
@@ -926,10 +1173,10 @@ def pick_mode(wt: Worktree, text: str, proposed: bool) -> tuple[str, str]:
     if wt.dirty == 0 and wt.ahead == 0 and not wt.pull and not proposed:
         return "ask", "IDLE"
     if bug and small and not proposed:
-        return "hotfix", "WORK"
+        return "hotfix", "BUILD"
     if feature and (proposed or wt.ahead > 1 or words > 40):
-        return "feat", "WORK"
-    return "fast", "WORK"
+        return "feat", "BUILD"
+    return "fast", "BUILD"
 
 
 def cmd_mode(args: argparse.Namespace) -> int:
@@ -937,10 +1184,10 @@ def cmd_mode(args: argparse.Namespace) -> int:
     print("#path\tmode\tstep\tevidence")
     overall = "ask"
     for wt in collect(args.repo, args.base):
-        proposed, hardened, pane_text = plan_state(wt)
-        text = recent_text(wt, args) + " " + pane_text
-        mode, chosen = pick_mode(wt, text, proposed)
-        step = step_for(wt, proposed, hardened, pane_text)
+        proposed, hardened = plan_state(wt)
+        pane_text = run(["herdr", "pane", "read", wt.pane, "--source", "recent", "--lines", "300"]) if wt.pane not in {"-", ""} else ""
+        mode, chosen = pick_mode(wt, recent_text(wt, args) + " " + pane_text.lower(), proposed)
+        step = step_for(wt, proposed, hardened)
         if mode != "ask" and step in {"IDLE", "DONE"}:
             step = chosen
         if mode == "feat" and overall in {"ask", "fast", "hotfix"}:
@@ -977,66 +1224,206 @@ def label_self(own_pane: str) -> str:
     return workspace
 
 
+def live_places() -> dict[str, tuple[str, str]]:
+    """checkout path -> (workspace, pane) for every live pane, whatever the agent list says.
+
+    A workspace closed and reopened keeps no agent record until one starts there, and its label
+    resets to the directory name; this is what lets `rename` put the label back.
+    """
+    places: dict[str, tuple[str, str]] = {}
+    for pane in herdr_json(["herdr", "pane", "list"]).get("panes", []):
+        for key in ("foreground_cwd", "cwd"):
+            cwd = pane.get(key) or ""
+            if cwd:
+                places.setdefault(str(Path(cwd).resolve()), (pane.get("workspace_id", ""), pane.get("pane_id", "")))
+    return places
+
+
 def cmd_rename(args: argparse.Namespace) -> int:
-    """Prefix every worktree and pane with its step symbol, then say what it is about."""
+    """Rename every registered worktree from its frozen identity and current step."""
     by_path, _by_ws = herdr_facts()
-    print("#path\tworkspace\tpane\tstep\tsymbol\tlabel")
+    places = live_places() if os.environ.get("HERDR_ENV") == "1" else {}
+    print("#path\tworkspace\tpane\tname\tstep\tsymbol\tlabel")
     own_pane = os.environ.get("HERDR_PANE_ID", "")
     if own_pane:
         workspace = label_self(own_pane) if args.apply or args.label_self else own_workspace()
-        print(f"self\t{workspace or '-'}\t{own_pane}\t-\t👁\t👁 OVERLORD")
+        print(f"self\t{workspace or '-'}\t{own_pane}\t-\t-\t👁\t👁 OVERLORD")
     for wt in collect(args.repo, args.base):
-        proposed, hardened, text = plan_state(wt)
-        step = step_for(wt, proposed, hardened, text)
+        if wt.name == "-":
+            # not registered: `collect` returns the whole realm, and renaming a stranger's
+            # workspace after the "-" placeholder would be a live lie
+            continue
+        proposed, hardened = plan_state(wt)
+        step = step_for(wt, proposed, hardened)
         symbol = STEP_STYLE.get(step, ("•", "#888888"))[0]
-        label = paint(step, short_title(wt))
-        workspace = by_path.get(str(wt.path.resolve()), "")
-        print(f"{wt.path}\t{workspace or '-'}\t{wt.pane}\t{step}\t{symbol}\t{label}")
+        title = wt.title or short_title(wt)
+        label = paint(step, wt.name, title, work_fact(wt, step))
+        live_workspace, live_pane = places.get(str(wt.path.resolve()), ("", ""))
+        workspace = by_path.get(str(wt.path.resolve()), "") or live_workspace
+        pane = wt.pane if wt.pane not in {"-", ""} else live_pane
+        print(f"{wt.path}\t{workspace or '-'}\t{pane or '-'}\t{wt.name}\t{step}\t{symbol}\t{label}")
         if not args.apply:
             continue
+        tokens = (f"step={step}", f"name={wt.name}", f"title={title}")
         if workspace:
             herdr_apply(["herdr", "workspace", "rename", workspace, label])
-            herdr_apply(
-                ["herdr", "workspace", "report-metadata", workspace, "--source", "overlord",
-                 "--token", f"step={step}"]
-            )
-        if wt.pane not in {"-", ""}:
-            herdr_apply(["herdr", "pane", "rename", wt.pane, label])
-            herdr_apply(["herdr", "pane", "report-metadata", wt.pane, "--source", "overlord", "--token", f"step={step}"])
+            for token in tokens:
+                herdr_apply(["herdr", "workspace", "report-metadata", workspace, "--source", "overlord", "--token", token])
+        if pane:
+            herdr_apply(["herdr", "pane", "rename", pane, label])
+            for token in tokens:
+                herdr_apply(["herdr", "pane", "report-metadata", pane, "--source", "overlord", "--token", token])
     return 0
+
+
+REVIEW_DIR = STATE_DIR / "review"
+REVIEWED_RE = re.compile(r"^<!-- reviewed: ([0-9a-f]{7,64}) -->$")
+SEVERITIES = ("critical", "high", "medium", "low")
+
+
+def review_path(slug: str, number: int) -> Path:
+    """Artifact path, identical in every implementation: <state>/review/<owner>-<repo>-<pr>.txt."""
+    return REVIEW_DIR / f"{slug.replace('/', '-')}-{number}.txt"
+
+
+def reviewed_sha(path: Path) -> str:
+    """The head sha an artifact covers: its first line, empty when absent or unreadable."""
+    try:
+        first = path.read_text(errors="replace").splitlines()[:1]
+    except OSError:
+        return ""
+    match = REVIEWED_RE.fullmatch(first[0]) if first else None
+    return match.group(1) if match else ""
+
+
+def review_state(slug: str, pull: PullRequest) -> str:
+    """`current`, `stale` or `missing`: a review of an older commit is evidence about it only."""
+    path = review_path(slug, pull.number)
+    covered = reviewed_sha(path)
+    if not covered:
+        return "missing"
+    return "current" if covered == pull.sha[:len(covered)] else "stale"
+
+
+def severities(text: str) -> dict[str, int]:
+    """Findings per severity: ocr writes `[bug · high]` in text and `"severity": "high"` in JSON."""
+    marks = re.findall(r'"severity"\s*:\s*"([a-z]+)"', text.lower())
+    marks += [level.lower() for level in re.findall(r"· (critical|high|medium|low)\]", text)]
+    counts = {level: 0 for level in SEVERITIES}
+    for level in marks:
+        if level in counts:
+            counts[level] += 1
+    return counts
+
+
+def findings(text: str) -> list[tuple[str, str]]:
+    """(severity, message) per finding, so each defect routes as one instruction.
+
+    ocr's own config decides text or JSON, so both shapes are read: JSON pair fields, and one
+    `[type · severity]` block per comment in text mode.
+    """
+    out = [
+        (level.lower(), message.strip()[:300])
+        for level, message in re.findall(
+            r'"severity"\s*:\s*"([a-zA-Z]+)"[^}]*?"(?:message|title|body)"\s*:\s*"([^"]*)"', text
+        )
+        if level.lower() in SEVERITIES
+    ]
+    for block in re.split(r"^─── ", text, flags=re.M)[1:]:
+        mark = re.search(r"· (critical|high|medium|low)\]", block)
+        body = block.split("\n", 1)[1] if "\n" in block else block
+        body = re.sub(r"^\[[^\]]*\]\s*", "", body)
+        if mark and body.strip():
+            out.append((mark.group(1).lower(), " ".join(body.split())[:300]))
+    return out
+
+
+def ocr_present() -> bool:
+    """Memoised: a pass asks once per PR, and `which` is a fork each time."""
+    return bool(shared("ocr_present", lambda: run(["which", "ocr"])))
 
 
 def cmd_review(args: argparse.Namespace) -> int:
-    """Capture the screen of every worktree waiting on review, for a visual check."""
-    out_dir = Path(args.capture or (Path(os.environ.get("TMPDIR", "/tmp")) / "overlord-review"))
-    out_dir.mkdir(parents=True, exist_ok=True)
-    print("#path\tpane\tstep\tcapture")
+    """Review each PR's diff with the ocr CLI; the artifact gates every merge."""
+    if not ocr_present():
+        print("ocr\tmissing\tinstall the ocr CLI; no PR is landable without a review", file=sys.stderr)
+        return 1
+    REVIEW_DIR.mkdir(parents=True, exist_ok=True)
+    print("#repository\tpr\thead\tartifact\texit\tcritical\thigh\tmedium\tlow\treviewed\tstep")
+    routed: list[tuple[Worktree, PullRequest, str, str]] = []
+    failures = 0
     for wt in collect(args.repo, args.base):
-        proposed, hardened, text = plan_state(wt)
-        step = step_for(wt, proposed, hardened, text)
-        if step not in {"REV", "MRG"}:
+        proposed, hardened = plan_state(wt)
+        step = step_for(wt, proposed, hardened)
+        pull = wt.pull
+        # step_for only reaches REV/MRG through an open PR, so there is always a diff to review
+        if step not in {"REV", "MRG"} or not pull:
             continue
-        target = out_dir / f"{wt.path.name}-{step}.txt"
-        capture = ""
-        if wt.pane not in {"-", ""}:
-            capture = run(["herdr", "pane", "read", wt.pane, "--source", "visible", "--lines", "200", "--format", "ansi"])
-        if not capture:
-            capture = run(["git", "-C", str(wt.path), "diff", "--stat", f"origin/{args.base}...HEAD"])
-        target.write_text(capture or "empty capture\n")
-        print(f"{wt.path}\t{wt.pane}\t{step}\t{target}")
-    return 0
+        artifact = review_path(wt.slug, pull.number)
+        if review_state(wt.slug, pull) == "current":
+            # already reviewed at this head: re-running would burn an ocr run and, on a transient
+            # failure, delete a review that still covers the commit
+            counts = severities(artifact.read_text(errors="replace"))
+            print(
+                f"{wt.slug}\t{pull.number}\t{pull.sha[:12]}\t{artifact}\t0\t"
+                + "\t".join(str(counts[level]) for level in SEVERITIES)
+                + f"\t{reviewed_sha(artifact)[:12]}\t{step}"
+            )
+            continue
+        run(["git", "-C", str(wt.path), "fetch", "--quiet", "origin", args.base, pull.head])
+        body = run(["git", "-C", str(wt.path), "log", "-1", "--format=%s", pull.sha]) or pull.head
+        command = [
+            "ocr", "review", "--audience", "agent", "--format", "json",
+            "--background", f"PR #{pull.number} on {wt.slug}: {body}"[:400],
+            "--from", f"origin/{args.base}", "--to", pull.sha,
+            "--repo", str(wt.path), "--output", str(artifact),
+        ]
+        # a failed run must leave no marker: the previous artifact covers an older commit, and
+        # re-stamping it with the new sha would pass the gate on evidence about another head
+        artifact.unlink(missing_ok=True)
+        ocr_ok = ok(command, timeout=1800)
+        text = artifact.read_text(errors="replace") if artifact.exists() else ""
+        has_evidence = bool(text.strip())
+        code = 0 if ocr_ok and has_evidence else 1
+        failures += 1 if code else 0
+        counts = severities(text)
+        if code == 0:
+            artifact.write_text(f"<!-- reviewed: {pull.sha} -->\n{text}")
+        for level, message in findings(text):
+            if level != "low" and message:
+                routed.append((wt, pull, level, message))
+        print(
+            f"{wt.slug}\t{pull.number}\t{pull.sha[:12]}\t{artifact}\t{code}\t"
+            + "\t".join(str(counts[level]) for level in SEVERITIES)
+            + f"\t{reviewed_sha(artifact)[:12] or '-'}\t{step}"
+        )
+    if routed:
+        print("## findings")
+        for wt, pull, level, message in routed:
+            if wt.pane in {"-", ""}:
+                # a prompt addressed to nobody would read as sent; `asks` skips the same way
+                continue
+            # argv, one shell word per shlex.quote: the message comes from an untrusted diff, so
+            # no character of it may ever reach a shell unquoted
+            argv = ["herdr", "agent", "prompt", wt.pane,
+                    f"{level.upper()}: {strip_control(message)} (PR #{pull.number}, {wt.slug})"]
+            print(" ".join(shlex.quote(word) for word in argv))
+    return 1 if failures else 0
+CONTROL_RE = re.compile(r"[\x00-\x1f\x7f]")
+
+
+def strip_control(text: str) -> str:
+    """One line, no control bytes: review text is untrusted and ends up in a printed command."""
+    return CONTROL_RE.sub(" ", text).strip()
+
+
 
 
 def cmd_plans(args: argparse.Namespace) -> int:
     print("#path\tpane\tagent\tproposed\thardened\taction")
     for wt in collect(args.repo, args.base):
         proposed = (wt.path / PLAN_FILE).is_file()
-        hardened = False
-        if wt.pane not in {"-", ""}:
-            pane_output = run(["herdr", "pane", "read", wt.pane, "--source", "recent", "--lines", "300"]).lower()
-            hardened = "harden-plan" in pane_output
-            proposed = proposed or "plan ready for review" in pane_output or "exit plan mode" in pane_output
-
+        hardened = plan_hardened(wt.path)
         action = "none"
         if proposed and not hardened:
             action = "harden"
@@ -1049,7 +1436,10 @@ def cmd_plans(args: argparse.Namespace) -> int:
         if args.inject and action == "harden":
             run(["herdr", "pane", "run", wt.pane, HARDEN])
             print(f"sent {HARDEN} to {wt.pane}", file=sys.stderr)
-        if args.approve and action == "approve":
+        if args.approve and action != "none":
+            if action != "approve":
+                print(f"refused to approve {wt.path}: PLAN.md is not hardened (no current marker)", file=sys.stderr)
+                continue
             # the first option runs the plan and drops the current context
             run(["herdr", "pane", "send-keys", wt.pane, "1"])
             print(f"approved the plan in {wt.pane} (option 1)", file=sys.stderr)
@@ -1058,7 +1448,7 @@ def cmd_plans(args: argparse.Namespace) -> int:
 
 def cmd_prune(args: argparse.Namespace) -> int:
     print("#path\tbranch\tpr\taction")
-    registered = {str(Path(path).resolve()) for path in registry()}
+    registered = {str(Path(path).resolve()) for path in registry_paths(registry())}
     for wt in collect(args.repo, args.base):
         # the registry is the only source of ownership: a worktree this overlord never
         # adopted or spawned is not its to delete
@@ -1087,10 +1477,188 @@ def cmd_prune(args: argparse.Namespace) -> int:
                     break
     return 0
 
+
+STALLED_STEPS = {"HRD", "BUILD", "REV", "REB", "MRG"}
+ALERT_FILE = STATE_DIR / "alerted.json"
+IDLE_RE = re.compile(r"^\s*(?:>\s*)?(.+?)\?\s*$")
+
+
+def seconds_since(moment: str) -> int:
+    """Seconds from an ISO-8601 stamp to now: -1 when the stamp is missing or unreadable."""
+    if not moment:
+        return -1
+    try:
+        then = datetime.fromisoformat(moment.replace("Z", "+00:00"))
+    except ValueError:
+        return -1
+    return max(0, int((datetime.now(timezone.utc) - then).total_seconds()))
+
+
+def last_line(pane: str) -> str:
+    """The last non-empty line a minion printed, clipped: the tail of the conversation."""
+    if pane in {"-", ""}:
+        return ""
+    rows = [row.strip() for row in run(["herdr", "pane", "read", pane, "--source", "recent-unwrapped", "--lines", "40"]).splitlines()]
+    return next((row for row in reversed(rows) if row), "")[:160]
+
+
+def stall_rows(args: argparse.Namespace) -> list[dict]:
+    """One row per minion that is idle while its step still implies work."""
+    rows: list[dict] = []
+    for wt in collect(args.repo, args.base):
+        if wt.name == "-":
+            # a stranger's worktree: no minion to name, so no stall row and no alert about "-"
+            continue
+        if wt.agent_status != "idle":
+            continue
+        proposed, hardened = plan_state(wt)
+        step = step_for(wt, proposed, hardened)
+        if step not in STALLED_STEPS:
+            continue
+        tail = last_line(wt.pane)
+        dry = getattr(args, "dry_run", False)
+        # a dry run changes nothing and buys nothing: no classifier call, no gh request
+        verdict, _reason = ("skipped", "") if dry else classify(step, tail)
+        pull = wt.pull
+        rows.append({
+            "name": wt.name,
+            "step": step,
+            "title": wt.title or ("-" if dry else short_title(wt)),
+            "idle_seconds": min(ages) if (ages := [age for age in (
+                seconds_since(pull.updated_at if pull else ""),
+                seconds_since(wt.last_commit_at),
+            ) if age >= 0]) else -1,
+            "last_commit": wt.last_subject or "-",
+            "commit_age": seconds_since(wt.last_commit_at),
+            "dirty": wt.dirty,
+            "pr": f"#{pull.number} {pull.state} {pull.mergeable}" if pull else "none",
+            "checks": "skipped" if dry else (wt.checks or ("none" if not pull or pull.state != "OPEN"
+                                                           else ("green" if check_green(wt) else "not green"))),
+            "question": "yes" if IDLE_RE.match(tail) else "no",
+            # the label verdict is evidence for the overlord's decision, never a rename trigger,
+            # and it costs nothing unless a stall exists: no stall, no classifier call
+            "label": verdict,
+            "tail": tail or "-",
+            "pane": wt.pane,
+        })
+    return rows
+
+
+def show_stalls(args: argparse.Namespace) -> list[dict]:
+    rows = stall_rows(args)
+    print("#name\tstep\ttitle\tidle_seconds\tlast_commit\tcommit_age\tdirty\tpr\tchecks\tquestion\tlabel\ttail")
+    for row in rows:
+        print("\t".join(str(row[key]) for key in (
+            "name", "step", "title", "idle_seconds", "last_commit", "commit_age",
+            "dirty", "pr", "checks", "question", "label", "tail",
+        )))
+    return rows
+
+
+def alert_text(row: dict) -> str:
+    """The evidence the overlord decides on: everything it needs in one prompt."""
+    return (
+        f"Stall: minion {row['name']} is idle at {row['step']} ({row['title']}). "
+        f"{row['idle_seconds']}s idle, last commit {row['last_commit']!r} {row['commit_age']}s ago, "
+        f"{row['dirty']} dirty paths, PR {row['pr']}, checks {row['checks']}, "
+        f"last pane line a question: {row['question']} — {row['tail']}. "
+        f"Decide: resume it, answer it, merge it, prune it, respawn it, or leave a legitimate wait."
+    )
+
+
+def alert_new(rows: list[dict]) -> None:
+    """Prompt this pane once per stall, keyed by minion+step and cleared once that stall is gone."""
+    try:
+        alerted = json.loads(ALERT_FILE.read_text())
+    except (OSError, json.JSONDecodeError):
+        # one truncated file must not break every later pass: the worst case is a repeat alert
+        alerted = {}
+    if not isinstance(alerted, dict):
+        # `[]` or `3` parses fine and then raises on `key in alerted`: same guard as a bad decode
+        alerted = {}
+    pane = os.environ.get("HERDR_PANE_ID", "")
+    if not pane:
+        # nothing to prompt: say so once instead of retrying silently every sweep
+        print("alert: HERDR_PANE_ID unset, no stall reported", file=sys.stderr)
+        return
+    live = {f"{row['name']}:{row['step']}" for row in rows}
+    for row in rows:
+        key = f"{row['name']}:{row['step']}"
+        if key in alerted:
+            continue
+        if ok(["herdr", "agent", "prompt", pane, alert_text(row)]):
+            alerted[key] = [row["name"], row["step"]]
+    alerted = {key: value for key, value in alerted.items() if key in live}
+    STATE_DIR.mkdir(parents=True, exist_ok=True)
+    temporary = ALERT_FILE.with_suffix(".json.tmp")
+    temporary.write_text(json.dumps(alerted, indent=2, sort_keys=True))
+    temporary.replace(ALERT_FILE)
+
+STEP_GLOSSARY = (
+    "PLAN: plan mode, no committed plan. HRD: plan committed, hardening marker absent or stale. "
+    "BUILD: implementing. REV: reviewing the diff. REB: rebasing a conflicting PR. MRG: PR open, "
+    "green, waiting to merge. DONE: PR merged. IDLE: nothing started and nothing in flight."
+)
+
+
+def classifier_prompt(step: str, pane_text: str) -> str:
+    """The one prompt: glossary, current step, evidence. The guard runs before it, in code."""
+    return (
+        "You classify whether a minion's label is stale. Answer one word: updated, outdated, not_sure.\n"
+        f"Step glossary:\n{STEP_GLOSSARY}\nCurrent step: {step}\nPane evidence:\n{pane_text}\n"
+    )
+
+
+def classify(step: str, pane_text: str) -> tuple[str, str]:
+    """(verdict, reason), guarded in code: absent or unreadable evidence never reaches a model.
+
+    Both finalists answer `updated` on an empty pane, the one failure that leaves a stale label
+    lying, so the guard is here and not in the prompt. A sweep with nothing stale makes no call,
+    and the call has its own timeout so a slow tail never blocks the sweep from finishing.
+    """
+    text = (pane_text or "").strip()
+    if not text:
+        return "not_sure", "empty pane"
+    if text.startswith("<unreadable"):
+        return "not_sure", "unreadable pane"
+    command = os.environ.get("OVERLORD_CLASSIFIER_CMD", "")
+    if not command.strip():
+        return "not_sure", "no classifier client configured"
+    try:
+        argv = shlex.split(command)
+    except ValueError as exc:
+        return "not_sure", f"classifier command unparseable: {exc}"
+    try:
+        done = subprocess.run(
+            argv, input=classifier_prompt(step, text),
+            capture_output=True, text=True, timeout=CLASSIFIER_TIMEOUT,
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        return "not_sure", f"classifier failed: {exc}"
+    lines = (done.stdout or "").strip().splitlines()
+    answer = lines[-1].strip().lower() if lines else ""
+    return (answer, "") if answer in {"updated", "outdated", "not_sure"} else ("not_sure", "unparseable answer")
+
+
+def cmd_watch(args: argparse.Namespace) -> int:
+    """Print stalls, alert this pane once per new one, and repeat until --once or --stop."""
+    while True:
+        # a sweep is a fresh read: the pass-wide memo would otherwise replay its first snapshot
+        _MEMO.clear()
+        rows = show_stalls(args)
+        if args.alert:
+            alert_new(rows)
+        # `status --stop` writes the same file: a watch started for a loop ends with the loop
+        if args.once or not args.interval or consume_stop():
+            return 0
+        time.sleep(args.interval)
+
 DEPENDENCIES = (
-    ("git", "git", "brew install git"),
-    ("gh", "gh", "brew install gh"),
-    ("uv", "uv", "brew install uv"),
+    # (name, command, fix, installable): `preflight --apply` only brews what brew actually has
+    ("git", "git", "brew install git", True),
+    ("gh", "gh", "brew install gh", True),
+    ("uv", "uv", "brew install uv", True),
+    ("ocr", "ocr", "install the open-code-review CLI: its artifact gates every merge", False),
 )
 
 
@@ -1098,7 +1666,7 @@ def preflight_rows() -> tuple[list[dict[str, str]], list[str]]:
     """Every check this skill needs, as rows a stored verdict can reprint unchanged."""
     rows: list[dict[str, str]] = []
     missing: list[str] = []
-    for name, command, fix in DEPENDENCIES:
+    for name, command, fix, _installable in DEPENDENCIES:
         present = bool(run(["which", command]))
         rows.append({"check": name, "state": "ok" if present else "missing", "fix": fix})
         if not present:
@@ -1143,8 +1711,8 @@ def cmd_preflight(args: argparse.Namespace) -> int:
         return 0 if not cached.get("missing") else 1
 
     if args.apply:
-        for name, command, _fix in DEPENDENCIES:
-            if not run(["which", command]):
+        for name, command, _fix, installable in DEPENDENCIES:
+            if installable and not run(["which", command]):
                 run(["brew", "install", name])
 
     rows, missing = preflight_rows()
@@ -1188,12 +1756,12 @@ def credential_note(repo: Path) -> str:
 
 
 def handover(mode: str, task: str, clause: str, note: str = "") -> str | None:
-    """The text a worker starts from: preamble, mode prompts, credential note, task, completion clause.
+    """The text a minion starts from: preamble, mode prompts, credential note, task, completion clause.
 
-    A prompt file that is missing or empty is reported and returns None: the worker would
+    A prompt file that is missing or empty is reported and returns None: the minion would
     otherwise start without the rules it is meant to obey.
     """
-    names = ["preamble"] + (["hotfix"] if mode == "hotfix" else []) + ["work"]
+    names = ["preamble"] + (["hotfix"] if mode == "hotfix" else ["feat"] if mode == "feat" else []) + ["work"]
     parts: list[str] = []
     for name in names:
         path = PROMPTS / f"{name}.md"
@@ -1208,22 +1776,35 @@ def handover(mode: str, task: str, clause: str, note: str = "") -> str | None:
         parts.append(text)
     return "\n\n".join(parts + ([note] if note else []) + [task] + ([clause] if clause else []))
 
+def cmd_models(args: argparse.Namespace) -> int:
+    allowed, default = model_policy()
+    print("#model\tdefault")
+    for name in allowed or [default]:
+        print(f"{name}\t{'yes' if name == default else 'no'}")
+    return 0
+
 
 def cmd_spawn(args: argparse.Namespace) -> int:
-    """Start a job: create its worktree, then print the one command that hands over the task."""
+    """Start a minion's job in a fresh worktree."""
     if args.mode not in {"fast", "hotfix", "feat"}:
         print("mode must be fast, hotfix or feat", file=sys.stderr)
         return 2
     if not args.task:
         print("spawn needs --task", file=sys.stderr)
         return 2
+    model, refusal = resolve_model(getattr(args, "model", "") or os.environ.get("OVERLORD_MODEL", ""))
+    if refusal:
+        print(refusal, file=sys.stderr)
+        return 2
 
     repo = args.repo[0] if args.repo else Path.cwd()
-    slug = "-".join(word for word in re.split(r"[^a-z0-9]+", args.task.lower()) if word and word not in STOP_WORDS)[:60] or "job"
+    title = getattr(args, "title", "") or ""
+    if title and not re.fullmatch(r"[a-z0-9]+(-[a-z0-9]+)*", title):
+        print("--title must be lowercase letters, digits and single hyphens", file=sys.stderr)
+        return 2
+    slug = title or (title_slug(args.task)[:60] if title_slug(args.task) != "untitled" else "job")
     branch = f"worktree/{slug}"
     path = Path(args.dest).expanduser() / slug if args.dest else Path.home() / ".herdr" / "worktrees" / repo.name / slug
-    # The worker reports into this pane; without it there is no address to bake in, and a
-    # guessed one would send a completion line nowhere.
     pane = os.environ.get("HERDR_PANE_ID", "")
     if not pane:
         print("#warning\tHERDR_PANE_ID unset: completion clause omitted", file=sys.stderr)
@@ -1231,27 +1812,54 @@ def cmd_spawn(args: argparse.Namespace) -> int:
     if text is None:
         return 1
 
-    print(f"#worktree\t{path}\nbranch\t{branch}\nmode\t{args.mode}")
+    step = "PLAN" if args.mode == "feat" else "BUILD"
+    name = f"m{registry().get('next_name', 1)}"
+    birth = title or title_slug(slug)
+    preview = paint(step, name, birth)
+    print(f"#worktree\t{path}\nbranch\t{branch}\nmode\t{args.mode}\nmodel\t{model}\ntitle\t{birth}")
     if args.dry_run:
         print(f"would run\tgit -C {repo} worktree add -b {branch} {path} origin/{args.base}")
         print(f"would run\therdr workspace create --cwd {path} --no-focus")
-        print(f"would run\therdr agent start {agent_name(path)} --kind omp --pane <pane> -- --model {WORKER_MODEL}")
+        print(f"would run\therdr agent start {agent_name(path)} --kind omp --pane <pane> -- --model {model} --plan {model} --smol {model}")
+        if args.mode == "feat":
+            print(f"would run\therdr pane send-keys <pane> {PLAN_TOGGLE} once the shell has printed")
+            print("would run\tverify plan mode from the pane banner, fail the spawn otherwise")
         print("would run\therdr agent prompt <pane> <handover>")
+        print(f"would run\therdr workspace rename <workspace> {preview}")
+        print(f"would run\therdr pane rename <pane> {preview}")
         return 0
     if not ok(["git", "-C", str(repo), "worktree", "add", "-b", branch, str(path), f"origin/{args.base}"]):
         print("worktree creation failed", file=sys.stderr)
         return 1
     entries = registry()
-    entries[str(path.resolve())] = {"repo": str(repo), "branch": branch, "mode": args.mode, "task": args.task}
+    register_entry(entries, str(path.resolve()), {"repo": str(repo), "branch": branch, "mode": args.mode, "task": args.task}, slug)
+    identity = entries[str(path.resolve())]
+    if title:
+        # a validated --title is the frozen title verbatim: re-slugging it turns "fix" into
+        # "untitled" and drops a fifth word the branch name still carries
+        identity["title"] = birth = title[:64]
     save_registry(entries)
-    workspace, worker = open_workspace(path)
-    if not worker:
-        print(f"worktree ready, no worker started in {workspace or 'herdr'}: start one there", file=sys.stderr)
+    label = paint(step, identity["name"], birth)
+    workspace, minion = open_workspace(path, model)
+    if not minion:
+        print(f"worktree ready, no minion started in {workspace or 'herdr'}: start one there", file=sys.stderr)
         return 1
-    print(f"worker\t{workspace}:{worker}")
-    if not ok(["herdr", "agent", "prompt", worker, text], timeout=120):
+    print(f"worker\t{workspace}:{minion}")
+    if args.mode == "feat" and not enter_plan_mode(minion):
+        print(f"plan mode did not engage in {minion}: spawn failed before the handover", file=sys.stderr)
+        return 1
+    if not ok(["herdr", "agent", "prompt", minion, text], timeout=120):
         print("handover prompt failed", file=sys.stderr)
         return 1
+    if workspace and not herdr_apply(["herdr", "workspace", "rename", workspace, label]):
+        print(f"minion label failed for workspace {workspace}", file=sys.stderr)
+    if not herdr_apply(["herdr", "pane", "rename", minion, label]):
+        print(f"minion label failed for pane {minion}", file=sys.stderr)
+    for kind, target in ((("workspace", workspace), ("pane", minion))):
+        if not target:
+            continue
+        for token in (f"step={step}", f"name={identity['name']}", f"title={birth}"):
+            herdr_apply(["herdr", kind, "report-metadata", target, "--source", "overlord", "--token", token])
     return 0
 
 
@@ -1311,6 +1919,15 @@ def cmd_pass(args: argparse.Namespace) -> int:
     and the model reads the last section only: the prompts still owed, already worded.
     """
     code = cmd_bootstrap(args)
+    print("## review")
+    if getattr(args, "dry_run", False):
+        print("would run\treview")
+    else:
+        cmd_review(args)
+    print("## stalls")
+    rows = show_stalls(args)
+    if not getattr(args, "dry_run", False):
+        alert_new(rows)
     if getattr(args, "dry_run", False):
         print("## plans\nwould run\tplans --inject --approve")
         print("## rename\nwould run\trename --apply")
@@ -1404,13 +2021,15 @@ def main(argv: list[str]) -> int:
 
     spawn = subs.add_parser("spawn", help="start a job in a fresh worktree")
     spawn.add_argument("--mode", default="feat", help="fast, hotfix or feat")
-    spawn.add_argument("--task", default="", help="what the worker should do")
+    spawn.add_argument("--task", default="", help="what the minion should do")
+    spawn.add_argument("--title", default="", help="frozen title slug (lowercase letters, digits, hyphens)")
     spawn.add_argument("--dry-run", action="store_true", help="print instead of creating")
     spawn.add_argument("--dest", default="", help="parent directory for the worktree (default ~/.herdr/worktrees/<repo>)")
     # The same two flags as the top level, so `spawn … --repo PATH` reads as the table says;
     # SUPPRESS keeps a value given before the subcommand instead of resetting it.
     spawn.add_argument("--repo", action="append", default=argparse.SUPPRESS, help="repository to start the job in")
     spawn.add_argument("--base", default=argparse.SUPPRESS, help="base branch for the worktree")
+    spawn.add_argument("--model", default="", help="allowed model for this minion")
 
     for name, help_text in (
         ("survey", "survey every worktree: branch, commits, panes"),
@@ -1433,7 +2052,10 @@ def main(argv: list[str]) -> int:
     reg.add_argument("--remove", nargs="*", default=[], help="forget these worktree paths")
     reg.add_argument("--task", default="", help="what the worktree is for")
     reg.add_argument("--source-repo", default="", help="repository path the worktree came from")
+    reg.add_argument("--pr-owner", default="", help="minion that opened this worktree's PR (mN)")
     reg.add_argument("--rename-list", action="store_true", help="workspace, label and path of every owned worktree")
+
+    subs.add_parser("models", help="the models a minion may use, and the default")
 
     preflight = subs.add_parser("preflight", help="verify dependencies once, then reprint the verdict")
     preflight.add_argument("--apply", action="store_true", help="install what is absent, then re-check")
@@ -1461,17 +2083,22 @@ def main(argv: list[str]) -> int:
     rename.add_argument("--apply", action="store_true", help="do it instead of listing")
     rename.set_defaults(label_self=False)
 
-    review = subs.add_parser("review", help="capture the screen of worktrees awaiting review")
-    review.add_argument("--capture", default="", help="directory for the captures")
+    review = subs.add_parser("review", help="review each PR diff with ocr; the artifact gates the merge")
+
+    watch = subs.add_parser("watch", help="stalls: idle minions whose step still implies work")
+    watch.add_argument("--alert", action="store_true", help="prompt this pane once per new stall")
+    watch.add_argument("--once", action="store_true", help="one sweep, then exit")
+    watch.add_argument("--interval", type=int, default=0, help="seconds between sweeps; 0 runs one")
 
     args = parser.parse_args(argv)
     args.repo = [Path(path).expanduser() for path in args.repo]
     if not args.repo and run(["git", "-C", str(Path.cwd()), "rev-parse", "--git-dir"]):
         args.repo = [Path.cwd()]
     handlers = {
+        "adopt": cmd_adopt,
         "preflight": cmd_preflight,
         "registry": cmd_registry,
-        "adopt": cmd_adopt,
+        "models": cmd_models,
         "mode": cmd_mode,
         "spawn": cmd_spawn,
         "bootstrap": cmd_bootstrap,
@@ -1483,6 +2110,7 @@ def main(argv: list[str]) -> int:
         "prune": cmd_prune,
         "rename": cmd_rename,
         "review": cmd_review,
+        "watch": cmd_watch,
     }
     return handlers[args.command](args)
 
