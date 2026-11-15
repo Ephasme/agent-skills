@@ -385,7 +385,7 @@ class ReviewFixTests(unittest.TestCase):
             capture_output=True, text=True, env={"HOME": tempfile.mkdtemp(), "PATH": os.environ.get("PATH", "")},
         )
         self.assertEqual(done.returncode, 0, done.stderr)
-        self.assertEqual(done.stdout.split(), o.CLASSIFIER_MODELS)
+        self.assertEqual(done.stdout.split(), o.DEFAULT_ALLOWED)
 
     def test_every_subcommand_has_a_handler(self):
         parser = subprocess.run(
@@ -529,7 +529,7 @@ class SecondReviewTests(unittest.TestCase):
             config = Path(home) / "config.yaml"
             config.write_text("models:\n  - deepseek/deepseek-v4.1-flash-1017\n")
             with patch.object(o, "CONFIG_FILE", config):
-                self.assertEqual(o.model_policy(), (o.CLASSIFIER_MODELS, o.CLASSIFIER_MODELS[0]))
+                self.assertEqual(o.model_policy(), (o.DEFAULT_ALLOWED, o.WORKER_MODEL))
 
     def test_alert_state_rejects_a_non_mapping_json_value(self):
         with tempfile.TemporaryDirectory() as state:
@@ -545,13 +545,47 @@ class SecondReviewTests(unittest.TestCase):
                 }])
             self.assertEqual(json.loads(alert_file.read_text()), {"m1:BUILD": ["m1", "BUILD"]})
 
-    def test_plan_mode_toggles_at_most_once(self):
-        answers = iter(["", "", "plan mode"])
-        with patch.object(o, "run", side_effect=lambda *_a, **_k: next(answers, "plan mode")), patch.object(
+    def test_plan_chord_goes_to_the_pane_once_the_shell_has_printed(self):
+        banners = iter(["", "prompt ready\n", "plan mode active\n"])
+        with patch.object(o, "run", side_effect=lambda *_a, **_k: next(banners, "plan mode active\n")), patch.object(
             o, "ok", return_value=True
         ) as keystroke, patch.object(o.time, "sleep", return_value=None):
             self.assertTrue(o.enter_plan_mode("p"))
+        # never while blank: that chord is swallowed; once the shell prints, exactly one chord
         self.assertEqual(keystroke.call_count, 1)
+        self.assertEqual(keystroke.call_args.args[0][:3], ["herdr", "pane", "send-keys"])
+
+    def test_plan_chord_is_never_sent_twice(self):
+        with patch.object(o, "run", return_value="still booting\n"), patch.object(
+            o, "ok", return_value=True
+        ) as keystroke, patch.object(o.time, "sleep", return_value=None):
+            self.assertFalse(o.enter_plan_mode("p"))
+        self.assertEqual(keystroke.call_count, 1)
+
+    def test_a_plain_directory_can_harden(self):
+        with tempfile.TemporaryDirectory() as root:
+            path = Path(root)
+            (path / "PLAN.md").write_text("# plan\n<!-- hardened: " + "a" * 40 + " -->\n")
+            self.assertTrue(o.plan_hardened(path))
+            (path / "PLAN.md").write_text("# plan\n")
+            self.assertFalse(o.plan_hardened(path))
+
+    def test_review_skips_a_head_that_is_already_current(self):
+        with tempfile.TemporaryDirectory() as state:
+            review_dir = Path(state) / "review"
+            review_dir.mkdir(parents=True)
+            (review_dir / "o-n-13.txt").write_text(f"<!-- reviewed: {'b' * 40} -->\n[bug · high] x\n")
+            pull = o.PullRequest(number=13, state="OPEN", mergeable="MERGEABLE", merge_state="CLEAN",
+                                 draft=False, files=1, sha="b" * 40, head="h")
+            wt = o.Worktree(path=Path("/wt"), repo=Path("/repo"), branch="b", dirty=0, ahead=1,
+                            upstream="origin/b", slug="o/n", pull=pull, pane="p")
+            with patch.object(o, "REVIEW_DIR", review_dir), patch.object(o, "ocr_present", return_value=True), patch.object(
+                o, "collect", return_value=[wt]
+            ), patch.object(o, "plan_state", return_value=(False, False)), patch.object(
+                o, "step_for", return_value="MRG"
+            ), patch.object(o, "ok") as ocr_run, patch("sys.stdout", new_callable=io.StringIO):
+                o.cmd_review(argparse.Namespace(repo=[Path("/repo")], base="main"))
+            ocr_run.assert_not_called()
 
     def test_plan_state_is_memoised_and_returns_two_values(self):
         wt = o.Worktree(path=Path("/wt"), repo=Path("/repo"), branch="b", dirty=0, ahead=0,

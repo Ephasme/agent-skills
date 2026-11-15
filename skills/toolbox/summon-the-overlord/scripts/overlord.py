@@ -31,6 +31,7 @@ import importlib
 import json
 import os
 import re
+import shlex
 import subprocess
 import sys
 import time
@@ -62,6 +63,8 @@ PLAN_TOGGLE = "Alt+Shift+P"
 # silent false-updated rate (11 against 22 per 1000) and costs 11.6 against 95.6 micro-USD.
 CLASSIFIER_MODELS = ["deepseek/deepseek-v4.1-flash-1017", "openai/gpt-5-mini"]
 CLASSIFIER_TIMEOUT = 30
+# the worker model stays the spawn default: the classifier pair is allowed, not preferred
+DEFAULT_ALLOWED = [WORKER_MODEL, *CLASSIFIER_MODELS]
 
 
 def model_policy() -> tuple[list[str], str]:
@@ -69,8 +72,8 @@ def model_policy() -> tuple[list[str], str]:
     if not isinstance(models, dict):
         # a hand-edited list instead of a mapping must not crash spawn, models or resume
         models = {}
-    allowed = [str(name) for name in (models.get("allowed") or CLASSIFIER_MODELS)]
-    default = str(models.get("default") or (allowed[0] if allowed else WORKER_MODEL))
+    allowed = [str(name) for name in (models.get("allowed") or DEFAULT_ALLOWED)]
+    default = str(models.get("default") or WORKER_MODEL)
     return allowed, default
 
 
@@ -139,6 +142,8 @@ def backfill_names(entries: dict) -> bool:
         changed = True
     for path in sorted(key for key in entries if key != "next_name"):
         meta = entries[path]
+        if not isinstance(meta, dict):
+            continue
         if "name" not in meta:
             meta["name"] = f"m{entries['next_name']}"
             entries["next_name"] += 1
@@ -248,15 +253,14 @@ def enter_plan_mode(pane: str) -> bool:
     A chord sent while the shell is still starting is swallowed, hence the retry: `spawn` must
     never hand feat work over in normal mode, where the minion implements before any plan.
     """
+    # one chord only: a second one on a slow banner turns plan mode back off. It is re-sent
+    # solely while the pane is still blank, the case where a starting shell swallowed it.
     sent = False
-    for _ in range(10):
-        if "plan mode" in run(
-            ["herdr", "pane", "read", pane, "--source", "recent", "--lines", "40"]
-        ).lower():
+    for _ in range(20):
+        banner = run(["herdr", "pane", "read", pane, "--source", "recent", "--lines", "40"])
+        if "plan mode" in banner.lower():
             return True
-        # one chord, then only watch: a second chord on a slow banner turns plan mode back off,
-        # which is the failure this loop exists to prevent
-        if not sent and ok(["herdr", "agent", "send-keys", pane, PLAN_TOGGLE]):
+        if not sent and banner.strip() and ok(["herdr", "pane", "send-keys", pane, PLAN_TOGGLE]):
             sent = True
         time.sleep(1)
     return False
@@ -287,7 +291,9 @@ def resume_agent(record: dict, pane: str, path: Path) -> str:
     model, refusal = resolve_model("")
     if refusal or not start_agent(agent_name(path), pane, model):
         return "agent restart failed"
-    if registry().get(str(path.resolve()), {}).get("mode") == "feat" and not enter_plan_mode(pane):
+    # adopt registers everything as "adopted", so the mode field never says feat here; the plan
+    # itself does: a committed plan without a current marker means the hardening work is unfinished
+    if (path / PLAN_FILE).is_file() and not plan_hardened(path) and not enter_plan_mode(pane):
         return "agent restarted, plan mode did not engage"
     session = (record.get("agent_session") or {}).get("value", "")
     if not session:
@@ -968,11 +974,16 @@ def plan_hardened(path: Path) -> bool:
     plan makes the marker stale, which is what sends the worktree back to HRD.
     """
     plan = path / PLAN_FILE
-    if not plan.is_file() or not run(["git", "-C", str(path), "ls-files", "--error-unmatch", PLAN_FILE]):
+    if not plan.is_file():
         return False
     lines = plan.read_text(errors="replace").splitlines()
     match = HARDENED_RE.fullmatch(lines[-1].strip()) if lines else None
     if not match:
+        return False
+    if not run(["git", "-C", str(path), "rev-parse", "--git-dir"]):
+        # an adopted plain directory has no commits to name: a present marker is all it can have
+        return True
+    if not run(["git", "-C", str(path), "ls-files", "--error-unmatch", PLAN_FILE]):
         return False
     # both sides stripped: a trailing blank line is whitespace, not a plan edit, and an empty
     # `git show` (unknown sha) must never read as a match
@@ -1033,7 +1044,10 @@ def step_for(wt: Worktree, proposed: bool, hardened: bool) -> str:
         if not check_green(wt) or review_marker(wt) == "REVIEWING":
             return "REV"
         return "MRG"
-    committed_plan = bool(run(["git", "-C", str(wt.path), "ls-files", "--error-unmatch", PLAN_FILE]))
+    committed_plan = bool(shared(
+        ("plan_committed", str(wt.path.resolve())),
+        lambda: run(["git", "-C", str(wt.path), "ls-files", "--error-unmatch", PLAN_FILE]),
+    ))
     if proposed and not committed_plan:
         return "PLAN"
     if committed_plan and not hardened:
@@ -1060,9 +1074,9 @@ STEP_STYLE: dict[str, tuple[str, str]] = {
 }
 
 def paint(step: str, name: str, title: str, fact: str = "") -> str:
-    """`<symbol> <STEP> <name> <title> (<fact>)`: no fact means no parentheses at all."""
+    """`<symbol> <STEP> <name> <title> (<fact>)`, clamped to the width a rename accepts."""
     symbol, _colour = STEP_STYLE.get(step, ("•", "#888888"))
-    return f"{symbol} {step} {name} {title}" + (f" ({fact})" if fact else "")
+    return f"{symbol} {step} {name} {title}"[:64] + (f" ({fact})" if fact else "")
 
 
 def work_fact(wt: Worktree, step: str) -> str:
@@ -1183,6 +1197,10 @@ def cmd_rename(args: argparse.Namespace) -> int:
         workspace = label_self(own_pane) if args.apply or args.label_self else own_workspace()
         print(f"self\t{workspace or '-'}\t{own_pane}\t-\t-\t👁\t👁 OVERLORD")
     for wt in collect(args.repo, args.base):
+        if wt.name == "-":
+            # not registered: `collect` returns the whole realm, and renaming a stranger's
+            # workspace after the "-" placeholder would be a live lie
+            continue
         proposed, hardened = plan_state(wt)
         step = step_for(wt, proposed, hardened)
         symbol = STEP_STYLE.get(step, ("•", "#888888"))[0]
@@ -1280,19 +1298,26 @@ def cmd_review(args: argparse.Namespace) -> int:
         return 1
     REVIEW_DIR.mkdir(parents=True, exist_ok=True)
     print("#repository\tpr\thead\tartifact\texit\tcritical\thigh\tmedium\tlow\treviewed\tstep")
-    routed: list[str] = []
+    routed: list[tuple[Worktree, PullRequest, str, str]] = []
     for wt in collect(args.repo, args.base):
         proposed, hardened = plan_state(wt)
         step = step_for(wt, proposed, hardened)
-        if step not in {"REV", "MRG"}:
-            continue
         pull = wt.pull
-        if not pull or not wt.vcs:
-            capture = out_dir_capture(wt, args.base)
-            print(f"{wt.slug or '-'}\t{pull.number if pull else '-'}\t-\t{capture}\t0\t-\t-\t-\t-\t-\tscreen")
+        # step_for only reaches REV/MRG through an open PR, so there is always a diff to review
+        if step not in {"REV", "MRG"} or not pull:
+            continue
+        artifact = review_path(wt.slug, pull.number)
+        if review_state(wt.slug, pull) == "current":
+            # already reviewed at this head: re-running would burn an ocr run and, on a transient
+            # failure, delete a review that still covers the commit
+            counts = severities(artifact.read_text(errors="replace"))
+            print(
+                f"{wt.slug}\t{pull.number}\t{pull.sha[:12]}\t{artifact}\t0\t"
+                + "\t".join(str(counts[level]) for level in SEVERITIES)
+                + f"\t{reviewed_sha(artifact)[:12]}\t{step}"
+            )
             continue
         run(["git", "-C", str(wt.path), "fetch", "--quiet", "origin", args.base, pull.head])
-        artifact = review_path(wt.slug, pull.number)
         body = run(["git", "-C", str(wt.path), "log", "-1", "--format=%s", pull.sha]) or pull.head
         command = [
             "ocr", "review", "--audience", "agent", "--format", "json",
@@ -1319,20 +1344,12 @@ def cmd_review(args: argparse.Namespace) -> int:
     if routed:
         print("## findings")
         for wt, pull, level, message in routed:
-            print(f'herdr agent prompt {wt.pane} "{level.upper()}: {message} (PR #{pull.number}, {wt.slug})"')
-    return 0
+            if wt.pane in {"-", ""}:
+                # a prompt addressed to nobody would read as sent; `asks` skips the same way
+                continue
+            text_ = f"{level.upper()}: {message} (PR #{pull.number}, {wt.slug})"
+            print(f"herdr agent prompt {shlex.quote(wt.pane)} {shlex.quote(text_)}")
 
-
-def out_dir_capture(wt: Worktree, base: str) -> Path:
-    """Screen fallback for a target that cannot produce a diff: never mistaken for a review."""
-    out_dir = Path(os.environ.get("TMPDIR", "/tmp")) / "overlord-review"
-    out_dir.mkdir(parents=True, exist_ok=True)
-    target = out_dir / f"{wt.path.name}-screen.txt"
-    capture = ""
-    if wt.pane not in {"-", ""}:
-        capture = run(["herdr", "pane", "read", wt.pane, "--source", "visible", "--lines", "200", "--format", "ansi"])
-    target.write_text(capture or run(["git", "-C", str(wt.path), "diff", "--stat", f"origin/{base}...HEAD"]) or "empty\n")
-    return target
 
 
 def cmd_plans(args: argparse.Namespace) -> int:
@@ -1418,9 +1435,9 @@ def last_line(pane: str) -> str:
     return next((row for row in reversed(rows) if row), "")[:160]
 
 
-def stall_rows(args: argparse.Namespace) -> list[dict[str, str]]:
+def stall_rows(args: argparse.Namespace) -> list[dict]:
     """One row per minion that is idle while its step still implies work."""
-    rows: list[dict[str, str]] = []
+    rows: list[dict] = []
     for wt in collect(args.repo, args.base):
         if wt.agent_status != "idle":
             continue
@@ -1486,12 +1503,17 @@ def alert_new(rows: list[dict]) -> None:
     if not isinstance(alerted, dict):
         # `[]` or `3` parses fine and then raises on `key in alerted`: same guard as a bad decode
         alerted = {}
+    pane = os.environ.get("HERDR_PANE_ID", "")
+    if not pane:
+        # nothing to prompt: say so once instead of retrying silently every sweep
+        print("alert: HERDR_PANE_ID unset, no stall reported", file=sys.stderr)
+        return
     live = {f"{row['name']}:{row['step']}" for row in rows}
     for row in rows:
         key = f"{row['name']}:{row['step']}"
         if key in alerted:
             continue
-        if ok(["herdr", "agent", "prompt", os.environ.get("HERDR_PANE_ID", ""), alert_text(row)]):
+        if ok(["herdr", "agent", "prompt", pane, alert_text(row)]):
             alerted[key] = [row["name"], row["step"]]
     alerted = {key: value for key, value in alerted.items() if key in live}
     STATE_DIR.mkdir(parents=True, exist_ok=True)
