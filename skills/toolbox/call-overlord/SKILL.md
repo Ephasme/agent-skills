@@ -21,8 +21,20 @@ disable-model-invocation: true
 **Explicit invocation only.** A pass merges pull requests, which cannot be undone by a resolver.
 Where `disable-model-invocation` is ignored, this paragraph is the rule.
 
-It merges inside the realm only: what you named, adopted, spawned or opened in herdr. Discovery
-enumerates checkouts and authorizes nothing.
+## You are the overlord now
+
+Calling this skill binds the session for the rest of it: you are the overlord, and you stay the
+overlord on every later turn without being asked again. The role survives the turn that invoked
+it — a follow-up message, a task, a review request or a complaint all arrive to the overlord, and
+each is handled by dispatching a worker, merging, or running a gate, never by writing code here.
+
+What that rules out: editing files, running builds or committing in this pane, spawning an agent
+other than Oh My Pi (`--kind omp`), and creating the worktree as a herdr worktree. Work happens in
+a plain herdr workspace on a git worktree, with a worker this skill starts (`spawn`), and comes
+back to this pane as a report.
+
+It reports on and merges inside the realm only: what you named, adopted, spawned or opened in
+herdr. Nothing else is scanned.
 
 `$SKILL_DIR` is notation, not a set variable: this skill's directory, the one holding this `SKILL.md`.
 
@@ -90,30 +102,12 @@ GitHub API says so on the first request. One thing preflight cannot finish alone
 needs a human.
 
 
-## Discovery: only the roots you name
-
-A pass reports on `--repo`, the ownership registry, and the repositories discovery found. Nothing is
-found until `~/.overlord/config.yaml` names the directories to look in:
-
-```yaml
-discovery:
-  roots:
-    - ~/code/perso
-```
-
-`discover` lists each checkout directly under a root — its slug, its base branch, and the `account`
-that reaches it — and writes `~/.overlord/caches/discovery.yaml`. Who's who is settled there, once
-per repository: every gh login is tried, the one that can push wins over one that can only read, and
-the login is stored beside the slug so a pass never probes it again. A cache written before accounts
-were stored is rescanned, not trusted. The cache serves passes for 24 h, then a rescan replaces it;
-`discover --refresh` rescans now, and `--root DIR` scans a root the config does not name. A
-repository no account can read stays listed as `gh no`, so its pull requests are named as invisible
-instead of missing.
+## Realm: what a pass sees
 
 A repository enters the realm when you name it with `--repo`, adopt it, spawn a job in it, or hold
-it open in herdr — the last without an `adopt`. `order` plans that set alone and names the rest as
-`#note not in realm, not planned: …`; `status` reads the same gate, and `prune` deletes only what the
-registry owns.
+it open in herdr — the last without an `adopt`. No directory is scanned for others: a repository
+outside that set is invisible to every command. `order` and `status` read that set, and `prune`
+deletes only what the registry owns.
 
 
 ## Jobs: pick a mode first
@@ -125,11 +119,16 @@ registry owns.
 |`hotfix`|`fast` with the failure reproduced first: insert the bug — a failing test or a scripted repro — before the worker starts|
 |`ask`|change nothing: answer only, with `/skill:cite-or-refuse` or `/skill:fact-check-document`|
 
-`overlord.py spawn --mode fast|hotfix --task "<what to build>"` creates the worktree and starts the
-worker; with `--dry-run` the script prints the command it would run and creates nothing.
-The handover is not the bare task: `spawn` reads `$SKILL_DIR/prompts/` and sends `preamble.md`,
-`work.md`, then the task, inserting `hotfix.md` between the rules and the task in `hotfix` mode so
-the repro is the first instruction the worker reads. A prompt file that is missing or empty stops
+`overlord.py spawn --mode fast|hotfix --task "<what to build>"` creates the worktree, opens a plain
+herdr workspace on it, starts Oh My Pi in that workspace's root pane and prompts it with the
+handover; with `--dry-run` it prints the commands it would run and creates nothing. The worker is
+always `--kind omp` — never `claude`, `pi` or any other kind — and always starts with an explicit
+`--model`: this machine's omp config leaves every model role at `nothing`, so a worker started
+without one dies on its first request. `OVERLORD_MODEL` overrides the default
+(`omniroute/anthropic/claude-opus-4.5`). The handover is not the bare task: `spawn` reads
+`$SKILL_DIR/prompts/` and sends `preamble.md`, `work.md`, then the task, inserting `hotfix.md`
+between the rules and the task in `hotfix` mode so the repro is the first instruction the worker
+reads. A prompt file that is missing or empty stops
 `spawn` with the file named, rather than sending a shorter handover. Those files are runtime
 behaviour: edit them to change how a worker behaves, never as documentation.
 
@@ -175,9 +174,10 @@ where the registry is written but nothing moves.
 
 ## The feat pipeline, in six commands
 
-`bootstrap` prints every read-only table — preflight, discover, inventory, mode, order, plans, and
-the labels `rename` would set — in one process: one GitHub round trip and one git probe per
-worktree, instead of one of each per command. Run the single commands when you need one answer.
+`bootstrap` names the overlord's own pane and workspace `👁 OVERLORD`, then prints every read-only
+table — preflight, inventory, mode, order, plans, and the worktree labels `rename` would set — in
+one process: one GitHub round trip and one git probe per worktree, instead of one of each per
+command. Worktree labels are only applied by `rename --apply`. Run the single commands when you need one answer.
 
 ```bash
 "$SKILL_DIR/scripts/overlord.py" bootstrap                  # 1. where everything stands
@@ -190,7 +190,7 @@ worktree, instead of one of each per command. Run the single commands when you n
 
 Each subcommand takes `--repo PATH` (repeatable) and `--base BRANCH` (default `main`). With no
 `--repo`, a pass covers the current directory when it is a checkout, plus every registry and
-discovered repository. Top-level flags precede the subcommand: `overlord.py --repo PATH order`.
+repository open in herdr. Top-level flags precede the subcommand: `overlord.py --repo PATH order`.
 `survey`, `labels`, `relabel` and `verify` are dispatched before argparse, so they take those global
 flags as well as their own.
 

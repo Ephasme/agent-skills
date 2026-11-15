@@ -48,10 +48,11 @@ STATE_DIR = Path(os.environ.get("XDG_STATE_HOME", Path.home() / ".local" / "stat
 REGISTRY = STATE_DIR / "worktrees.json"
 OVERLORD_DIR = Path(os.environ.get("OVERLORD_HOME", Path.home() / ".overlord"))
 CONFIG_FILE = OVERLORD_DIR / "config.yaml"
-CACHE_DIR = OVERLORD_DIR / "caches"
-DISCOVERY_CACHE = CACHE_DIR / "discovery.yaml"
-DISCOVERY_TTL_HOURS = 24
 PROMPTS = Path(__file__).resolve().parent.parent / "prompts"
+# `herdr agent start` takes the model on its own command line: this machine's config.yml
+# leaves every modelRole at `nothing`, so an agent started without one dies on its first
+# request with a 400 naming the value.
+WORKER_MODEL = os.environ.get("OVERLORD_MODEL", "omniroute/anthropic/claude-opus-4.5")
 
 
 def registry() -> dict[str, dict[str, str]]:
@@ -81,8 +82,7 @@ def save_registry(entries: dict[str, dict[str, str]]) -> None:
 def read_yaml(path: Path, what: str) -> dict:
     """A YAML state file: empty when absent, an error when unreadable.
 
-    A corrupt config or cache never reads as empty: discovery would silently rescan, and
-    preflight would forget that it already ran.
+    A corrupt config never reads as empty: preflight would forget that it already ran.
     """
     if not path.exists():
         return {}
@@ -118,90 +118,6 @@ def shared(key, build):
     return _MEMO[key]
 
 
-def config_roots() -> list[Path]:
-    """The directories discovery may scan, named in config.yaml: none unless the file says so."""
-    section = read_yaml(CONFIG_FILE, "config").get("discovery") or {}
-    roots = section.get("roots") or []
-    return [Path(os.path.expanduser(str(root))) for root in roots if str(root).strip()]
-
-
-def scan_roots(roots: list[Path]) -> dict[str, dict]:
-    """Every git checkout directly under a root, or the root itself: path -> slug, base, account, gh.
-
-    Who's who is settled here, once per repository: the account that can push to it, else one
-    that can read it, else none. A slug no account reaches keeps gh false instead of
-    disappearing: an invisible remote is a fact the report has to name.
-    """
-    found: dict[str, dict] = {}
-    for root in roots:
-        candidates = [root, *sorted(root.iterdir())] if root.is_dir() else [root]
-        for candidate in candidates:
-            if not candidate.is_dir():
-                continue
-            toplevel = run(["git", "-C", str(candidate), "rev-parse", "--show-toplevel"])
-            if not toplevel:
-                continue
-            path = Path(toplevel).resolve()
-            if str(path) in found:
-                continue
-            slug = repo_slug(path)
-            head = run(["git", "-C", str(path), "symbolic-ref", "--short", "refs/remotes/origin/HEAD"])
-            login, _token, readable = credential(slug) if slug else ("-", "", False)
-            found[str(path)] = {
-                "slug": slug,
-                "base": (head or "origin/main").removeprefix("origin/"),
-                "gh": readable,
-                "account": login,
-            }
-    return found
-
-
-def refresh_discovery(roots: list[Path]) -> dict[str, dict]:
-    """Rescan the roots and replace the cache: the only writer of discovery.yaml."""
-    repos = scan_roots(roots)
-    write_yaml(
-        DISCOVERY_CACHE,
-        {"generated_at": stamp(), "ttl_hours": DISCOVERY_TTL_HOURS, "roots": [str(root) for root in roots], "repos": repos},
-    )
-    return repos
-
-
-def cache_age(cache: dict) -> float | None:
-    """Seconds since the cache was generated, None when it carries no readable stamp."""
-    try:
-        then = datetime.strptime(str(cache.get("generated_at") or ""), "%Y-%m-%dT%H:%M:%SZ")
-    except ValueError:
-        return None
-    return (datetime.now(timezone.utc) - then.replace(tzinfo=timezone.utc)).total_seconds()
-
-
-def placed(repos: dict) -> bool:
-    """Whether every cached entry names its account: a cache from before who's who was stored is stale."""
-    return all(isinstance(meta, dict) and "account" in meta for meta in repos.values())
-
-
-def discovery(refresh: bool = False) -> dict[str, dict]:
-    """Repositories discovery knows: the cache while it is fresh, a rescan once it expired.
-
-    No roots in config.yaml means no discovery at all, so a pass covers --repo and the
-    registry alone until the file names a directory to look in.
-    """
-    roots = config_roots()
-    if not roots:
-        return {}
-    cache = read_yaml(DISCOVERY_CACHE, "discovery cache")
-    age = cache_age(cache)
-    ttl = float(cache.get("ttl_hours") or DISCOVERY_TTL_HOURS) * 3600
-    repos = cache.get("repos")
-    if refresh or age is None or age > ttl or not isinstance(repos, dict) or not placed(repos):
-        return refresh_discovery(roots)
-    return repos
-
-
-def discovered() -> list[Path]:
-    return shared("discovered", lambda: [Path(path) for path in discovery() if Path(path).is_dir()])
-
-
 def own_workspace() -> str:
     """The workspace this overlord runs in: the realm every adopted target moves into."""
     return os.environ.get("HERDR_WORKSPACE_ID") or os.environ.get("HERDR_PANE_ID", "").split(":")[0]
@@ -231,7 +147,9 @@ def herdr_places() -> dict[str, list[str]]:
         for ws in herdr_json(["herdr", "workspace", "list"]).get("workspaces", [])
     }
     for pane in herdr_json(["herdr", "pane", "list"]).get("panes", []):
-        places.setdefault(pane.get("workspace_id", ""), []).append(pane.get("cwd") or "")
+        places.setdefault(pane.get("workspace_id", ""), []).extend(
+            path for path in (pane.get("foreground_cwd"), pane.get("cwd")) if path
+        )
     return places
 
 
@@ -241,10 +159,37 @@ def agent_name(path: Path) -> str:
     return (slug if slug[:1].isalpha() else f"a-{slug}")[:32].rstrip("-") or "adopted"
 
 
+def start_agent(name: str, pane: str) -> bool:
+    """Oh My Pi, never another kind, with the model it must be given to run at all.
+
+    A fresh workspace's shell needs a moment before it accepts a program, so the start is
+    retried while it is refused, and a start that succeeds is never issued twice.
+    """
+    for _ in range(10):
+        if ok(["herdr", "agent", "start", name, "--kind", "omp", "--pane", pane, "--", "--model", WORKER_MODEL], timeout=120):
+            return True
+        time.sleep(1)
+    return False
+
+
+def open_workspace(path: Path) -> tuple[str, str]:
+    """A plain herdr workspace on this checkout, with a worker started in its root pane.
+
+    herdr's own worktree workspaces are never used: they claim the checkout and the branch,
+    which this skill manages itself. Returns (workspace, pane), either empty on failure.
+    """
+    created = herdr_json(["herdr", "workspace", "create", "--cwd", str(path), "--no-focus"])
+    pane = (created.get("root_pane") or {}).get("pane_id", "")
+    workspace = ((created.get("workspace") or {}).get("workspace_id")
+                 or (created.get("root_pane") or {}).get("workspace_id", ""))
+    if not pane:
+        return workspace, ""
+    return workspace, (pane if start_agent(agent_name(path), pane) else "")
+
+
 def resume_agent(record: dict, pane: str, path: Path) -> str:
     """Start the moved agent again and point it at the session file it lost."""
-    name = agent_name(path)
-    if not ok(["herdr", "agent", "start", name, "--kind", record.get("agent") or "omp", "--pane", pane]):
+    if not start_agent(agent_name(path), pane):
         return "agent restart failed"
     session = (record.get("agent_session") or {}).get("value", "")
     if not session:
@@ -273,7 +218,8 @@ def relocate(path: Path, places: dict[str, list[str]], agents: dict[str, dict], 
         return f"kept: {held} refused to close"
     created = herdr_json(["herdr", "workspace", "create", "--cwd", str(path), "--no-focus"])
     pane = (created.get("root_pane") or {}).get("pane_id", "")
-    reopened = (created.get("workspace") or {}).get("workspace_id", "")
+    reopened = ((created.get("workspace") or {}).get("workspace_id")
+                or (created.get("root_pane") or {}).get("workspace_id", ""))
     if not pane or not reopened:
         return "closed, reopen failed"
     places.pop(held, None)
@@ -420,19 +366,15 @@ _CREDENTIAL: dict[str, tuple[str, str, bool]] = {}
 def credential(slug: str) -> tuple[str, str, bool]:
     """(login, token, readable) for one repository: an account that can push wins, else one that can read.
 
-    The account discovery stored is tried first, so a pass costs no probe on a repository
-    discovery already placed. An explicit GITHUB_TOKEN or GH_TOKEN pins every repository to it.
+    An explicit GITHUB_TOKEN or GH_TOKEN pins every repository to it.
     """
     for name in ("GITHUB_TOKEN", "GH_TOKEN"):
         if token := os.environ.get(name):
             return "-", token, True
     if slug in _CREDENTIAL:
         return _CREDENTIAL[slug]
-    stored = stored_account(slug)
-    accounts = gh_accounts()
-    ordered = [row for row in accounts if row[0] == stored] + [row for row in accounts if row[0] != stored]
     fallback: tuple[str, str, bool] = ("-", "", False)
-    for login, token, _active in ordered:
+    for login, token, _active in gh_accounts():
         repo = repo_access(slug, token)
         if not repo:
             continue
@@ -442,21 +384,6 @@ def credential(slug: str) -> tuple[str, str, bool]:
         fallback = fallback if fallback[2] else (login, token, True)
     _CREDENTIAL[slug] = fallback
     return fallback
-
-
-def stored_account(slug: str) -> str:
-    """The login discovery recorded for this slug: discovery is where who's who lives."""
-    return shared("stored_accounts", _stored_accounts).get(slug, "")
-
-
-def _stored_accounts() -> dict[str, str]:
-    """Read from the cache file, never from discovery(): a rescan calls credential itself."""
-    cache = read_yaml(DISCOVERY_CACHE, "discovery cache")
-    return {
-        meta["slug"]: meta.get("account", "")
-        for meta in (cache.get("repos") or {}).values()
-        if isinstance(meta, dict) and meta.get("slug") and meta.get("account")
-    }
 
 
 def repo_slug(path: Path) -> str:
@@ -496,6 +423,12 @@ def _herdr_facts() -> tuple[dict[str, str], dict[str, tuple[str, str]]]:
         for checkout in [(ws.get("worktree") or {}).get("checkout_path", "")]
         if checkout
     }
+    # A plain workspace holds no herdr worktree record; its pane's directory is the only
+    # place its checkout shows up, and it is where this skill puts every job anyway.
+    for pane in herdr_json(["herdr", "pane", "list"]).get("panes", []):
+        cwd = pane.get("foreground_cwd") or pane.get("cwd") or ""
+        if cwd:
+            by_path.setdefault(str(Path(cwd).resolve()), pane.get("workspace_id", ""))
     by_ws = {
         agent.get("workspace_id", ""): (agent.get("agent_status", "unknown"), agent.get("pane_id", ""))
         for agent in agents.get("result", {}).get("agents", [])
@@ -660,22 +593,10 @@ def _herdr_open_repos() -> set[Path]:
 
 
 def realm_repos(named: list[Path]) -> list[Path]:
-    """Repositories a pass may act on: named, adopted, or open in herdr.
-
-    Discovery only enumerates checkouts, so a repository it finds is listed and left alone:
-    nothing outside the realm is rebased, merged or pruned.
-    """
+    """Explicit repositories, owned worktrees' repos, and repositories open in herdr."""
     found = {Path(repo).expanduser().resolve() for repo in [*named, *registry_repos(), *herdr_open_repos()]}
     return sorted(repo for repo in found if repo.is_dir())
 
-
-def scope_repos(repos: list[Path]) -> list[Path]:
-    """Repositories a pass reports on: named, registry and discovered ones. Acting uses `realm_repos`."""
-    found: dict[Path, None] = {}
-    for repo in [*repos, *registry_repos(), *discovered()]:
-        if repo.is_dir():
-            found.setdefault(repo.resolve(), None)
-    return sorted(found)
 
 
 def collect(repos: list[Path], base: str) -> list[Worktree]:
@@ -690,7 +611,7 @@ def _collect(repos: list[Path], base: str) -> list[Worktree]:
     rows: list[Worktree] = []
     seen: set[Path] = set()
     registry_entries = registry()
-    repos = scope_repos(repos)
+    repos = realm_repos(repos)
     for repo in repos:
         if not run(["git", "-C", str(repo), "rev-parse", "--git-dir"]):
             print(f"not a git repository: {repo}", file=sys.stderr)
@@ -891,11 +812,6 @@ def cmd_order(args: argparse.Namespace) -> int:
             f"{index}\t{slug}\t{github.account(slug)}\t{pull.number}\t{pull.head}\t{pull.base}\t"
             f"{len(pull.paths)}\t{cluster}\t{worktree}\t{'yes' if ready else 'no'}\t{blocker or '-'}"
         )
-    outside = sorted(
-        {slug for slug in (repo_slug(repo) for repo in scope_repos(args.repo) if repo.resolve() not in set(realm)) if slug}
-    )
-    if outside:
-        print(f"#note\tnot in realm, not planned: {', '.join(outside)}")
     return 0
 STOP_WORDS = {
     "feat", "fix", "chore", "docs", "refactor", "test", "tests", "the", "a", "an", "and",
@@ -1063,7 +979,7 @@ def cmd_rename(args: argparse.Namespace) -> int:
     print("#path\tworkspace\tpane\tstep\tsymbol\tlabel")
     own_pane = os.environ.get("HERDR_PANE_ID", "")
     if own_pane:
-        workspace = label_self(own_pane) if args.apply else own_workspace()
+        workspace = label_self(own_pane) if args.apply or args.label_self else own_workspace()
         print(f"self\t{workspace or '-'}\t{own_pane}\t-\t👁\t👁 OVERLORD")
     for wt in collect(args.repo, args.base):
         proposed, hardened, text = plan_state(wt)
@@ -1239,37 +1155,6 @@ def cmd_preflight(args: argparse.Namespace) -> int:
     return 0 if not missing else 1
 
 
-def cmd_discover(args: argparse.Namespace) -> int:
-    """The repositories under the configured roots, and whether this token can read them."""
-    roots = [Path(os.path.expanduser(root)) for root in args.root] or config_roots()
-    if not roots:
-        print("#path\tslug\tbase\tgh")
-        print(f"#note\tno roots: add discovery.roots to {CONFIG_FILE}")
-        return 0
-    cache = read_yaml(DISCOVERY_CACHE, "discovery cache")
-    age = cache_age(cache)
-    ttl = float(cache.get("ttl_hours") or DISCOVERY_TTL_HOURS) * 3600
-    repos = cache.get("repos")
-    stale = (
-        args.refresh
-        or age is None
-        or age > ttl
-        or not isinstance(repos, dict)
-        or not placed(repos)
-    )
-    repos = refresh_discovery(roots) if stale else repos
-    print("#path\tslug\tbase\tgh\taccount")
-    for path, meta in sorted(repos.items()):
-        print(
-            f"{path}\t{meta.get('slug') or '-'}\t{meta.get('base') or '-'}\t"
-            f"{'yes' if meta.get('gh') else 'no'}\t{meta.get('account') or '-'}"
-        )
-    state = "rescanned" if stale else f"fresh, {int((age or 0) // 60)}m of {int(ttl // 60)}m"
-    print(f"#cache\t{state}\t{DISCOVERY_CACHE}", file=sys.stderr)
-    return 0
-
-
-
 def completion(branch: str, pane: str) -> str:
     """The clause that makes a worker report itself, so the overlord waits on nothing."""
     line = f"DONE {branch}: <outcome, commit sha, PR url, what you ran, anything unverified>"
@@ -1345,15 +1230,24 @@ def cmd_spawn(args: argparse.Namespace) -> int:
     print(f"#worktree\t{path}\nbranch\t{branch}\nmode\t{args.mode}")
     if args.dry_run:
         print(f"would run\tgit -C {repo} worktree add -b {branch} {path} origin/{args.base}")
-    elif not ok(["git", "-C", str(repo), "worktree", "add", "-b", branch, str(path), f"origin/{args.base}"]):
+        print(f"would run\therdr workspace create --cwd {path} --no-focus")
+        print(f"would run\therdr agent start {agent_name(path)} --kind omp --pane <pane> -- --model {WORKER_MODEL}")
+        print("would run\therdr agent prompt <pane> <handover>")
+        return 0
+    if not ok(["git", "-C", str(repo), "worktree", "add", "-b", branch, str(path), f"origin/{args.base}"]):
         print("worktree creation failed", file=sys.stderr)
         return 1
-    else:
-        entries = registry()
-        entries[str(path.resolve())] = {"repo": str(repo), "branch": branch, "mode": args.mode, "task": args.task}
-        save_registry(entries)
-        print("next\tstart an agent in that path, then:")
-    print(f'\therdr agent prompt <pane> "{text}"')
+    entries = registry()
+    entries[str(path.resolve())] = {"repo": str(repo), "branch": branch, "mode": args.mode, "task": args.task}
+    save_registry(entries)
+    workspace, worker = open_workspace(path)
+    if not worker:
+        print(f"worktree ready, no worker started in {workspace or 'herdr'}: start one there", file=sys.stderr)
+        return 1
+    print(f"worker\t{workspace}:{worker}")
+    if not ok(["herdr", "agent", "prompt", worker, text], timeout=120):
+        print("handover prompt failed", file=sys.stderr)
+        return 1
     return 0
 
 
@@ -1367,12 +1261,13 @@ def cmd_bootstrap(args: argparse.Namespace) -> int:
     print("## preflight")
     code = cmd_preflight(argparse.Namespace(**{**vars(args), "apply": False, "refresh": False}))
     for title, handler, extra in (
-        ("discover", cmd_discover, {"refresh": False, "root": []}),
         ("inventory", cmd_inventory, {}),
         ("mode", cmd_mode, {"transcript": ""}),
         ("order", cmd_order, {}),
         ("plans", cmd_plans, {"inject": False, "approve": False}),
-        ("rename", cmd_rename, {"apply": False}),
+        # the overlord names its own pane and workspace; worktree labels stay a preview
+        # until `rename --apply`
+        ("rename", cmd_rename, {"apply": False, "label_self": True}),
     ):
         print(f"## {title}")
         handler(argparse.Namespace(**{**vars(args), **extra}))
@@ -1457,10 +1352,6 @@ def main(argv: list[str]) -> int:
     preflight.add_argument("--apply", action="store_true", help="install what is absent, then re-check")
     preflight.add_argument("--refresh", action="store_true", help="re-check even when a verdict is stored")
 
-    discover = subs.add_parser("discover", help="repositories under the configured roots")
-    discover.add_argument("--refresh", action="store_true", help="rescan and replace the cache")
-    discover.add_argument("--root", action="append", default=[], help="scan this root instead of the configured ones")
-
     subs.add_parser("bootstrap", help="every read-only table a pass needs, in one process")
     subs.add_parser("inventory", help="one row per worktree")
     subs.add_parser("order", help="merge plan for the open pull requests")
@@ -1479,6 +1370,7 @@ def main(argv: list[str]) -> int:
 
     rename = subs.add_parser("rename", help="prefix every worktree and pane with its step")
     rename.add_argument("--apply", action="store_true", help="do it instead of listing")
+    rename.set_defaults(label_self=False)
 
     review = subs.add_parser("review", help="capture the screen of worktrees awaiting review")
     review.add_argument("--capture", default="", help="directory for the captures")
@@ -1489,7 +1381,6 @@ def main(argv: list[str]) -> int:
         args.repo = [Path.cwd()]
     handlers = {
         "preflight": cmd_preflight,
-        "discover": cmd_discover,
         "registry": cmd_registry,
         "adopt": cmd_adopt,
         "mode": cmd_mode,
