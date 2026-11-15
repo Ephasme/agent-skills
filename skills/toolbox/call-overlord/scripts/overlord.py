@@ -1,0 +1,579 @@
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.11"
+# dependencies = ["httpx>=0.27"]
+# ///
+"""Overlord helpers for landing worktree pull requests.
+
+Every fact and every ordering decision lives here, so a pass costs one script run and
+almost no model reasoning:
+
+    inventory   one row per git worktree of the repositories given
+    status      exit 0 when no worktree holds landable work (a loop gate)
+    order       the merge plan for the open PRs: clusters by touched files, stacks
+                after their base, smallest diff first, plus what still blocks each
+    plans       proposed plans and their hardening state; --inject sends
+                /skill:harden-plan, --approve picks the first option (run the plan
+                and drop the current context)
+    prune       remove worktrees whose PR merged and whose tree is clean
+                (--apply does it)
+
+Pull requests come from the GitHub REST API with the token `gh auth token` hands out,
+so a repository costs a couple of requests instead of one subprocess per branch.
+herdr is optional throughout: it only adds the agent state per workspace and is the
+only way to press a key in a pane.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import re
+import subprocess
+import sys
+import time
+from dataclasses import dataclass, field
+from pathlib import Path
+
+import httpx
+
+STOP_FILE = Path(os.environ.get("LAND_WORK_STOP", f"{os.environ.get('TMPDIR', '/tmp')}/land-work-stop"))
+IDLE_MINUTES = 20
+ACTIVITY_FILE = Path(os.environ.get("TMPDIR", "/tmp")) / "overlord-last-active"
+LEGACY_STOP = Path(os.environ.get("TMPDIR", "/tmp")) / "merge-agents-stop"
+PLAN_FILE = "PLAN.md"
+HARDEN = "/skill:harden-plan"
+API = "https://api.github.com"
+
+
+def run(cmd: list[str], cwd: Path | None = None, timeout: int = 120) -> str:
+    try:
+        done = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True, timeout=timeout)
+    except (OSError, subprocess.SubprocessError):
+        return ""
+    return done.stdout.strip() if done.returncode == 0 else ""
+
+
+def github_token() -> str:
+    for name in ("GITHUB_TOKEN", "GH_TOKEN"):
+        if token := os.environ.get(name):
+            return token
+    return run(["gh", "auth", "token"])
+
+
+def repo_slug(path: Path) -> str:
+    """owner/name from any remote URL: ssh alias, ssh, or https."""
+    url = run(["git", "-C", str(path), "remote", "get-url", "origin"])
+    if not url:
+        return ""
+    tail = url.rsplit(":", 1)[-1].removeprefix("//")
+    tail = tail.replace("https://", "").replace("http://", "")
+    if "/" in tail and "." in tail.split("/", 1)[0]:
+        tail = tail.split("/", 1)[1]
+    parts = [part for part in tail.removesuffix(".git").split("/") if part]
+    return "/".join(parts[-2:]) if len(parts) >= 2 else ""
+
+
+def worktree_paths(repo: Path) -> list[Path]:
+    out = run(["git", "-C", str(repo), "worktree", "list", "--porcelain"])
+    return [Path(line.removeprefix("worktree ")) for line in out.splitlines() if line.startswith("worktree ")]
+
+
+def herdr_facts() -> tuple[dict[str, str], dict[str, tuple[str, str]]]:
+    """checkout path -> workspace id, workspace id -> (agent state, pane). Empty without herdr."""
+    if os.environ.get("HERDR_ENV") != "1":
+        return {}, {}
+    try:
+        workspaces = json.loads(run(["herdr", "workspace", "list"]) or "{}")
+        agents = json.loads(run(["herdr", "agent", "list"]) or "{}")
+    except json.JSONDecodeError:
+        return {}, {}
+    by_path = {
+        (ws.get("worktree") or {}).get("checkout_path", ""): ws.get("workspace_id", "")
+        for ws in workspaces.get("result", {}).get("workspaces", [])
+        if (ws.get("worktree") or {}).get("checkout_path")
+    }
+    by_ws = {
+        agent.get("workspace_id", ""): (agent.get("agent_status", "unknown"), agent.get("pane_id", ""))
+        for agent in agents.get("result", {}).get("agents", [])
+    }
+    return by_path, by_ws
+
+
+@dataclass
+class PullRequest:
+    number: int
+    state: str
+    mergeable: str
+    merge_state: str
+    draft: bool
+    files: int
+    head: str = ""
+    base: str = ""
+    paths: list[str] = field(default_factory=list)
+
+
+def pull_from_json(pull: dict) -> PullRequest:
+    """REST reports a merged pull request as closed, with merged_at set."""
+    state = "MERGED" if pull.get("merged_at") or pull.get("merged") else str(pull.get("state", "")).upper()
+    return PullRequest(
+        number=int(pull.get("number", 0)),
+        state=state,
+        mergeable=str(pull.get("mergeable") or "-").upper(),
+        merge_state=str(pull.get("mergeable_state") or "-").upper(),
+        draft=bool(pull.get("draft", False)),
+        files=int(pull.get("changed_files", 0) or 0),
+        head=((pull.get("head") or {}).get("ref") or ""),
+        base=((pull.get("base") or {}).get("ref") or ""),
+    )
+
+
+class Github:
+    def __init__(self) -> None:
+        headers = {"Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28"}
+        token = github_token()
+        if token:
+            headers["Authorization"] = f"Bearer {token}"
+        self.client = httpx.Client(headers=headers, timeout=30)
+        self.pulls: dict[str, dict[str, PullRequest]] = {}
+
+    def branch_pulls(self, slug: str) -> dict[str, PullRequest]:
+        """branch -> its most relevant PR: an open one wins over merged or closed."""
+        if slug in self.pulls:
+            return self.pulls[slug]
+        found: dict[str, PullRequest] = {}
+        response = self.client.get(f"{API}/repos/{slug}/pulls", params={"state": "all", "per_page": 100, "sort": "updated"})
+        if response.status_code != 200:
+            print(f"github: {slug}: {response.status_code} {response.text[:120]}", file=sys.stderr)
+            self.pulls[slug] = found
+            return found
+        for raw in response.json():
+            pull = pull_from_json(raw)
+            current = found.get(pull.head)
+            if current is None or [pull.state, current.state].count("OPEN") == 1 and pull.state == "OPEN":
+                found[pull.head] = pull
+        self.pulls[slug] = found
+        return found
+
+    def open_pulls(self, slug: str) -> list[PullRequest]:
+        response = self.client.get(f"{API}/repos/{slug}/pulls", params={"state": "open", "per_page": 100})
+        if response.status_code != 200:
+            print(f"github: {slug}: {response.status_code} {response.text[:120]}", file=sys.stderr)
+            return []
+        return [pull_from_json(raw) for raw in response.json()]
+
+    def detail(self, slug: str, number: int) -> PullRequest | None:
+        response = self.client.get(f"{API}/repos/{slug}/pulls/{number}")
+        if response.status_code != 200:
+            return None
+        pull = pull_from_json(response.json())
+        files = self.client.get(f"{API}/repos/{slug}/pulls/{number}/files", params={"per_page": 100})
+        if files.status_code == 200:
+            pull.paths = [item.get("filename", "") for item in files.json() if item.get("filename")]
+        return pull
+
+    def checks_green(self, slug: str, number: int) -> tuple[bool, str]:
+        response = self.client.get(f"{API}/repos/{slug}/commits/{self.head_sha(slug, number)}/check-runs")
+        if response.status_code != 200:
+            return True, ""
+        runs = response.json().get("check_runs", [])
+        if not runs:
+            return True, ""
+        bad = [
+            run_["name"]
+            for run_ in runs
+            if run_.get("status") == "completed" and run_.get("conclusion") not in {"success", "skipped", "neutral"}
+        ]
+        pending = [run_["name"] for run_ in runs if run_.get("status") != "completed"]
+        if bad:
+            return False, "failed: " + ", ".join(bad[:3])
+        if pending:
+            return False, "pending: " + ", ".join(pending[:3])
+        return True, ""
+
+    def head_sha(self, slug: str, number: int) -> str:
+        response = self.client.get(f"{API}/repos/{slug}/pulls/{number}")
+        if response.status_code != 200:
+            return ""
+        return (response.json().get("head") or {}).get("sha", "")
+
+
+@dataclass
+class Worktree:
+    path: Path
+    repo: Path
+    branch: str
+    dirty: int
+    ahead: int
+    upstream: str
+    slug: str
+    pull: PullRequest | None
+    agent: str = "-"
+    pane: str = "-"
+
+
+def collect(repos: list[Path], base: str) -> list[Worktree]:
+    github = Github()
+    by_path, by_ws = herdr_facts()
+    rows: list[Worktree] = []
+    for repo in repos:
+        if not run(["git", "-C", str(repo), "rev-parse", "--git-dir"]):
+            print(f"not a git repository: {repo}", file=sys.stderr)
+            continue
+        for path in worktree_paths(repo):
+            if not path.is_dir():
+                continue
+            branch = run(["git", "-C", str(path), "rev-parse", "--abbrev-ref", "HEAD"]) or "-"
+            status = run(["git", "-C", str(path), "status", "--porcelain"])
+            dirty = len([line for line in status.splitlines() if line.strip()])
+            ahead_text = run(["git", "-C", str(path), "rev-list", "--count", f"origin/{base}..HEAD"])
+            slug = repo_slug(path)
+            workspace = by_path.get(str(path.resolve()), "")
+            agent, pane = by_ws.get(workspace, ("-", "-")) if workspace else ("-", "-")
+            rows.append(
+                Worktree(
+                    path=path,
+                    repo=repo,
+                    branch=branch,
+                    dirty=dirty,
+                    ahead=int(ahead_text) if ahead_text.isdigit() else 0,
+                    upstream=run(["git", "-C", str(path), "rev-parse", "--abbrev-ref", "@{u}"]) or "none",
+                    slug=slug,
+                    pull=github.branch_pulls(slug).get(branch) if slug else None,
+                    agent=agent,
+                    pane=pane,
+                )
+            )
+    return rows
+
+
+def landable(wt: Worktree) -> str:
+    """Empty when landed or empty; otherwise why it still holds work."""
+    if wt.dirty:
+        return "dirty"
+    if wt.pull and wt.pull.state == "OPEN":
+        return "open-pr"
+    if wt.pull and wt.pull.state == "MERGED":
+        return ""
+    return "no-pr" if wt.ahead > 0 else ""
+
+
+def cmd_inventory(args: argparse.Namespace) -> int:
+    columns = ("path", "branch", "dirty", "ahead", "upstream", "slug", "pr", "state", "mergeable", "draft", "files", "agent", "pane")
+    print("#" + "\t".join(columns))
+    for wt in collect(args.repo, args.base):
+        pull = wt.pull
+        print(
+            "\t".join(
+                str(value)
+                for value in (
+                    wt.path, wt.branch, wt.dirty, wt.ahead, wt.upstream, wt.slug or "-",
+                    pull.number if pull else "-", pull.state if pull else "-",
+                    pull.mergeable if pull else "-", str(pull.draft).lower() if pull else "-",
+                    pull.files if pull else "-", wt.agent, wt.pane,
+                )
+            )
+        )
+    return 0
+
+
+def consume_stop() -> bool:
+    for path in (STOP_FILE, LEGACY_STOP):
+        if path.is_file():
+            path.unlink(missing_ok=True)
+            print(f"stop file consumed: {path}")
+            return True
+    return False
+
+
+def cmd_status(args: argparse.Namespace) -> int:
+    if args.stop:
+        STOP_FILE.write_text("")
+        print(f"stop file created: {STOP_FILE}")
+        return 0
+    if consume_stop():
+        return 0
+    rows = collect(args.repo, args.base)
+    # a pass with work in flight keeps a loop alive; once nothing is landable, only
+    # a quiet spell stops it, so a worker mid-turn is never cut off
+    if any(landable(wt) or wt.agent == "working" for wt in rows):
+        ACTIVITY_FILE.write_text(str(int(time.time())))
+    remaining = 0
+    for wt in collect(args.repo, args.base):
+        reason = landable(wt)
+        if reason:
+            remaining += 1
+        if args.verbose or reason:
+            print(f"{wt.path.name}\t{reason or 'landed'}")
+    if remaining:
+        return 1
+    idle_minutes = (time.time() - ACTIVITY_FILE.stat().st_mtime) / 60 if ACTIVITY_FILE.exists() else 1e9
+    return 0 if idle_minutes >= args.idle_minutes else 1
+
+
+def clusters(pulls: list[PullRequest]) -> dict[int, int]:
+    """PR number -> cluster id, where an id groups every PR whose file sets intersect."""
+    parent = {pull.number: pull.number for pull in pulls}
+
+    def find(number: int) -> int:
+        while parent[number] != number:
+            parent[number] = parent[parent[number]]
+            number = parent[number]
+        return number
+
+    for index, left in enumerate(pulls):
+        for right in pulls[index + 1 :]:
+            if set(left.paths) & set(right.paths):
+                parent[find(right.number)] = find(left.number)
+    return {pull.number: find(pull.number) for pull in pulls}
+
+
+def cmd_order(args: argparse.Namespace) -> int:
+    github = Github()
+    plan: list[tuple[int, str, PullRequest, bool, str, int]] = []
+    for repo in args.repo:
+        slug = repo_slug(repo)
+        if not slug:
+            continue
+        branches = {
+            run(["git", "-C", str(path), "rev-parse", "--abbrev-ref", "HEAD"])
+            for path in worktree_paths(repo)
+        }
+        pulls = [pull for pull in github.open_pulls(slug) if pull.head in branches]
+        pulls = [pull for pull in (github.detail(slug, pull.number) for pull in pulls) if pull]
+        groups = clusters(pulls)
+        heads = {pull.head for pull in pulls}
+        for pull in pulls:
+            green, blocker = github.checks_green(slug, pull.number)
+            blockers = []
+            if pull.draft:
+                blockers.append("draft")
+            if pull.mergeable != "MERGEABLE":
+                blockers.append(f"mergeable={pull.mergeable or 'unknown'}")
+            if not green:
+                blockers.append(blocker)
+            if pull.base in heads:
+                blockers.append(f"stacked on {pull.base}")
+            plan.append(
+                (len(pull.paths), slug, pull, not blockers, "; ".join(b for b in blockers if b), groups[pull.number])
+            )
+
+    # smallest diff first inside a cluster; a stacked pull stays behind its base
+    plan.sort(key=lambda row: (row[5], row[0], row[2].number))
+
+    print("#rank\trepo\tpr\tbranch\tbase\tfiles\tcluster\tready\tblockers")
+    for index, (_files, slug, pull, ready, blocker, cluster) in enumerate(plan, start=1):
+        print(
+            f"{index}\t{slug}\t{pull.number}\t{pull.head}\t{pull.base}\t"
+            f"{len(pull.paths)}\t{cluster}\t{'yes' if ready else 'no'}\t{blocker or '-'}"
+        )
+    return 0
+STEPS = ("SEE", "PLAN", "HRD", "WORK", "REV", "REB", "MRG", "DONE")
+STOP_WORDS = {
+    "feat", "fix", "chore", "docs", "refactor", "test", "tests", "the", "a", "an", "and",
+    "to", "of", "for", "in", "on", "with", "per", "by", "is", "it", "this", "that",
+}
+
+
+def plan_state(wt: Worktree) -> tuple[bool, bool, str]:
+    """(proposed, hardened, pane text). A plan file counts, and so does the pane banner."""
+    proposed = (wt.path / PLAN_FILE).is_file()
+    hardened = False
+    text = ""
+    if wt.pane not in {"-", ""}:
+        text = run(["herdr", "pane", "read", wt.pane, "--source", "recent", "--lines", "300"]).lower()
+        hardened = "harden-plan" in text
+        proposed = proposed or "plan ready for review" in text or "exit plan mode" in text or "plan mode" in text
+    return proposed, hardened, text
+
+
+def short_title(wt: Worktree) -> str:
+    """Four kebab words at most: the PR title, else the newest commit subject."""
+    source = ""
+    if wt.pull and wt.pull.number and wt.slug:
+        source = run(["gh", "pr", "view", str(wt.pull.number), "-R", wt.slug, "--json", "title", "--jq", ".title"])
+    if not source:
+        source = run(["git", "-C", str(wt.path), "log", "-1", "--format=%s"])
+    words = [word for word in re.split(r"[^a-z0-9]+", source.lower()) if word]
+    kept = [word for word in words if word not in STOP_WORDS][:4]
+    if not kept:
+        kept = [word for word in wt.branch.replace("worktree/", "").split("-") if word][:2]
+    return "-".join(kept) or "untitled"
+
+
+def step_for(wt: Worktree, proposed: bool, hardened: bool, pane_text: str) -> str:
+    """The one stage this worktree is at, from landed back to looking around."""
+    if wt.pull and wt.pull.state == "MERGED":
+        return "DONE"
+    if wt.pull and wt.pull.state == "OPEN":
+        return "REB" if wt.pull.mergeable == "CONFLICTING" or wt.pull.merge_state == "DIRTY" else "MRG"
+    if wt.pull and wt.pull.draft:
+        return "WORK"
+    if proposed and not hardened:
+        return "HRD"
+    if proposed and hardened:
+        return "REV"
+    if "plan mode" in pane_text:
+        return "PLAN"
+    if wt.dirty or wt.ahead > 0:
+        return "WORK"
+    return "SEE"
+
+
+# symbol, colour and what the label says the worktree is doing
+STEP_STYLE: dict[str, tuple[str, str]] = {
+    "SEE": ("👁", "#56b6c2"),
+    "PLAN": ("🗺", "#61afef"),
+    "HRD": ("🛡", "#c678dd"),
+    "WORK": ("⚒", "#e5c07b"),
+    "REV": ("🔍", "#d19a66"),
+    "REB": ("⟳", "#c678dd"),
+    "MRG": ("⤵", "#98c379"),
+    "DONE": ("✔", "#7f8c8d"),
+}
+OVERLORD = ("👁", "OVR")
+
+
+def paint(step: str, title: str) -> str:
+    symbol, colour = STEP_STYLE.get(step, ("•", "#888888"))
+    return f"{symbol} {step} {title} [{colour}]"[:64]
+
+
+def cmd_rename(args: argparse.Namespace) -> int:
+    """Prefix every worktree and pane with its step symbol, then say what it is about."""
+    by_path, _by_ws = herdr_facts()
+    print("#path\tworkspace\tpane\tstep\tsymbol\tlabel")
+    for wt in collect(args.repo, args.base):
+        proposed, hardened, text = plan_state(wt)
+        step = step_for(wt, proposed, hardened, text)
+        symbol = STEP_STYLE.get(step, ("•", "#888888"))[0]
+        label = paint(step, short_title(wt))
+        workspace = by_path.get(str(wt.path.resolve()), "")
+        print(f"{wt.path}\t{workspace or '-'}\t{wt.pane}\t{step}\t{symbol}\t{label}")
+        if not args.apply:
+            continue
+        if workspace:
+            run(["herdr", "workspace", "rename", workspace, label])
+            run(
+                ["herdr", "workspace", "report-metadata", "--source", "overlord",
+                 "--token", f"step={step}", "--token", f"dot={symbol}", workspace]
+            )
+        if wt.pane not in {"-", ""}:
+            run(["herdr", "pane", "rename", wt.pane, label])
+            run(["herdr", "pane", "report-metadata", "--source", "overlord", "--agent", label, wt.pane])
+    return 0
+
+
+def cmd_review(args: argparse.Namespace) -> int:
+    """Capture the screen of every worktree waiting on review, for a visual check."""
+    out_dir = Path(args.capture or (Path(os.environ.get("TMPDIR", "/tmp")) / "overlord-review"))
+    out_dir.mkdir(parents=True, exist_ok=True)
+    print("#path\tpane\tstep\tcapture")
+    for wt in collect(args.repo, args.base):
+        proposed, hardened, text = plan_state(wt)
+        step = step_for(wt, proposed, hardened, text)
+        if step not in {"REV", "MRG"}:
+            continue
+        target = out_dir / f"{wt.path.name}-{step}.txt"
+        capture = ""
+        if wt.pane not in {"-", ""}:
+            capture = run(["herdr", "pane", "read", wt.pane, "--source", "visible", "--lines", "200", "--format", "ansi"])
+        if not capture:
+            capture = run(["git", "-C", str(wt.path), "diff", "--stat", f"origin/{args.base}...HEAD"])
+        target.write_text(capture or "empty capture\n")
+        print(f"{wt.path}\t{wt.pane}\t{step}\t{target}")
+    return 0
+
+
+def cmd_plans(args: argparse.Namespace) -> int:
+    print("#path\tpane\tagent\tproposed\thardened\taction")
+    for wt in collect(args.repo, args.base):
+        proposed = (wt.path / PLAN_FILE).is_file()
+        hardened = False
+        if wt.pane not in {"-", ""}:
+            pane_output = run(["herdr", "pane", "read", wt.pane, "--source", "recent", "--lines", "300"]).lower()
+            hardened = "harden-plan" in pane_output
+            proposed = proposed or "plan ready for review" in pane_output or "exit plan mode" in pane_output
+
+        action = "none"
+        if proposed and not hardened:
+            action = "harden"
+        elif proposed and hardened:
+            action = "approve"
+        print(f"{wt.path}\t{wt.pane}\t{wt.agent}\t{'yes' if proposed else 'no'}\t{'yes' if hardened else 'no'}\t{action}")
+
+        if wt.pane in {"-", ""}:
+            continue
+        if args.inject and action == "harden":
+            run(["herdr", "pane", "run", wt.pane, HARDEN])
+            print(f"sent {HARDEN} to {wt.pane}", file=sys.stderr)
+        if args.approve and action == "approve":
+            # the first option runs the plan and drops the current context
+            run(["herdr", "pane", "send-keys", wt.pane, "1"])
+            print(f"approved the plan in {wt.pane} (option 1)", file=sys.stderr)
+    return 0
+
+
+def cmd_prune(args: argparse.Namespace) -> int:
+    print("#path\tbranch\tpr\taction")
+    for wt in collect(args.repo, args.base):
+        if not wt.pull or wt.pull.state != "MERGED" or wt.dirty or wt.agent in {"working", "blocked"}:
+            continue
+        print(f"{wt.path}\t{wt.branch}\t{wt.pull.number}\tremove")
+        if not args.apply:
+            continue
+        run(["git", "-C", str(wt.repo), "worktree", "remove", "--force", str(wt.path)])
+        run(["git", "-C", str(wt.repo), "branch", "-D", wt.branch])
+        if wt.pane not in {"-", ""}:
+            _by_path, by_ws = herdr_facts()
+            for workspace, (_state, pane) in by_ws.items():
+                if pane == wt.pane:
+                    run(["herdr", "workspace", "close", workspace])
+                    break
+    return 0
+
+
+def main(argv: list[str]) -> int:
+    parser = argparse.ArgumentParser(description="Land worktree pull requests.")
+    parser.add_argument("--repo", action="append", default=[], help="repository to inspect (repeatable)")
+    parser.add_argument("--base", default="main", help="base branch for ahead counts")
+    subs = parser.add_subparsers(dest="command", required=True)
+
+    subs.add_parser("inventory", help="one row per worktree")
+    subs.add_parser("order", help="merge plan for the open pull requests")
+
+    status = subs.add_parser("status", help="gate: 0 when nothing is left to land")
+    status.add_argument("--stop", action="store_true", help="write the stop file instead of checking")
+    status.add_argument("--verbose", "-v", action="store_true", help="print landed rows too")
+    status.add_argument("--idle-minutes", type=int, default=IDLE_MINUTES, help="stop when nothing moved for this long")
+
+    plans = subs.add_parser("plans", help="proposed plans and their hardening state")
+    plans.add_argument("--inject", action="store_true", help=f"type {HARDEN} into unhardened panes")
+    plans.add_argument("--approve", action="store_true", help="pick option 1 once a plan is hardened")
+
+    prune = subs.add_parser("prune", help="remove worktrees whose pull request merged")
+    prune.add_argument("--apply", action="store_true", help="do it instead of listing")
+
+    rename = subs.add_parser("rename", help="prefix every worktree and pane with its step")
+    rename.add_argument("--apply", action="store_true", help="do it instead of listing")
+
+    review = subs.add_parser("review", help="capture the screen of worktrees awaiting review")
+    review.add_argument("--capture", default="", help="directory for the captures")
+
+    args = parser.parse_args(argv)
+    args.repo = [Path(path) for path in args.repo] or [Path.cwd()]
+    handlers = {
+        "inventory": cmd_inventory,
+        "order": cmd_order,
+        "status": cmd_status,
+        "plans": cmd_plans,
+        "prune": cmd_prune,
+        "rename": cmd_rename,
+        "review": cmd_review,
+    }
+    return handlers[args.command](args)
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))
