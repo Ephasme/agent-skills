@@ -504,6 +504,24 @@ class ReviewFixTests(unittest.TestCase):
         self.assertEqual(o.title_slug("task brief"), "untitled")
 
 
+    def test_pass_dry_run_does_not_classify_or_query_for_stall_facts(self):
+        fake = argparse.Namespace(repo=[], base="main", dry_run=True, alert=False)
+        wt = o.Worktree(path=Path("/wt"), repo=Path("/repo"), branch="b", dirty=0, ahead=0,
+                        upstream="none", slug="o/n", pull=None, name="m1", title="t", task="t",
+                        agent_status="idle", pane="p")
+        with patch.object(o, "cmd_bootstrap", return_value=0), patch.object(
+            o, "collect", return_value=[wt]
+        ), patch.object(o, "plan_state", return_value=(False, False)), patch.object(
+            o, "step_for", return_value="BUILD"
+        ), patch.object(o, "last_line", return_value="evidence"), patch.object(
+            o, "classify", side_effect=AssertionError("classifier called during dry run")
+        ), patch.object(o, "short_title", side_effect=AssertionError("gh called during dry run")), patch.object(
+            o, "order_plan", return_value=[]
+        ), patch.object(o, "asks", return_value=[]), patch.object(o, "Github", side_effect=AssertionError(
+            "network client built during dry run"
+        )), patch("sys.stdout", new_callable=io.StringIO):
+            self.assertEqual(o.cmd_pass(fake), 0)
+
 class SecondReviewTests(unittest.TestCase):
     """One test per finding open-code-review raised on head 331e366."""
 
@@ -803,7 +821,33 @@ class SecondReviewTests(unittest.TestCase):
             (path / "PLAN.md").write_text(body + f"<!-- hardened: {sha} -->\n")
             git("commit", "-qam", "marker")
             self.assertTrue(o.plan_hardened(path))
+    def test_a_successful_empty_ocr_output_is_failure(self):
+        with tempfile.TemporaryDirectory() as state:
+            review_dir = Path(state) / "review"
+            review_dir.mkdir(parents=True)
+            pull = o.PullRequest(number=13, state="OPEN", mergeable="MERGEABLE", merge_state="CLEAN",
+                                 draft=False, files=1, sha="f" * 40, head="h")
+            wt = o.Worktree(path=Path("/wt"), repo=Path("/repo"), branch="b", dirty=0, ahead=1,
+                            upstream="origin/b", slug="o/n", pull=pull, pane="p")
 
+            def empty_success(_argv, **_kwargs):
+                (review_dir / "o-n-13.txt").write_text("")
+                return True
+
+            with patch.object(o, "REVIEW_DIR", review_dir), patch.object(o, "ocr_present", return_value=True), patch.object(
+                o, "collect", return_value=[wt]
+            ), patch.object(o, "plan_state", return_value=(False, False)), patch.object(
+                o, "step_for", return_value="REV"
+            ), patch.object(o, "ok", side_effect=empty_success), patch("sys.stdout", new_callable=io.StringIO):
+                self.assertEqual(o.cmd_review(argparse.Namespace(repo=[Path("/repo")], base="main")), 1)
+            self.assertEqual(o.review_state("o/n", pull), "missing")
+
+    def test_title_is_not_reslugged_when_stored(self):
+        entries = {}
+        o.register_entry(entries, "/tmp/title", {"task": "anything"}, "fix")
+        self.assertEqual(entries["/tmp/title"]["title"], "fix")
+        o.register_entry(entries, "/tmp/long", {"task": "anything"}, "one-two-three-four-five")
+        self.assertEqual(entries["/tmp/long"]["title"], "one-two-three-four-five")
     def test_ocr_is_reported_but_not_brewed(self):
         installable = {name: flag for name, _command, _fix, flag in o.DEPENDENCIES}
         self.assertFalse(installable["ocr"])

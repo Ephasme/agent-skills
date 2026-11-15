@@ -128,11 +128,11 @@ def register_entry(entries: dict, path: str, meta: dict, title: str = "") -> Non
     if known is not None:
         known.update({key: value for key, value in meta.items() if value})
         if title:
-            known["title"] = title_slug(title)
+            known["title"] = title[:64]
         return
     meta["name"] = f"m{entries.get('next_name', 1)}"
     entries["next_name"] = int(entries.get("next_name", 1)) + 1
-    meta["title"] = title_slug(title or meta.get("task", "") or Path(path).name)
+    meta["title"] = (title or title_slug(meta.get("task", "") or Path(path).name))[:64]
     entries[path] = meta
 
 
@@ -1835,7 +1835,6 @@ def cmd_spawn(args: argparse.Namespace) -> int:
         return 1
     entries = registry()
     register_entry(entries, str(path.resolve()), {"repo": str(repo), "branch": branch, "mode": args.mode, "task": args.task}, slug)
-    save_registry(entries)
     identity = entries[str(path.resolve())]
     if title:
         # a validated --title is the frozen title verbatim: re-slugging it turns "fix" into
