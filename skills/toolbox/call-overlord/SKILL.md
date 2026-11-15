@@ -29,6 +29,17 @@ into the next pass.
 Starting a job means creating a worktree and giving one worker the task: `git worktree add -b
 worktree/<slug> <path> origin/<base>`, then start an agent there and hand it the task. In `hotfix`
 the repro comes first, as the first instruction, so the worker watches the failure before fixing it.
+## Preflight
+
+```bash
+"$SKILL_DIR/scripts/overlord.py" preflight           # ok/absent per dependency
+"$SKILL_DIR/scripts/overlord.py" preflight --apply   # install what brew can
+```
+
+It checks git, gh, uv, python 3.11+, the GitHub token and herdr's availability, and installs the
+absent Homebrew packages. Two things it cannot finish alone: `gh auth login` needs a human, and the
+Agent Mail project needs the `ensure_project` call from the mail section below.
+
 
 ## Jobs: pick a mode first
 

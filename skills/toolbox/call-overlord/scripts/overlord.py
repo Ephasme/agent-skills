@@ -55,6 +55,14 @@ def run(cmd: list[str], cwd: Path | None = None, timeout: int = 120) -> str:
     return done.stdout.strip() if done.returncode == 0 else ""
 
 
+def ok(cmd: list[str], timeout: int = 60) -> bool:
+    """True when the command ran and exited 0. gh writes status to stderr, so stdout is useless."""
+    try:
+        return subprocess.run(cmd, capture_output=True, text=True, timeout=timeout).returncode == 0
+    except (OSError, subprocess.SubprocessError):
+        return False
+
+
 def github_token() -> str:
     for name in ("GITHUB_TOKEN", "GH_TOKEN"):
         if token := os.environ.get(name):
@@ -533,12 +541,63 @@ def cmd_prune(args: argparse.Namespace) -> int:
                     break
     return 0
 
+DEPENDENCIES = (
+    ("git", "git", "brew install git"),
+    ("gh", "gh", "brew install gh"),
+    ("uv", "uv", "brew install uv"),
+)
+
+
+def cmd_preflight(args: argparse.Namespace) -> int:
+    """Check every dependency and configuration this skill needs; install what is missing."""
+    missing: list[str] = []
+    print("#check\tstate\tfix")
+
+    for name, command, fix in DEPENDENCIES:
+        present = bool(run(["which", command]))
+        print(f"{name}\t{'ok' if present else 'missing'}\t{fix}")
+        if not present:
+            missing.append(name)
+            if args.apply:
+                run(["brew", "install", name])
+
+    version = run(["python3", "-c", "import sys; print('%d.%d' % sys.version_info[:2])"]) or "0.0"
+    major, _, minor = version.partition(".")
+    new_enough = int(major or 0) > 3 or (int(major or 0) == 3 and int(minor or 0) >= 11)
+    print(f"python3\t{version}\t{'ok' if new_enough else 'needs 3.11+: brew install python@3.13'}")
+    if not new_enough:
+        missing.append(f"python{version}")
+
+    if run(["which", "gh"]):
+        authed = ok(["gh", "auth", "status"])
+        print(f"gh auth\t{'ok' if authed else 'not logged in'}\tgh auth login")
+        if not authed:
+            missing.append("gh-auth")
+    else:
+        print("gh auth\tunknown\tinstall gh first")
+
+    herdr = bool(run(["which", "herdr"])) and os.environ.get("HERDR_ENV") == "1"
+    print(f"herdr\t{'ok' if herdr else 'optional, absent'}\tnothing: git and gh cover the work")
+
+    print("agent mail\tmanual\tensure_project + register_agent from the skill body")
+    print(f"token\t{'ok' if github_token() else 'missing'}\tgh auth login, or export GITHUB_TOKEN")
+    if not github_token():
+        missing.append("github-token")
+
+    if missing and args.apply:
+        print(f"still missing after install: {', '.join(missing)}", file=sys.stderr)
+    return 0 if not missing else 1
+
+
 
 def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(description="Land worktree pull requests.")
     parser.add_argument("--repo", action="append", default=[], help="repository to inspect (repeatable)")
     parser.add_argument("--base", default="main", help="base branch for ahead counts")
     subs = parser.add_subparsers(dest="command", required=True)
+
+    preflight = subs.add_parser("preflight", help="verify dependencies, install what is missing")
+    preflight.add_argument("--apply", action="store_true", help="install what is absent")
 
     subs.add_parser("inventory", help="one row per worktree")
     subs.add_parser("order", help="merge plan for the open pull requests")
@@ -564,6 +623,7 @@ def main(argv: list[str]) -> int:
     args = parser.parse_args(argv)
     args.repo = [Path(path) for path in args.repo] or [Path.cwd()]
     handlers = {
+        "preflight": cmd_preflight,
         "inventory": cmd_inventory,
         "order": cmd_order,
         "status": cmd_status,
