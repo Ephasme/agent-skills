@@ -521,6 +521,7 @@ class PullRequest:
     sha: str = ""
     paths: list[str] = field(default_factory=list)
     updated_at: str = ""
+    body: str = ""
 
 
 def pull_from_json(pull: dict) -> PullRequest:
@@ -537,6 +538,7 @@ def pull_from_json(pull: dict) -> PullRequest:
         base=((pull.get("base") or {}).get("ref") or ""),
         sha=((pull.get("head") or {}).get("sha") or ""),
         updated_at=str(pull.get("updated_at") or pull.get("merged_at") or ""),
+        body=str(pull.get("body") or ""),
     )
 
 
@@ -680,9 +682,13 @@ def realm_repos(named: list[Path]) -> list[Path]:
 
 
 def collect(repos: list[Path], base: str) -> list[Worktree]:
-    """One row per worktree, read once per pass: every table below shares these facts."""
+    """One row per worktree, read once per pass: every table below shares these facts.
+
+    Always a list, empty when nothing is in the realm: every caller iterates the result.
+    """
     key = ("collect", tuple(sorted(str(Path(repo).expanduser().resolve()) for repo in repos)), base)
-    return shared(key, lambda: _collect(repos, base))
+    rows = shared(key, lambda: _collect(repos, base))
+    return rows if isinstance(rows, list) else []
 
 
 def _collect(repos: list[Path], base: str) -> list[Worktree]:
@@ -690,17 +696,20 @@ def _collect(repos: list[Path], base: str) -> list[Worktree]:
     by_path, by_ws = herdr_facts()
     rows: list[Worktree] = []
     seen: set[Path] = set()
-    registry_entries = registry()
+    identities = {
+        str(Path(path).resolve()): meta
+        for path, meta in registry().items() if path != "next_name"
+    }
     repos = realm_repos(repos)
     for repo in repos:
         if not run(["git", "-C", str(repo), "rev-parse", "--git-dir"]):
             print(f"not a git repository: {repo}", file=sys.stderr)
             continue
-        registry_paths = {Path(path) for path in registry_entries if path != "next_name"}
+        registry_paths = {Path(path) for path in identities}
         registered = {
             Path(path)
-            for path, meta in registry_entries.items()
-            if path != "next_name" and meta.get("repo") and Path(meta["repo"]).resolve() == repo.resolve()
+            for path, meta in identities.items()
+            if meta.get("repo") and Path(meta["repo"]).resolve() == repo.resolve()
         }
         for path in sorted(registry_paths):
             if path in seen or not path.is_dir():
@@ -709,7 +718,7 @@ def _collect(repos: list[Path], base: str) -> list[Worktree]:
                 continue
             seen.add(path)
             workspace = by_path.get(str(path.resolve()), "")
-            meta = registry_entries.get(str(path.resolve()), {})
+            meta = identities.get(str(path.resolve()), {})
             agent, pane = by_ws.get(workspace, ("-", "-")) if workspace else ("-", "-")
             rows.append(Worktree(
                 path=path, repo=path, branch="-", dirty=0, ahead=0, upstream="none",
@@ -727,7 +736,7 @@ def _collect(repos: list[Path], base: str) -> list[Worktree]:
             ahead_text = run(["git", "-C", str(path), "rev-list", "--count", f"origin/{base}..HEAD"])
             slug = repo_slug(path)
             workspace = by_path.get(str(path.resolve()), "")
-            meta = registry_entries.get(str(path.resolve()), {})
+            meta = identities.get(str(path.resolve()), {})
             agent, pane = by_ws.get(workspace, ("-", "-")) if workspace else ("-", "-")
             pull = github.branch_pulls(slug).get(branch) if slug else None
             rows.append(Worktree(
@@ -743,6 +752,7 @@ def _collect(repos: list[Path], base: str) -> list[Worktree]:
                 checks=(shared(("checks", slug, pull.number), lambda: github.checks_green(slug, pull.number, pull.sha)[1] or "green")
                         if pull and pull.state == "OPEN" else "none"),
             ))
+    return rows
 
 
 def landable(wt: Worktree) -> str:
@@ -949,6 +959,22 @@ def short_title(wt: Worktree) -> str:
     return "-".join(kept) or "untitled"
 
 
+def check_green(wt: Worktree) -> bool:
+    """Green means every check run on the PR head succeeded: the fact collect already read."""
+    return wt.checks == "green"
+
+
+def review_marker(wt: Worktree) -> str:
+    """Whichever exact marker line comes last in the PR body: REVIEWING or REVIEW_CLEAR."""
+    if not wt.pull:
+        return ""
+    found = ""
+    for line in wt.pull.body.splitlines():
+        if line.strip() in {"REVIEWING", "REVIEW_CLEAR"}:
+            found = line.strip()
+    return found
+
+
 def step_for(wt: Worktree, proposed: bool, hardened: bool, pane_text: str = "") -> str:
     """Select step from plan commit marker, git and PR facts only."""
     if wt.pull and wt.pull.state == "MERGED":
@@ -1066,9 +1092,25 @@ def label_self(own_pane: str) -> str:
     return workspace
 
 
+def live_places() -> dict[str, tuple[str, str]]:
+    """checkout path -> (workspace, pane) for every live pane, whatever the agent list says.
+
+    A workspace closed and reopened keeps no agent record until one starts there, and its label
+    resets to the directory name; this is what lets `rename` put the label back.
+    """
+    places: dict[str, tuple[str, str]] = {}
+    for pane in herdr_json(["herdr", "pane", "list"]).get("panes", []):
+        for key in ("foreground_cwd", "cwd"):
+            cwd = pane.get(key) or ""
+            if cwd:
+                places.setdefault(str(Path(cwd).resolve()), (pane.get("workspace_id", ""), pane.get("pane_id", "")))
+    return places
+
+
 def cmd_rename(args: argparse.Namespace) -> int:
-    """Rename every registered worktree using its stored identity and current step."""
+    """Rename every registered worktree from its frozen identity and current step."""
     by_path, _by_ws = herdr_facts()
+    places = live_places() if os.environ.get("HERDR_ENV") == "1" else {}
     print("#path\tworkspace\tpane\tname\tstep\tsymbol\tlabel")
     own_pane = os.environ.get("HERDR_PANE_ID", "")
     if own_pane:
@@ -1079,16 +1121,18 @@ def cmd_rename(args: argparse.Namespace) -> int:
         step = step_for(wt, proposed, hardened)
         symbol = STEP_STYLE.get(step, ("•", "#888888"))[0]
         label = paint(step, wt.name, wt.title or short_title(wt))
-        workspace = by_path.get(str(wt.path.resolve()), "")
-        print(f"{wt.path}\t{workspace or '-'}\t{wt.pane}\t{wt.name}\t{step}\t{symbol}\t{label}")
+        live_workspace, live_pane = places.get(str(wt.path.resolve()), ("", ""))
+        workspace = by_path.get(str(wt.path.resolve()), "") or live_workspace
+        pane = wt.pane if wt.pane not in {"-", ""} else live_pane
+        print(f"{wt.path}\t{workspace or '-'}\t{pane or '-'}\t{wt.name}\t{step}\t{symbol}\t{label}")
         if not args.apply:
             continue
         if workspace:
             herdr_apply(["herdr", "workspace", "rename", workspace, label])
             herdr_apply(["herdr", "workspace", "report-metadata", workspace, "--source", "overlord", "--token", f"step={step}"])
-        if wt.pane not in {"-", ""}:
-            herdr_apply(["herdr", "pane", "rename", wt.pane, label])
-            herdr_apply(["herdr", "pane", "report-metadata", wt.pane, "--source", "overlord", "--token", f"step={step}"])
+        if pane:
+            herdr_apply(["herdr", "pane", "rename", pane, label])
+            herdr_apply(["herdr", "pane", "report-metadata", pane, "--source", "overlord", "--token", f"step={step}"])
     return 0
 
 

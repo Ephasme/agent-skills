@@ -35,6 +35,11 @@ evidence.
 plan-mode prompt pending, and it stays `PLAN` until a plan file exists and is committed. Only then
 does the step move, to `HRD` without a current marker or to `BUILD` with one.
 
+`rename --apply` is the only thing that restores a label: a worktree whose herdr workspace was closed
+and reopened comes back labelled with its directory name, and `rename` reads the registry identity
+through the live pane's directory, so the label returns without re-registering anything.
+
+
 ## Stalls
 
 |Step|idle|

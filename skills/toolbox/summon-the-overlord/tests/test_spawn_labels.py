@@ -195,7 +195,81 @@ class StallTests(unittest.TestCase):
                 o.cmd_watch(args)
             self.assertEqual(prompt.call_count, 1)
             self.assertEqual(json.loads(alerted.read_text()), {"m1:BUILD": ["m1", "BUILD"]})
+class CollectContractTests(unittest.TestCase):
+    """collect always returns a list: every table iterates it, and None was a live outage."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self.tmp.name)
+        self.state = tempfile.TemporaryDirectory()
+        self.repo = self.root / "repo"
+        self.repo.mkdir()
+        self.git("init", "-q", "-b", "main", cwd=self.repo)
+        (self.repo / "f.txt").write_text("x")
+        self.git("add", "f.txt", cwd=self.repo)
+        self.git("commit", "-q", "-m", "first", cwd=self.repo)
+
+    def tearDown(self):
+        self.tmp.cleanup()
+        self.state.cleanup()
+
+    def git(self, *argv, cwd=None):
+        return subprocess.run(GIT + list(argv), cwd=cwd or self.root, capture_output=True, text=True, check=True).stdout
+
+    def collected(self, repos) -> list:
+        o._MEMO.clear()
+        with patch.object(o, "REGISTRY", Path(self.state.name) / "w.json"), patch.object(
+            o, "STATE_DIR", Path(self.state.name)
+        ), patch.object(o, "herdr_facts", return_value=({}, {})), patch.object(
+            o, "herdr_open_repos", return_value=set()
+        ), patch.object(o, "Github") as github, patch("sys.stderr", new_callable=io.StringIO):
+            github.return_value.branch_pulls.return_value = {}
+            return o.collect(repos, "main")
+
+    def test_repository_with_worktrees(self):
+        (self.root / "wt").mkdir()
+        self.git("worktree", "add", "-q", "-b", "side", str(self.root / "wt"), cwd=self.repo)
+        self.assertEqual(len(self.collected([self.repo])), 2)
+
+    def test_repository_with_no_commits_still_returns_rows(self):
+        fresh = self.root / "fresh"
+        fresh.mkdir()
+        self.git("init", "-q", "-b", "main", cwd=fresh)
+        self.assertIsInstance(self.collected([fresh]), list)
+
+    def test_path_that_is_not_a_repository(self):
+        plain = self.root / "plain"
+        plain.mkdir()
+        self.assertEqual(self.collected([plain]), [])
+
+    def test_empty_repository_list(self):
+        self.assertEqual(self.collected([]), [])
 
 
+class PullStepTests(unittest.TestCase):
+    def worktree(self, body: str, checks: str = "green") -> o.Worktree:
+        pull = o.PullRequest(
+            number=1, state="OPEN", mergeable="MERGEABLE", merge_state="CLEAN",
+            draft=False, files=1, body=body,
+        )
+        return o.Worktree(
+            path=Path("/wt"), repo=Path("/repo"), branch="b", dirty=0, ahead=1,
+            upstream="origin/b", slug="o/n", pull=pull, checks=checks,
+        )
+
+    def test_green_open_pr_waits_to_merge(self):
+        self.assertEqual(o.step_for(self.worktree(""), True, True), "MRG")
+
+    def test_exact_reviewing_marker_keeps_a_green_pr_in_review(self):
+        self.assertEqual(o.step_for(self.worktree("REVIEWING"), True, True), "REV")
+        self.assertEqual(o.step_for(self.worktree("REVIEWING\nREVIEW_CLEAR"), True, True), "MRG")
+
+    def test_red_checks_stay_in_review(self):
+        self.assertEqual(o.step_for(self.worktree("", checks="failed: ci"), True, True), "REV")
+
+    def test_conflicting_pr_rebases(self):
+        wt = self.worktree("")
+        wt.pull.merge_state = "DIRTY"
+        self.assertEqual(o.step_for(wt, True, True), "REB")
 if __name__ == "__main__":
     unittest.main()
