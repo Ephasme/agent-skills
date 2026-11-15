@@ -1,3 +1,17 @@
+---
+name: rename-herdr-workspaces
+description: >-
+  Renames herdr worktree workspaces after the work they actually hold, and renames
+  their branches to match. Use when the user asks to rename, relabel or tidy herdr
+  workspaces, or when a workspace label no longer says what its agent is doing, e.g.
+  "rename the workspaces", "these labels are stale", or in French "renomme les
+  workspaces". Surveys each linked worktree, proposes a kebab-case name from the
+  conversation and the recent commits, then renames the workspace, moves its branch
+  and tells the agent.
+compatibility: Requires herdr (terminal workspace manager) plus git, python 3.11+ and uv.
+disable-model-invocation: true
+---
+
 # Rename herdr workspaces
 
 **Explicit invocation only.** Applying a plan creates an upstream and deletes the old remote branch;

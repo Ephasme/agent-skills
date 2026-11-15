@@ -590,11 +590,44 @@ def cmd_preflight(args: argparse.Namespace) -> int:
 
 
 
+def cmd_spawn(args: argparse.Namespace) -> int:
+    """Start a job: create its worktree, then print the one command that hands over the task."""
+    if args.mode not in {"fast", "hotfix", "feat"}:
+        print("mode must be fast, hotfix or feat", file=sys.stderr)
+        return 2
+    if not args.task:
+        print("spawn needs --task", file=sys.stderr)
+        return 2
+
+    repo = args.repo[0]
+    slug = "-".join(word for word in re.split(r"[^a-z0-9]+", args.task.lower()) if word and word not in STOP_WORDS)[:60] or "job"
+    branch = f"worktree/{slug}"
+    path = Path.home() / ".herdr" / "worktrees" / repo.name / slug
+    probe = "First write the failing test or a scripted repro for: " + args.task if args.mode == "hotfix" else ""
+    print(f"#worktree\t{path}\nbranch\t{branch}\nmode\t{args.mode}")
+    if args.dry_run:
+        print(f"would run\tgit -C {repo} worktree add -b {branch} {path} origin/{args.base}")
+        return 0
+    run(["git", "-C", str(repo), "worktree", "add", "-b", branch, str(path), f"origin/{args.base}"])
+    if not path.is_dir():
+        print("worktree creation failed", file=sys.stderr)
+        return 1
+    handover = " ".join(part for part in (probe, args.task) if part)
+    print("next\tstart an agent in that path, then:")
+    print(f'\therdr agent prompt <pane> "{handover}" --wait --until idle')
+    return 0
+
+
 def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(description="Land worktree pull requests.")
     parser.add_argument("--repo", action="append", default=[], help="repository to inspect (repeatable)")
     parser.add_argument("--base", default="main", help="base branch for ahead counts")
     subs = parser.add_subparsers(dest="command", required=True)
+
+    spawn = subs.add_parser("spawn", help="start a job in a fresh worktree")
+    spawn.add_argument("--mode", default="feat", help="fast, hotfix or feat")
+    spawn.add_argument("--task", default="", help="what the worker should do")
+    spawn.add_argument("--dry-run", action="store_true", help="print instead of creating")
 
     preflight = subs.add_parser("preflight", help="verify dependencies, install what is missing")
     preflight.add_argument("--apply", action="store_true", help="install what is absent")
@@ -624,6 +657,7 @@ def main(argv: list[str]) -> int:
     args.repo = [Path(path) for path in args.repo] or [Path.cwd()]
     handlers = {
         "preflight": cmd_preflight,
+        "spawn": cmd_spawn,
         "inventory": cmd_inventory,
         "order": cmd_order,
         "status": cmd_status,
