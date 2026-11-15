@@ -29,6 +29,13 @@ into the next pass.
 Starting a job means creating a worktree and giving one worker the task: `git worktree add -b
 worktree/<slug> <path> origin/<base>`, then start an agent there and hand it the task. In `hotfix`
 the repro comes first, as the first instruction, so the worker watches the failure before fixing it.
+
+## The overlord's pane merges, it does not build
+
+The overlord's own pane runs `overlord.py` and merges. Every code change, gate run and commit
+happens in a herdr agent pane inside a git worktree: a fix made in the overlord's pane has no
+worktree, no branch and no PR, so nothing can review it, land it or prune it.
+
 ## Pick the mode yourself
 
 ```bash
@@ -116,6 +123,18 @@ registry at `$XDG_STATE_HOME/call-overlord/worktrees.json` is the only source, `
 back, and a corrupt registry is an error rather than an empty list. Adoption is a takeover, prune
 included: a merged, clean, idle adopted worktree is removed like any other.
 
+Adoption moves the target into the overlord's own realm, unconditionally: the herdr workspace
+holding that path is closed — a `working` agent included — and the path reopens as a new workspace
+below the overlord (`workspace create --cwd`). herdr refuses `worktree open --workspace` across
+repositories, so it is never used, and a target is never a tab or a nested workspace under the
+overlord: it gets a workspace of its own. The agent the close killed is restarted in the new pane
+from the session file `agent list` reported (`agent_session.value`) and prompted to resume that
+file; a restart or prompt that fails is reported, never retried silently.
+
+The `realm` column says what happened: `<held>→<new>, agent resumed`, `opened <ws>, no agent`,
+`in realm <ws>`, `kept: <ws> refused to close`, and `no herdr: not moved` without `HERDR_ENV=1`,
+where the registry is written but nothing moves.
+
 ## The feat pipeline, in six commands
 
 ```bash
@@ -129,7 +148,8 @@ included: a merged, clean, idle adopted worktree is removed like any other.
 ```
 
 Each subcommand takes `--repo PATH` (repeatable, default the current directory) and `--base BRANCH`
-(default `main`).
+(default `main`). Top-level flags precede the subcommand: `overlord.py --repo PATH order`. After
+it argparse rejects them, and `overlord.py order --repo PATH` errors with unrecognized arguments.
 
 ## Plans outrank the merge queue
 
