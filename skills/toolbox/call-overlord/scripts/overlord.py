@@ -69,33 +69,113 @@ def save_registry(entries: dict[str, dict[str, str]]) -> None:
     temporary.replace(REGISTRY)
 
 
+def own_workspace() -> str:
+    """The workspace this overlord runs in: the realm every adopted target moves into."""
+    return os.environ.get("HERDR_WORKSPACE_ID") or os.environ.get("HERDR_PANE_ID", "").split(":")[0]
+
+
+def herdr_json(argv: list[str]) -> dict:
+    """One herdr command's result object: empty when herdr is absent or answers garbage."""
+    try:
+        return json.loads(run(argv) or "{}").get("result") or {}
+    except json.JSONDecodeError:
+        return {}
+
+
+def herdr_agents() -> dict[str, dict]:
+    """workspace id -> the live agent record there, session file included. Empty without herdr."""
+    if os.environ.get("HERDR_ENV") != "1":
+        return {}
+    return {agent.get("workspace_id", ""): agent for agent in herdr_json(["herdr", "agent", "list"]).get("agents", [])}
+
+
+def herdr_places() -> dict[str, list[str]]:
+    """workspace id -> every path it holds: its checkout and its panes' working directories."""
+    if os.environ.get("HERDR_ENV") != "1":
+        return {}
+    places = {
+        ws.get("workspace_id", ""): [(ws.get("worktree") or {}).get("checkout_path") or ""]
+        for ws in herdr_json(["herdr", "workspace", "list"]).get("workspaces", [])
+    }
+    for pane in herdr_json(["herdr", "pane", "list"]).get("panes", []):
+        places.setdefault(pane.get("workspace_id", ""), []).append(pane.get("cwd") or "")
+    return places
+
+
+def agent_name(path: Path) -> str:
+    """A live agent name herdr accepts: [a-z][a-z0-9_-]{0,31}, from the checkout name."""
+    slug = re.sub(r"[^a-z0-9-]+", "-", path.name.lower()).strip("-") or "adopted"
+    return (slug if slug[:1].isalpha() else f"a-{slug}")[:32].rstrip("-") or "adopted"
+
+
+def resume_agent(record: dict, pane: str, path: Path) -> str:
+    """Start the moved agent again and point it at the session file it lost."""
+    name = agent_name(path)
+    if not ok(["herdr", "agent", "start", name, "--kind", record.get("agent") or "omp", "--pane", pane]):
+        return "agent restart failed"
+    session = (record.get("agent_session") or {}).get("value", "")
+    if not session:
+        return "agent restarted, no session file to resume"
+    instruction = f"Your pane moved to a new workspace. Resume the session at {session} and carry on where you left off."
+    if not ok(["herdr", "agent", "prompt", pane, instruction]):
+        return "agent restarted, resume prompt failed"
+    return "agent resumed"
+
+
+def relocate(path: Path, places: dict[str, list[str]], agents: dict[str, dict], realm: str) -> str:
+    """Cut the target from whatever workspace holds it, then reopen it below the realm.
+
+    Unconditional: a working agent is closed like an idle one, then restarted from its session
+    file on the new pane. worktree open is refused across repositories, so the reopen is always
+    a workspace create, and each adopted target is a workspace, never a tab under the overlord.
+    """
+    if not realm:
+        return "no herdr: not moved"
+    resolved = str(path.resolve())
+    held = next((ws for ws, paths in places.items() if any(p and str(Path(p).resolve()) == resolved for p in paths)), "")
+    if held == realm:
+        return f"in realm {realm}"
+    record = agents.get(held, {})
+    if held and not ok(["herdr", "workspace", "close", held]):
+        return f"kept: {held} refused to close"
+    created = herdr_json(["herdr", "workspace", "create", "--cwd", str(path), "--no-focus"])
+    pane = (created.get("root_pane") or {}).get("pane_id", "")
+    reopened = (created.get("workspace") or {}).get("workspace_id", "")
+    if not pane or not reopened:
+        return "closed, reopen failed"
+    places.pop(held, None)
+    agents.pop(held, None)
+    places[reopened] = [str(path)]
+    move = f"{held}→{reopened}" if held else f"opened {reopened}"
+    return f"{move}, {resume_agent(record, pane, path)}" if record else f"{move}, no agent"
+
+
 def cmd_adopt(args: argparse.Namespace) -> int:
-    """Take over worktrees this overlord did not create: an existing workspace or a path."""
-    workspaces = {}
-    if os.environ.get("HERDR_ENV") == "1":
-        for ws in json.loads(run(["herdr", "workspace", "list"]) or "{}").get("result", {}).get("workspaces", []):
-            workspaces[ws.get("workspace_id", "")] = (ws.get("worktree") or {}).get("checkout_path", "")
+    """Take over worktrees this overlord did not create, and move them into its own realm."""
+    places = herdr_places()
+    agents = herdr_agents()
+    realm = own_workspace() if places else ""
 
     entries = registry()
-    print("#target\tpath\tbranch\tstate")
+    print("#target\tpath\tbranch\tstate\trealm")
     adopted = 0
     for target in args.targets:
-        path_text = workspaces.get(target) or target
+        path_text = next((p for p in places.get(target, []) if p), target)
         path = Path(path_text).expanduser()
         if not path.is_dir():
-            print(f"{target}\t{path}\t-\tmissing")
+            print(f"{target}\t{path}\t-\tmissing\t-")
             continue
         toplevel = run(["git", "-C", str(path), "rev-parse", "--show-toplevel"])
         repo = Path(toplevel) if toplevel else path
         branch = run(["git", "-C", str(path), "rev-parse", "--abbrev-ref", "HEAD"]) or "-" if toplevel else "-"
         resolved = str(path.resolve())
         if resolved in entries:
-            print(f"{target}\t{path}\t{branch}\talready owned")
+            print(f"{target}\t{path}\t{branch}\talready owned\t-")
             continue
         kind = "git" if toplevel else "dir"
         entries[resolved] = {"repo": str(repo), "branch": branch, "mode": "adopted", "task": args.task, "kind": kind}
         adopted += 1
-        print(f"{target}\t{path}\t{branch}\tadopted")
+        print(f"{target}\t{path}\t{branch}\tadopted\t{relocate(path, places, agents, realm)}")
     if adopted:
         save_registry(entries)
     print(f"\nowned worktrees: {len(entries)}")
