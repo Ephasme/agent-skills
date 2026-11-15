@@ -71,7 +71,6 @@ def save_registry(entries: dict[str, dict[str, str]]) -> None:
 
 def cmd_adopt(args: argparse.Namespace) -> int:
     """Take over worktrees this overlord did not create: an existing workspace or a path."""
-    by_path, _by_ws = herdr_facts()
     workspaces = {}
     if os.environ.get("HERDR_ENV") == "1":
         for ws in json.loads(run(["herdr", "workspace", "list"]) or "{}").get("result", {}).get("workspaces", []):
@@ -126,13 +125,14 @@ def cmd_registry(args: argparse.Namespace) -> int:
     if args.rename_list:
         by_path, _by_ws = herdr_facts()
         labels = {
-            (ws.get("worktree") or {}).get("checkout_path", ""): ws.get("label", "")
+            str(Path((ws.get("worktree") or {}).get("checkout_path", "")).resolve()): ws.get("label", "")
             for ws in json.loads(run(["herdr", "workspace", "list"]) or "{}").get("result", {}).get("workspaces", [])
+            if (ws.get("worktree") or {}).get("checkout_path")
         } if os.environ.get("HERDR_ENV") == "1" else {}
         print("#workspace\tlabel\tpath")
         for path, meta in sorted(entries.items()):
             workspace = by_path.get(str(Path(path).resolve()), "-")
-            print(f"{workspace}\t{labels.get(path, meta.get('task', ''))[:40]}\t{path}")
+            print(f"{workspace}\t{labels.get(str(Path(path).resolve()), meta.get('task', ''))[:40]}\t{path}")
         return 0
     print(json.dumps(entries, indent=2, sort_keys=True))
     return 0
@@ -193,9 +193,10 @@ def herdr_facts() -> tuple[dict[str, str], dict[str, tuple[str, str]]]:
     except json.JSONDecodeError:
         return {}, {}
     by_path = {
-        (ws.get("worktree") or {}).get("checkout_path", ""): ws.get("workspace_id", "")
+        str(Path(checkout).resolve()): ws.get("workspace_id", "")
         for ws in workspaces.get("result", {}).get("workspaces", [])
-        if (ws.get("worktree") or {}).get("checkout_path")
+        for checkout in [(ws.get("worktree") or {}).get("checkout_path", "")]
+        if checkout
     }
     by_ws = {
         agent.get("workspace_id", ""): (agent.get("agent_status", "unknown"), agent.get("pane_id", ""))
@@ -214,6 +215,7 @@ class PullRequest:
     files: int
     head: str = ""
     base: str = ""
+    sha: str = ""
     paths: list[str] = field(default_factory=list)
 
 
@@ -229,6 +231,7 @@ def pull_from_json(pull: dict) -> PullRequest:
         files=int(pull.get("changed_files", 0) or 0),
         head=((pull.get("head") or {}).get("ref") or ""),
         base=((pull.get("base") or {}).get("ref") or ""),
+        sha=((pull.get("head") or {}).get("sha") or ""),
     )
 
 
@@ -276,10 +279,13 @@ class Github:
             pull.paths = [item.get("filename", "") for item in files.json() if item.get("filename")]
         return pull
 
-    def checks_green(self, slug: str, number: int) -> tuple[bool, str]:
-        response = self.client.get(f"{API}/repos/{slug}/commits/{self.head_sha(slug, number)}/check-runs")
+    def checks_green(self, slug: str, number: int, sha: str = "") -> tuple[bool, str]:
+        sha = sha or self.head_sha(slug, number)
+        if not sha:
+            return False, "unknown: head sha unavailable"
+        response = self.client.get(f"{API}/repos/{slug}/commits/{sha}/check-runs")
         if response.status_code != 200:
-            return True, ""
+            return False, f"unknown: check-runs {response.status_code}"
         runs = response.json().get("check_runs", [])
         if not runs:
             return True, ""
@@ -327,12 +333,18 @@ def collect(repos: list[Path], base: str) -> list[Worktree]:
     by_path, by_ws = herdr_facts()
     rows: list[Worktree] = []
     seen: set[Path] = set()
+    registry_entries = registry()
     repos = repos + [r for r in registry_repos() if r not in repos]
     for repo in repos:
         if not run(["git", "-C", str(repo), "rev-parse", "--git-dir"]):
             print(f"not a git repository: {repo}", file=sys.stderr)
             continue
-        registry_paths = {Path(path) for path in registry()}
+        registry_paths = {Path(path) for path in registry_entries}
+        registered = {
+            Path(path)
+            for path, meta in registry_entries.items()
+            if meta.get("repo") and Path(meta["repo"]).resolve() == repo.resolve()
+        }
         for path in sorted(registry_paths):
             if path in seen or not path.is_dir():
                 continue
@@ -347,7 +359,7 @@ def collect(repos: list[Path], base: str) -> list[Worktree]:
                     slug="", pull=None, agent=agent, pane=pane, vcs=False,
                 )
             )
-        for path in worktree_paths(repo) + [p for p in registry_paths if p.parent.parent == repo.parent or True]:
+        for path in worktree_paths(repo) + sorted(registered):
             if not path.is_dir() or path in seen:
                 continue
             seen.add(path)
@@ -429,7 +441,7 @@ def cmd_status(args: argparse.Namespace) -> int:
     if any(landable(wt) or wt.agent == "working" for wt in rows):
         ACTIVITY_FILE.write_text(str(int(time.time())))
     remaining = 0
-    for wt in collect(args.repo, args.base):
+    for wt in rows:
         reason = landable(wt)
         if reason:
             remaining += 1
@@ -458,9 +470,19 @@ def clusters(pulls: list[PullRequest]) -> dict[int, int]:
     return {pull.number: find(pull.number) for pull in pulls}
 
 
+def stack_depth(pull: PullRequest, by_head: dict[str, PullRequest]) -> int:
+    """How many pulls this one sits on inside the plan: its position in the stack."""
+    depth, seen = 0, set()
+    while pull.base in by_head and pull.base not in seen:
+        seen.add(pull.base)
+        pull = by_head[pull.base]
+        depth += 1
+    return depth
+
+
 def cmd_order(args: argparse.Namespace) -> int:
     github = Github()
-    plan: list[tuple[int, str, PullRequest, bool, str, int]] = []
+    plan: list[tuple[int, str, PullRequest, bool, str, int, int]] = []
     for repo in args.repo:
         slug = repo_slug(repo)
         if not slug:
@@ -472,24 +494,29 @@ def cmd_order(args: argparse.Namespace) -> int:
         pulls = [pull for pull in github.open_pulls(slug) if pull.head in branches]
         pulls = [pull for pull in (github.detail(slug, pull.number) for pull in pulls) if pull]
         groups = clusters(pulls)
-        heads = {pull.head for pull in pulls}
+        by_head = {pull.head: pull for pull in pulls}
         for pull in pulls:
-            green, blocker = github.checks_green(slug, pull.number)
+            green, blocker = github.checks_green(slug, pull.number, pull.sha)
             blockers = []
             if pull.draft:
                 blockers.append("draft")
-            if pull.mergeable != "MERGEABLE":
-                blockers.append(f"mergeable={pull.mergeable or 'unknown'}")
+            if pull.merge_state != "CLEAN":
+                blockers.append(f"mergeable={pull.merge_state if pull.merge_state != '-' else 'unknown'}")
             if not green:
                 blockers.append(blocker)
-            if pull.base in heads:
+            if pull.base in by_head:
                 blockers.append(f"stacked on {pull.base}")
             plan.append(
-                (len(pull.paths), slug, pull, not blockers, "; ".join(b for b in blockers if b), groups[pull.number])
+                (
+                    len(pull.paths), slug, pull, not blockers,
+                    "; ".join(b for b in blockers if b), groups[pull.number],
+                    stack_depth(pull, by_head),
+                )
             )
 
-    # smallest diff first inside a cluster; a stacked pull stays behind its base
-    plan.sort(key=lambda row: (row[5], row[0], row[2].number))
+    # stack depth first so a stacked pull stays behind its base, then cluster,
+    # smallest diff first, then PR number
+    plan.sort(key=lambda row: (row[6], row[5], row[0], row[2].number))
 
     print("#rank\trepo\tpr\tbranch\tbase\tfiles\tcluster\tready\tblockers")
     for index, (_files, slug, pull, ready, blocker, cluster) in enumerate(plan, start=1):
@@ -498,7 +525,6 @@ def cmd_order(args: argparse.Namespace) -> int:
             f"{len(pull.paths)}\t{cluster}\t{'yes' if ready else 'no'}\t{blocker or '-'}"
         )
     return 0
-STEPS = ("SEE", "PLAN", "HRD", "WORK", "REV", "REB", "MRG", "DONE")
 STOP_WORDS = {
     "feat", "fix", "chore", "docs", "refactor", "test", "tests", "the", "a", "an", "and",
     "to", "of", "for", "in", "on", "with", "per", "by", "is", "it", "this", "that",
@@ -541,10 +567,10 @@ def step_for(wt: Worktree, proposed: bool, hardened: bool, pane_text: str) -> st
         return "PLAN" if "plan mode" in pane_text else "WORK"
     if wt.pull and wt.pull.state == "MERGED":
         return "DONE"
-    if wt.pull and wt.pull.state == "OPEN":
-        return "REB" if wt.pull.mergeable == "CONFLICTING" or wt.pull.merge_state == "DIRTY" else "MRG"
     if wt.pull and wt.pull.draft:
         return "WORK"
+    if wt.pull and wt.pull.state == "OPEN":
+        return "REB" if wt.pull.merge_state == "DIRTY" else "MRG"
     if proposed and not hardened:
         return "HRD"
     if proposed and hardened:
@@ -567,17 +593,15 @@ STEP_STYLE: dict[str, tuple[str, str]] = {
     "MRG": ("⤵", "#98c379"),
     "DONE": ("✔", "#7f8c8d"),
 }
-OVERLORD = ("👁", "OVR")
-
 
 def paint(step: str, title: str) -> str:
     symbol, colour = STEP_STYLE.get(step, ("•", "#888888"))
-    return f"{symbol} {step} {title} [{colour}]"[:64]
+    head, suffix = f"{symbol} {step} {title}", f" [{colour}]"
+    return head[: 64 - len(suffix)] + suffix
 
 
 BUG_WORDS = ("fix", "bug", "crash", "broken", "regression", "panic", "error", "flake", "hotfix")
 FEATURE_WORDS = ("feat", "add", "implement", "design", "redesign", "support", "introduce")
-ASK_WORDS = ("explain", "what is", "why does", "how does", "compare", "cite", "fact-check")
 
 
 def recent_text(wt: Worktree, args: argparse.Namespace) -> str:
@@ -593,7 +617,7 @@ def recent_text(wt: Worktree, args: argparse.Namespace) -> str:
     return " ".join(parts).lower()
 
 
-def pick_mode(wt: Worktree, text: str, proposed: bool, args: argparse.Namespace) -> tuple[str, str]:
+def pick_mode(wt: Worktree, text: str, proposed: bool) -> tuple[str, str]:
     """Mode and step from evidence alone: same facts in, same answer out."""
     words = sum(1 for _ in text.split())
     small = wt.ahead <= 1 and wt.dirty <= 2 and (wt.pull.files if wt.pull else 0) <= 3
@@ -615,7 +639,7 @@ def cmd_mode(args: argparse.Namespace) -> int:
     for wt in collect(args.repo, args.base):
         proposed, hardened, pane_text = plan_state(wt)
         text = recent_text(wt, args) + " " + pane_text
-        mode, chosen = pick_mode(wt, text, proposed, args)
+        mode, chosen = pick_mode(wt, text, proposed)
         step = step_for(wt, proposed, hardened, pane_text)
         if mode != "ask" and step in {"SEE", "DONE"}:
             step = chosen
@@ -634,6 +658,12 @@ def cmd_rename(args: argparse.Namespace) -> int:
     """Prefix every worktree and pane with its step symbol, then say what it is about."""
     by_path, _by_ws = herdr_facts()
     print("#path\tworkspace\tpane\tstep\tsymbol\tlabel")
+    own_pane = os.environ.get("HERDR_PANE_ID", "")
+    if own_pane:
+        label = "👁 OVERLORD"
+        run(["herdr", "pane", "rename", own_pane, label])
+        run(["herdr", "pane", "report-metadata", "--source", "overlord", "--agent", label, own_pane])
+        print(f"self\t-\t{own_pane}\t-\t👁\t{label}")
     for wt in collect(args.repo, args.base):
         proposed, hardened, text = plan_state(wt)
         step = step_for(wt, proposed, hardened, text)
@@ -715,8 +745,11 @@ def cmd_prune(args: argparse.Namespace) -> int:
         print(f"{wt.path}\t{wt.branch}\t{wt.pull.number}\tremove")
         if not args.apply:
             continue
-        run(["git", "-C", str(wt.repo), "worktree", "remove", "--force", str(wt.path)])
+        if not ok(["git", "-C", str(wt.repo), "worktree", "remove", "--force", str(wt.path)]):
+            print(f"could not remove {wt.path}", file=sys.stderr)
+            continue
         entries = registry()
+        entries.pop(str(wt.path.resolve()), None)
         entries.pop(str(wt.path), None)
         save_registry(entries)
         run(["git", "-C", str(wt.repo), "branch", "-D", wt.branch])
@@ -795,28 +828,18 @@ def cmd_spawn(args: argparse.Namespace) -> int:
     if args.dry_run:
         print(f"would run\tgit -C {repo} worktree add -b {branch} {path} origin/{args.base}")
         return 0
-    run(["git", "-C", str(repo), "worktree", "add", "-b", branch, str(path), f"origin/{args.base}"])
-    if not path.is_dir():
+    if not ok(["git", "-C", str(repo), "worktree", "add", "-b", branch, str(path), f"origin/{args.base}"]):
         print("worktree creation failed", file=sys.stderr)
         return 1
     handover = " ".join(part for part in (probe, args.task) if part)
-    if not args.dry_run:
-        entries = registry()
-        entries[str(path)] = {"repo": str(repo), "branch": branch, "mode": args.mode, "task": args.task}
-        save_registry(entries)
+    entries = registry()
+    entries[str(path.resolve())] = {"repo": str(repo), "branch": branch, "mode": args.mode, "task": args.task}
+    save_registry(entries)
     print("next\tstart an agent in that path, then:")
     print(f'\therdr agent prompt <pane> "{handover}" --wait --until idle')
     return 0
 
 
-def delegated(module: str):
-    """Run one of the integrated rename helpers by importing it beside this file."""
-    import importlib
-
-    def handler(args: argparse.Namespace) -> int:
-        return importlib.import_module(module).main(args.rest)
-
-    return handler
 
 
 BRIDGED = {"survey": "survey", "labels": "labels", "relabel": "apply", "verify": "verify"}
