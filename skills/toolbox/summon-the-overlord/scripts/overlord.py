@@ -643,6 +643,7 @@ class Worktree:
     last_subject: str = ""
     last_commit_at: str = ""
     checks: str = "none"
+    task: str = ""
 
 
 def registry_repos() -> list[Path]:
@@ -724,6 +725,7 @@ def _collect(repos: list[Path], base: str) -> list[Worktree]:
                 path=path, repo=path, branch="-", dirty=0, ahead=0, upstream="none",
                 slug="", pull=None, agent=agent, pane=pane, vcs=False,
                 name=meta.get("name", "-"), title=meta.get("title", ""),
+                task=str(meta.get("task") or ""),
                 agent_status=by_ws.get(workspace, ("unknown", "-"))[0] if workspace else "unknown",
             ))
         for path in worktree_paths(repo) + sorted(registered):
@@ -746,6 +748,7 @@ def _collect(repos: list[Path], base: str) -> list[Worktree]:
                 slug=slug, pull=pull,
                 agent=agent, pane=pane, linked=path.resolve() != repo.resolve(),
                 name=meta.get("name", "-"), title=meta.get("title", ""),
+                task=str(meta.get("task") or ""),
                 agent_status=by_ws.get(workspace, ("unknown", "-"))[0] if workspace else "unknown",
                 last_subject=run(["git", "-C", str(path), "log", "-1", "--format=%s"]),
                 last_commit_at=run(["git", "-C", str(path), "log", "-1", "--format=%cI"]),
@@ -994,7 +997,9 @@ def step_for(wt: Worktree, proposed: bool, hardened: bool, pane_text: str = "") 
         return "BUILD"
     if wt.ahead > 0 or wt.dirty:
         return "BUILD"
-    return "PLAN" if str(wt.path.resolve()) in registry() else "IDLE"
+    # A registry entry carrying a task is a job in flight even with no git: IDLE means nothing
+    # started and nothing in flight, so it excludes every entry that has one.
+    return "PLAN" if wt.task else "IDLE"
 
 
 # symbol, colour and what the label says the worktree is doing

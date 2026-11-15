@@ -271,5 +271,26 @@ class PullStepTests(unittest.TestCase):
         wt = self.worktree("")
         wt.pull.merge_state = "DIRTY"
         self.assertEqual(o.step_for(wt, True, True), "REB")
+
+
+class InFlightTests(unittest.TestCase):
+    """A registry entry with a task is a job in flight, git target or not."""
+
+    def job(self, task: str, **facts) -> o.Worktree:
+        return o.Worktree(
+            path=Path("/tmp/label-eval"), repo=Path("/tmp/label-eval"), branch="-",
+            dirty=0, ahead=0, upstream="none", slug="", pull=None, vcs=False,
+            name="m5", title="cheap-classifier-eval", task=task, **facts,
+        )
+
+    def test_non_git_job_with_a_task_and_no_plan_is_plan(self):
+        with patch.object(o, "registry", return_value={"/tmp/label-eval": {"name": "m5"}}):
+            self.assertEqual(o.step_for(self.job("measure cheap models"), False, False), "PLAN")
+
+    def test_registered_entry_without_a_task_and_nothing_in_flight_is_idle(self):
+        with patch.object(o, "registry", return_value={"/tmp/label-eval": {"name": "m5"}}):
+            self.assertEqual(o.step_for(self.job(""), False, False), "IDLE")
+
+
 if __name__ == "__main__":
     unittest.main()
