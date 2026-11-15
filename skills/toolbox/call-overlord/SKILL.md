@@ -48,7 +48,7 @@ plus the step per worktree, with the evidence it used:
 
 |signal|mode|step|
 |---|---|---|
-|nothing dirty, nothing ahead, no PR, no plan|`ask`|`SEE`|
+|nothing dirty, nothing ahead, no PR, no plan|`ask`|`IDLE`|
 |bug words in the commits or the conversation, one commit or two files, no plan|`hotfix`|`WORK`, with the repro unanswered|
 |a plan, several commits, review evidence, more than one worktree|`feat`|the pipeline step|
 |anything else already in motion|`fast`|`WORK`|
@@ -159,14 +159,17 @@ where the registry is written but nothing moves.
 
 ## The feat pipeline, in six commands
 
+`bootstrap` prints every read-only table — preflight, discover, inventory, mode, order, plans, and
+the labels `rename` would set — in one process: one GitHub round trip and one git probe per
+worktree, instead of one of each per command. Run the single commands when you need one answer.
+
 ```bash
-"$SKILL_DIR/scripts/overlord.py" plans --inject --approve   # 1. review gate
-"$SKILL_DIR/scripts/overlord.py" inventory                  # 2. what every worktree holds
-"$SKILL_DIR/scripts/overlord.py" order                      # 3. what merges, in which order
-"$SKILL_DIR/scripts/overlord.py" rename --apply             # 4. step labels on every pane
-"$SKILL_DIR/scripts/overlord.py" review                     # 5. capture what awaits review
-"$SKILL_DIR/scripts/overlord.py" status                     # 6. anything left? 0 = stop
-"$SKILL_DIR/scripts/overlord.py" prune --apply              # 7. drop the landed worktrees
+"$SKILL_DIR/scripts/overlord.py" bootstrap                  # 1. where everything stands
+"$SKILL_DIR/scripts/overlord.py" plans --inject --approve   # 2. review gate
+"$SKILL_DIR/scripts/overlord.py" rename --apply             # 3. step labels on every pane
+"$SKILL_DIR/scripts/overlord.py" review                     # 4. capture what awaits review
+"$SKILL_DIR/scripts/overlord.py" status                     # 5. anything left? 0 = stop
+"$SKILL_DIR/scripts/overlord.py" prune --apply              # 6. drop the landed worktrees
 ```
 
 Each subcommand takes `--repo PATH` (repeatable) and `--base BRANCH` (default `main`). With no
@@ -226,23 +229,26 @@ line or a colour preference is not a defect. Nothing merges until the defects it
 ## Labels and status dots
 
 `rename --apply` prefixes every workspace and pane with its step and a short title taken from the PR
-title or newest commit, and reports the same step as pane metadata so the status dot matches.
+title or newest commit, and reports the same step as the `step` metadata token.
 
-|step|symbol|colour|meaning|
-|---|---|---|---|
-|`SEE`|👁|`#56b6c2`|looking around, nothing started|
-|`PLAN`|🗺|`#61afef`|plan mode, no plan proposed yet|
-|`HRD`|🛡|`#c678dd`|plan proposed, waiting for hardening|
-|`WORK`|⚒|`#e5c07b`|implementing|
-|`REV`|🔍|`#d19a66`|reviewing what was built|
-|`REB`|⟳|`#c678dd`|rebasing a conflicting PR|
-|`MRG`|⤵|`#98c379`|PR open, waiting to merge|
-|`DONE`|✔|`#7f8c8d`|merged, ready to prune|
+|step|symbol|meaning|
+|---|---|---|
+|`IDLE`|💤|nothing started, nothing in flight|
+|`PLAN`|🗺|plan mode, no plan proposed yet|
+|`HRD`|🛡|plan proposed, waiting for hardening|
+|`WORK`|⚒|implementing|
+|`REV`|🔍|reviewing what was built|
+|`REB`|⟳|rebasing a conflicting PR|
+|`MRG`|⤵|PR open, waiting to merge|
+|`DONE`|✔|merged, ready to prune|
+
+The label carries no colour, and must not: herdr renders a label literally, so a hex code in it is
+visible text. The dot beside a workspace is herdr's own status icon for that workspace's agent.
 
 The overlord's own dot is an eye: it watches, it does not build. The overlord is the session that
-runs this skill, never a spawned agent or an extra pane: its pane is named `👁 OVERLORD`, no step
-and no title (`rename --apply` labels it from `HERDR_PANE_ID`), and a second pane must never be
-created to hold it.
+runs this skill, never a spawned agent or an extra pane: `rename --apply` names both its pane and
+the workspace holding it `👁 OVERLORD` — from `HERDR_PANE_ID` and `HERDR_WORKSPACE_ID` — with no
+step and no title, and a second pane must never be created to hold it.
 
 ## Mail instead of polling
 
@@ -253,12 +259,14 @@ scatter into separate projects.
 ensure_project   human_key: /path/to/primary/checkout
 register_agent   project_key: <same path>, program: omp, name: omitted
 send_message     project_key: <same path>, sender_name: <your name>, to: [...]
+fetch_inbox      project_key: <same path>, agent_name: <the name register_agent returned>
 ```
 
-Per pass: ensure the project, register, message each live agent the project key and the four moments
-worth a message (PR open, needs rebase, blocked, merged), then drain your own inbox with
-`fetch_inbox` at the start and the end. A report beats pane text when they disagree; one message per
-decision.
+`register_agent` returns the name it chose and `fetch_inbox` refuses a call without `agent_name`:
+keep that name, or every inbox read is a validation error. Per pass: ensure the project, register,
+message each live agent the project key and the four moments worth a message (PR open, needs
+rebase, blocked, merged), then drain your own inbox with `fetch_inbox` at the start and the end. A
+report beats pane text when they disagree; one message per decision.
 
 ## Prune, then stop
 

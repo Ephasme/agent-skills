@@ -105,6 +105,18 @@ def stamp() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+
+# A pass is one process: every table reuses the facts already read, so a bootstrap costs
+# one GitHub round trip and one git probe per worktree instead of one per command.
+_MEMO: dict = {}
+
+
+def shared(key, build):
+    if key not in _MEMO:
+        _MEMO[key] = build()
+    return _MEMO[key]
+
+
 def config_roots() -> list[Path]:
     """The directories discovery may scan, named in config.yaml: none unless the file says so."""
     section = read_yaml(CONFIG_FILE, "config").get("discovery") or {}
@@ -118,7 +130,7 @@ def scan_roots(roots: list[Path]) -> dict[str, dict]:
     A repository whose slug the token cannot read keeps gh false instead of disappearing:
     an invisible remote is a fact the report has to name.
     """
-    github = Github()
+    github = shared("github", Github)
     found: dict[str, dict] = {}
     for root in roots:
         candidates = [root, *sorted(root.iterdir())] if root.is_dir() else [root]
@@ -175,7 +187,7 @@ def discovery(refresh: bool = False) -> dict[str, dict]:
 
 
 def discovered() -> list[Path]:
-    return [Path(path) for path in discovery() if Path(path).is_dir()]
+    return shared("discovered", lambda: [Path(path) for path in discovery() if Path(path).is_dir()])
 
 
 def own_workspace() -> str:
@@ -374,6 +386,10 @@ def worktree_paths(repo: Path) -> list[Path]:
 
 def herdr_facts() -> tuple[dict[str, str], dict[str, tuple[str, str]]]:
     """checkout path -> workspace id, workspace id -> (agent state, pane). Empty without herdr."""
+    return shared("herdr_facts", _herdr_facts)
+
+
+def _herdr_facts() -> tuple[dict[str, str], dict[str, tuple[str, str]]]:
     if os.environ.get("HERDR_ENV") != "1":
         return {}, {}
     try:
@@ -462,12 +478,9 @@ class Github:
         """Whether this token can see the repository at all: what makes its PRs invisible."""
         return self.client.get(f"{API}/repos/{slug}").status_code == 200
 
-    def detail(self, slug: str, number: int) -> PullRequest | None:
-        response = self.client.get(f"{API}/repos/{slug}/pulls/{number}")
-        if response.status_code != 200:
-            return None
-        pull = pull_from_json(response.json())
-        files = self.client.get(f"{API}/repos/{slug}/pulls/{number}/files", params={"per_page": 100})
+    def with_paths(self, slug: str, pull: PullRequest) -> PullRequest:
+        """The pull request with its touched files: one request, not a second fetch of the row."""
+        files = self.client.get(f"{API}/repos/{slug}/pulls/{pull.number}/files", params={"per_page": 100})
         if files.status_code == 200:
             pull.paths = [item.get("filename", "") for item in files.json() if item.get("filename")]
         return pull
@@ -532,7 +545,13 @@ def scope_repos(repos: list[Path]) -> list[Path]:
 
 
 def collect(repos: list[Path], base: str) -> list[Worktree]:
-    github = Github()
+    """One row per worktree, read once per pass: every table below shares these facts."""
+    key = ("collect", tuple(sorted(str(Path(repo).expanduser().resolve()) for repo in repos)), base)
+    return shared(key, lambda: _collect(repos, base))
+
+
+def _collect(repos: list[Path], base: str) -> list[Worktree]:
+    github = shared("github", Github)
     by_path, by_ws = herdr_facts()
     rows: list[Worktree] = []
     seen: set[Path] = set()
@@ -691,7 +710,7 @@ def stack_depth(pull: PullRequest, by_head: dict[str, PullRequest]) -> int:
 
 
 def cmd_order(args: argparse.Namespace) -> int:
-    github = Github()
+    github = shared("github", Github)
     plan: list[tuple[int, str, PullRequest, bool, str, int, int, str]] = []
     for repo in scope_repos(args.repo):
         slug = repo_slug(repo)
@@ -703,7 +722,7 @@ def cmd_order(args: argparse.Namespace) -> int:
             checkouts.setdefault(branch, path)
         # every open pull request counts, checked out locally or not: one whose worktree was
         # pruned is still work this pass owes, not a pull request to abandon silently
-        pulls = [pull for pull in (github.detail(slug, pull.number) for pull in github.open_pulls(slug)) if pull]
+        pulls = [github.with_paths(slug, pull) for pull in github.open_pulls(slug)]
         groups = clusters(pulls)
         by_head = {pull.head: pull for pull in pulls}
         for pull in pulls:
@@ -744,6 +763,10 @@ STOP_WORDS = {
 
 def plan_state(wt: Worktree) -> tuple[bool, bool, str]:
     """(proposed, hardened, pane text). A plan file counts, and so does the pane banner."""
+    return shared(("plan_state", str(wt.path), wt.pane), lambda: _plan_state(wt))
+
+
+def _plan_state(wt: Worktree) -> tuple[bool, bool, str]:
     proposed = (wt.path / PLAN_FILE).is_file()
     hardened = False
     text = ""
@@ -790,12 +813,12 @@ def step_for(wt: Worktree, proposed: bool, hardened: bool, pane_text: str) -> st
         return "PLAN"
     if wt.dirty or wt.ahead > 0:
         return "WORK"
-    return "SEE"
+    return "IDLE"
 
 
 # symbol, colour and what the label says the worktree is doing
 STEP_STYLE: dict[str, tuple[str, str]] = {
-    "SEE": ("👁", "#56b6c2"),
+    "IDLE": ("💤", "#56b6c2"),
     "PLAN": ("🗺", "#61afef"),
     "HRD": ("🛡", "#c678dd"),
     "WORK": ("⚒", "#e5c07b"),
@@ -806,9 +829,9 @@ STEP_STYLE: dict[str, tuple[str, str]] = {
 }
 
 def paint(step: str, title: str) -> str:
-    symbol, colour = STEP_STYLE.get(step, ("•", "#888888"))
-    head, suffix = f"{symbol} {step} {title}", f" [{colour}]"
-    return head[: 64 - len(suffix)] + suffix
+    """The visible label. Colour is herdr's config, never text: a hex code in a label is noise."""
+    symbol, _colour = STEP_STYLE.get(step, ("•", "#888888"))
+    return f"{symbol} {step} {title}"[:64]
 
 
 BUG_WORDS = ("fix", "bug", "crash", "broken", "regression", "panic", "error", "flake", "hotfix")
@@ -835,7 +858,7 @@ def pick_mode(wt: Worktree, text: str, proposed: bool) -> tuple[str, str]:
     bug = any(word in text for word in BUG_WORDS)
     feature = any(word in text for word in FEATURE_WORDS) or proposed
     if wt.dirty == 0 and wt.ahead == 0 and not wt.pull and not proposed:
-        return "ask", "SEE"
+        return "ask", "IDLE"
     if bug and small and not proposed:
         return "hotfix", "WORK"
     if feature and (proposed or wt.ahead > 1 or words > 40):
@@ -852,7 +875,7 @@ def cmd_mode(args: argparse.Namespace) -> int:
         text = recent_text(wt, args) + " " + pane_text
         mode, chosen = pick_mode(wt, text, proposed)
         step = step_for(wt, proposed, hardened, pane_text)
-        if mode != "ask" and step in {"SEE", "DONE"}:
+        if mode != "ask" and step in {"IDLE", "DONE"}:
             step = chosen
         if mode == "feat" and overall in {"ask", "fast", "hotfix"}:
             overall = "feat"
@@ -865,16 +888,37 @@ def cmd_mode(args: argparse.Namespace) -> int:
     return 0
 
 
+def herdr_apply(cmd: list[str]) -> bool:
+    """A herdr command that has to work, or say so: a rename nobody applied is a lie."""
+    if ok(cmd):
+        return True
+    print(f"herdr failed: {' '.join(cmd)}", file=sys.stderr)
+    return False
+
+
+def label_self(own_pane: str) -> str:
+    """Name the overlord's own pane and the workspace holding it: one name, no step, no title."""
+    label = "👁 OVERLORD"
+    workspace = own_workspace()
+    herdr_apply(["herdr", "pane", "rename", own_pane, label])
+    herdr_apply(["herdr", "pane", "report-metadata", own_pane, "--source", "overlord", "--token", "step=OVERLORD"])
+    if workspace:
+        herdr_apply(["herdr", "workspace", "rename", workspace, label])
+        herdr_apply(
+            ["herdr", "workspace", "report-metadata", workspace, "--source", "overlord",
+             "--token", "step=OVERLORD"]
+        )
+    return workspace
+
+
 def cmd_rename(args: argparse.Namespace) -> int:
     """Prefix every worktree and pane with its step symbol, then say what it is about."""
     by_path, _by_ws = herdr_facts()
     print("#path\tworkspace\tpane\tstep\tsymbol\tlabel")
     own_pane = os.environ.get("HERDR_PANE_ID", "")
     if own_pane:
-        label = "👁 OVERLORD"
-        run(["herdr", "pane", "rename", own_pane, label])
-        run(["herdr", "pane", "report-metadata", "--source", "overlord", "--agent", label, own_pane])
-        print(f"self\t-\t{own_pane}\t-\t👁\t{label}")
+        workspace = label_self(own_pane) if args.apply else own_workspace()
+        print(f"self\t{workspace or '-'}\t{own_pane}\t-\t👁\t👁 OVERLORD")
     for wt in collect(args.repo, args.base):
         proposed, hardened, text = plan_state(wt)
         step = step_for(wt, proposed, hardened, text)
@@ -885,14 +929,14 @@ def cmd_rename(args: argparse.Namespace) -> int:
         if not args.apply:
             continue
         if workspace:
-            run(["herdr", "workspace", "rename", workspace, label])
-            run(
-                ["herdr", "workspace", "report-metadata", "--source", "overlord",
-                 "--token", f"step={step}", "--token", f"dot={symbol}", workspace]
+            herdr_apply(["herdr", "workspace", "rename", workspace, label])
+            herdr_apply(
+                ["herdr", "workspace", "report-metadata", workspace, "--source", "overlord",
+                 "--token", f"step={step}"]
             )
         if wt.pane not in {"-", ""}:
-            run(["herdr", "pane", "rename", wt.pane, label])
-            run(["herdr", "pane", "report-metadata", "--source", "overlord", "--agent", label, wt.pane])
+            herdr_apply(["herdr", "pane", "rename", wt.pane, label])
+            herdr_apply(["herdr", "pane", "report-metadata", wt.pane, "--source", "overlord", "--token", f"step={step}"])
     return 0
 
 
@@ -1048,7 +1092,7 @@ def cmd_discover(args: argparse.Namespace) -> int:
     roots = [Path(os.path.expanduser(root)) for root in args.root] or config_roots()
     if not roots:
         print("#path\tslug\tbase\tgh")
-        print(f"no roots: add discovery.roots to {CONFIG_FILE}", file=sys.stderr)
+        print(f"#note\tno roots: add discovery.roots to {CONFIG_FILE}")
         return 0
     cache = read_yaml(DISCOVERY_CACHE, "discovery cache")
     age = cache_age(cache)
@@ -1094,6 +1138,26 @@ def cmd_spawn(args: argparse.Namespace) -> int:
     return 0
 
 
+
+
+def cmd_bootstrap(args: argparse.Namespace) -> int:
+    """Every read-only table a pass needs, in one process: one GitHub round trip, one git probe.
+
+    The commands below each read the same facts; run separately they pay for them again.
+    """
+    print("## preflight")
+    code = cmd_preflight(argparse.Namespace(**{**vars(args), "apply": False, "refresh": False}))
+    for title, handler, extra in (
+        ("discover", cmd_discover, {"refresh": False, "root": []}),
+        ("inventory", cmd_inventory, {}),
+        ("mode", cmd_mode, {"transcript": ""}),
+        ("order", cmd_order, {}),
+        ("plans", cmd_plans, {"inject": False, "approve": False}),
+        ("rename", cmd_rename, {"apply": False}),
+    ):
+        print(f"## {title}")
+        handler(argparse.Namespace(**{**vars(args), **extra}))
+    return code
 
 
 BRIDGED = {"survey": "survey", "labels": "labels", "relabel": "apply", "verify": "verify"}
@@ -1174,6 +1238,7 @@ def main(argv: list[str]) -> int:
     discover.add_argument("--refresh", action="store_true", help="rescan and replace the cache")
     discover.add_argument("--root", action="append", default=[], help="scan this root instead of the configured ones")
 
+    subs.add_parser("bootstrap", help="every read-only table a pass needs, in one process")
     subs.add_parser("inventory", help="one row per worktree")
     subs.add_parser("order", help="merge plan for the open pull requests")
 
@@ -1206,6 +1271,7 @@ def main(argv: list[str]) -> int:
         "adopt": cmd_adopt,
         "mode": cmd_mode,
         "spawn": cmd_spawn,
+        "bootstrap": cmd_bootstrap,
         "inventory": cmd_inventory,
         "order": cmd_order,
         "status": cmd_status,
