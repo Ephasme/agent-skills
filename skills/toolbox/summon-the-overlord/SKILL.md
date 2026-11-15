@@ -129,7 +129,8 @@ workspace's root pane and prompts it with the handover. The minion is always `--
 the first request of that kind die with `400 … nothing: model — nothing is not a valid model ID`.
 Plan mode is the case that bites, because omp routes a planning turn through `modelRoles.plan`.
 
-That model comes from `models.allowed` in `~/.overlord/config.yaml`: `--model` or `OVERLORD_MODEL`
+That model comes from `models.allowed` in `~/.overlord/config.yaml`, which ships as the classifier
+pair `deepseek/deepseek-v4.1-flash-1017` then `openai/gpt-5-mini`: `--model` or `OVERLORD_MODEL`
 names one of them, an unlisted name is refused before any worktree exists, and `overlord.py models`
 prints the list and the default — never probe a model by starting a minion.
 

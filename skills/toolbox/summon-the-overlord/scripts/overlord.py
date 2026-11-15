@@ -51,14 +51,23 @@ CONFIG_FILE = OVERLORD_DIR / "config.yaml"
 PROMPTS = Path(os.environ.get("OVERLORD_PROMPTS", Path(__file__).resolve().parent.parent / "prompts"))
 # `herdr agent start` takes the model on its own command line: this machine's config.yml
 # leaves every modelRole at `nothing`, so an agent started without one dies on its first
+# request with a 400 naming the value. Roles are per-machine config, so an override wins.
+WORKER_MODEL = os.environ.get("OVERLORD_MODEL", "omniroute/anthropic/claude-opus-4.5")
 HARDENED_RE = re.compile(r"^<!-- hardened: ([0-9a-f]{40,64}) -->$")
 PLAN_TOGGLE = "Alt+Shift+P"
 
 
+# Classifier pair chosen on error direction and cost, not on an accuracy win: the intervals
+# overlap (batch 0.960 [0.902-0.984] against Mini's 0.890 [0.814-0.937]), DeepSeek halves the
+# silent false-updated rate (11 against 22 per 1000) and costs 11.6 against 95.6 micro-USD.
+CLASSIFIER_MODELS = ["deepseek/deepseek-v4.1-flash-1017", "openai/gpt-5-mini"]
+CLASSIFIER_TIMEOUT = 30
+
+
 def model_policy() -> tuple[list[str], str]:
     models = read_yaml(CONFIG_FILE, "config").get("models") or {}
-    allowed = [str(name) for name in (models.get("allowed") or [])]
-    default = str(models.get("default") or (allowed[0] if allowed else WORKER_MODEL))
+    allowed = [str(name) for name in (models.get("allowed") or CLASSIFIER_MODELS)]
+    default = str(models.get("default") or allowed[0])
     return allowed, default
 
 
@@ -96,7 +105,12 @@ def title_slug(source: str) -> str:
 
 
 def register_entry(entries: dict, path: str, meta: dict, title: str = "") -> None:
-    if path in entries:
+    """Register a path, or update the fields a caller supplied: identity is never reassigned."""
+    known = entries.get(path)
+    if known is not None:
+        known.update({key: value for key, value in meta.items() if value})
+        if title:
+            known["title"] = title_slug(title)
         return
     meta["name"] = f"m{entries.get('next_name', 1)}"
     entries["next_name"] = int(entries.get("next_name", 1)) + 1
@@ -224,10 +238,12 @@ def enter_plan_mode(pane: str) -> bool:
     never hand feat work over in normal mode, where the minion implements before any plan.
     """
     for _ in range(10):
-        if ok(["herdr", "agent", "send-keys", pane, PLAN_TOGGLE]) and "plan mode" in run(
+        if "plan mode" in run(
             ["herdr", "pane", "read", pane, "--source", "recent", "--lines", "40"]
         ).lower():
             return True
+        # toggle only once plan mode is absent here: a blind chord on a slow banner turns it off
+        ok(["herdr", "agent", "send-keys", pane, PLAN_TOGGLE])
         time.sleep(1)
     return False
 
@@ -257,6 +273,8 @@ def resume_agent(record: dict, pane: str, path: Path) -> str:
     model, refusal = resolve_model("")
     if refusal or not start_agent(agent_name(path), pane, model):
         return "agent restart failed"
+    if registry().get(str(path.resolve()), {}).get("mode") == "feat" and not enter_plan_mode(pane):
+        return "agent restarted, plan mode did not engage"
     session = (record.get("agent_session") or {}).get("value", "")
     if not session:
         return "agent restarted, no session file to resume"
@@ -935,11 +953,13 @@ def plan_hardened(path: Path) -> bool:
     if not plan.is_file() or not run(["git", "-C", str(path), "ls-files", "--error-unmatch", PLAN_FILE]):
         return False
     lines = plan.read_text(errors="replace").splitlines()
-    match = HARDENED_RE.fullmatch(lines[-1]) if lines else None
+    match = HARDENED_RE.fullmatch(lines[-1].strip()) if lines else None
     if not match:
         return False
-    shown = run(["git", "-C", str(path), "show", f"{match.group(1)}:{PLAN_FILE}"]).splitlines()
-    return shown == lines[:-1]
+    # both sides stripped: a trailing blank line is whitespace, not a plan edit, and an empty
+    # `git show` (unknown sha) must never read as a match
+    shown = run(["git", "-C", str(path), "show", f"{match.group(1)}:{PLAN_FILE}"]).strip()
+    return bool(shown) and shown == "\n".join(lines[:-1]).strip()
 
 
 def plan_state(wt: Worktree) -> tuple[bool, bool, str]:
@@ -992,6 +1012,8 @@ def step_for(wt: Worktree, proposed: bool, hardened: bool, pane_text: str = "") 
     if wt.pull and wt.pull.state == "OPEN":
         if wt.pull.merge_state == "DIRTY":
             return "REB"
+        if wt.pull.draft:
+            return "BUILD"
         if not check_green(wt) or review_marker(wt) == "REVIEWING":
             return "REV"
         return "MRG"
@@ -1022,7 +1044,7 @@ STEP_STYLE: dict[str, tuple[str, str]] = {
 }
 
 def paint(step: str, name: str, title: str) -> str:
-    """`<symbol> <STEP> <name> <title>`: the label is the only place the id is rendered."""
+    """`<symbol> <STEP> <name> <title>`: the left panel prints this label verbatim."""
     symbol, _colour = STEP_STYLE.get(step, ("•", "#888888"))
     return f"{symbol} {step} {name} {title}"[:64]
 
@@ -1132,19 +1154,23 @@ def cmd_rename(args: argparse.Namespace) -> int:
         proposed, hardened, _text = plan_state(wt)
         step = step_for(wt, proposed, hardened)
         symbol = STEP_STYLE.get(step, ("•", "#888888"))[0]
-        label = paint(step, wt.name, wt.title or short_title(wt))
+        title = wt.title or short_title(wt)
+        label = paint(step, wt.name, title)
         live_workspace, live_pane = places.get(str(wt.path.resolve()), ("", ""))
         workspace = by_path.get(str(wt.path.resolve()), "") or live_workspace
         pane = wt.pane if wt.pane not in {"-", ""} else live_pane
         print(f"{wt.path}\t{workspace or '-'}\t{pane or '-'}\t{wt.name}\t{step}\t{symbol}\t{label}")
         if not args.apply:
             continue
+        tokens = (f"step={step}", f"title={title}")
         if workspace:
             herdr_apply(["herdr", "workspace", "rename", workspace, label])
-            herdr_apply(["herdr", "workspace", "report-metadata", workspace, "--source", "overlord", "--token", f"step={step}"])
+            for token in tokens:
+                herdr_apply(["herdr", "workspace", "report-metadata", workspace, "--source", "overlord", "--token", token])
         if pane:
             herdr_apply(["herdr", "pane", "rename", pane, label])
-            herdr_apply(["herdr", "pane", "report-metadata", pane, "--source", "overlord", "--token", f"step={step}"])
+            for token in tokens:
+                herdr_apply(["herdr", "pane", "report-metadata", pane, "--source", "overlord", "--token", token])
     return 0
 
 
@@ -1277,7 +1303,7 @@ def cmd_plans(args: argparse.Namespace) -> int:
         if args.inject and action == "harden":
             run(["herdr", "pane", "run", wt.pane, HARDEN])
             print(f"sent {HARDEN} to {wt.pane}", file=sys.stderr)
-        if args.approve:
+        if args.approve and action != "none":
             if action != "approve":
                 print(f"refused to approve {wt.path}: PLAN.md is not hardened (no current marker)", file=sys.stderr)
                 continue
@@ -1399,7 +1425,11 @@ def alert_text(row: dict) -> str:
 
 def alert_new(rows: list[dict]) -> None:
     """Prompt this pane once per stall, keyed by minion+step and cleared once that stall is gone."""
-    alerted = json.loads(ALERT_FILE.read_text()) if ALERT_FILE.exists() else {}
+    try:
+        alerted = json.loads(ALERT_FILE.read_text())
+    except (OSError, json.JSONDecodeError):
+        # one truncated file must not break every later pass: the worst case is a repeat alert
+        alerted = {}
     live = {f"{row['name']}:{row['step']}" for row in rows}
     for row in rows:
         key = f"{row['name']}:{row['step']}"
@@ -1409,12 +1439,57 @@ def alert_new(rows: list[dict]) -> None:
             alerted[key] = [row["name"], row["step"]]
     alerted = {key: value for key, value in alerted.items() if key in live}
     STATE_DIR.mkdir(parents=True, exist_ok=True)
-    ALERT_FILE.write_text(json.dumps(alerted, indent=2, sort_keys=True))
+    temporary = ALERT_FILE.with_suffix(".json.tmp")
+    temporary.write_text(json.dumps(alerted, indent=2, sort_keys=True))
+    temporary.replace(ALERT_FILE)
+
+STEP_GLOSSARY = (
+    "PLAN: plan mode, no committed plan. HRD: plan committed, hardening marker absent or stale. "
+    "BUILD: implementing. REV: reviewing the diff. REB: rebasing a conflicting PR. MRG: PR open, "
+    "green, waiting to merge. DONE: PR merged. IDLE: nothing started and nothing in flight."
+)
+
+
+def classifier_prompt(step: str, pane_text: str) -> str:
+    """The one prompt: glossary, current step, evidence. The guard runs before it, in code."""
+    return (
+        "You classify whether a minion's label is stale. Answer one word: updated, outdated, not_sure.\n"
+        f"Step glossary:\n{STEP_GLOSSARY}\nCurrent step: {step}\nPane evidence:\n{pane_text}\n"
+    )
+
+
+def classify(step: str, pane_text: str) -> tuple[str, str]:
+    """(verdict, reason), guarded in code: absent or unreadable evidence never reaches a model.
+
+    Both finalists answer `updated` on an empty pane, the one failure that leaves a stale label
+    lying, so the guard is here and not in the prompt. A sweep with nothing stale makes no call,
+    and the call has its own timeout so a slow tail never blocks the sweep from finishing.
+    """
+    text = (pane_text or "").strip()
+    if not text:
+        return "not_sure", "empty pane"
+    if text.startswith("<unreadable"):
+        return "not_sure", "unreadable pane"
+    command = os.environ.get("OVERLORD_CLASSIFIER_CMD", "")
+    if not command:
+        return "not_sure", "no classifier client configured"
+    try:
+        done = subprocess.run(
+            command.split(), input=classifier_prompt(step, text),
+            capture_output=True, text=True, timeout=CLASSIFIER_TIMEOUT,
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        return "not_sure", f"classifier failed: {exc}"
+    lines = (done.stdout or "").strip().splitlines()
+    answer = lines[-1].strip().lower() if lines else ""
+    return (answer, "") if answer in {"updated", "outdated", "not_sure"} else ("not_sure", "unparseable answer")
 
 
 def cmd_watch(args: argparse.Namespace) -> int:
     """Print stalls, alert this pane once per new one, and repeat until --once or --stop."""
     while True:
+        # a sweep is a fresh read: the pass-wide memo would otherwise replay its first snapshot
+        _MEMO.clear()
         rows = show_stalls(args)
         if args.alert:
             alert_new(rows)
@@ -1623,6 +1698,11 @@ def cmd_spawn(args: argparse.Namespace) -> int:
         print(f"minion label failed for workspace {workspace}", file=sys.stderr)
     if not herdr_apply(["herdr", "pane", "rename", minion, label]):
         print(f"minion label failed for pane {minion}", file=sys.stderr)
+    for kind, target in ((("workspace", workspace), ("pane", minion))):
+        if not target:
+            continue
+        for token in (f"step={step}", f"title={birth}"):
+            herdr_apply(["herdr", kind, "report-metadata", target, "--source", "overlord", "--token", token])
     return 0
 
 
@@ -1857,6 +1937,7 @@ def main(argv: list[str]) -> int:
     if not args.repo and run(["git", "-C", str(Path.cwd()), "rev-parse", "--git-dir"]):
         args.repo = [Path.cwd()]
     handlers = {
+        "adopt": cmd_adopt,
         "preflight": cmd_preflight,
         "registry": cmd_registry,
         "models": cmd_models,

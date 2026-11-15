@@ -2,6 +2,7 @@ import argparse
 import importlib.util
 import io
 import json
+import os
 import subprocess
 import tempfile
 import unittest
@@ -367,5 +368,106 @@ class ReviewGateTests(unittest.TestCase):
         )
 
 
+class ReviewFixTests(unittest.TestCase):
+    """One test per defect open-code-review raised on PR 13."""
+
+    def test_models_run_without_a_config_file_at_all(self):
+        # repro from the review: HOME=/tmp/emptyhome overlord.py models died on WORKER_MODEL
+        done = subprocess.run(
+            [sys.executable, "-c", (
+                "import importlib.util,sys;"
+                "spec=importlib.util.spec_from_file_location('ov',sys.argv[1]);"
+                "m=importlib.util.module_from_spec(spec);sys.modules['ov']=m;spec.loader.exec_module(m);"
+                "print('\\n'.join(m.model_policy()[0]))"
+            ), str(SCRIPT)],
+            capture_output=True, text=True, env={"HOME": tempfile.mkdtemp(), "PATH": os.environ.get("PATH", "")},
+        )
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertEqual(done.stdout.split(), o.CLASSIFIER_MODELS)
+
+    def test_every_subcommand_has_a_handler(self):
+        parser = subprocess.run(
+            [sys.executable, str(SCRIPT), "--help"], capture_output=True, text=True,
+        )
+        self.assertEqual(parser.returncode, 0, parser.stderr)
+        for name in ("adopt", "bootstrap", "inventory", "mode", "models", "order", "pass",
+                     "plans", "preflight", "prune", "registry", "rename", "review", "spawn",
+                     "status", "watch"):
+            with self.subTest(command=name):
+                self.assertTrue(hasattr(o, f"cmd_{name}"))
+        done = subprocess.run(
+            [sys.executable, str(SCRIPT), "adopt", "/tmp/does-not-exist"],
+            capture_output=True, text=True, env={**os.environ, "XDG_STATE_HOME": tempfile.mkdtemp()},
+        )
+        self.assertNotIn("KeyError", done.stderr)
+
+    def test_watch_clears_the_memo_between_sweeps(self):
+        args = argparse.Namespace(repo=[], base="main", alert=False, once=False, interval=1)
+        seen: list[dict] = []
+
+        def sweep(_args):
+            seen.append(dict(o._MEMO))
+            o._MEMO["sweep"] = len(seen)
+            if len(seen) == 2:
+                raise SystemExit(0)
+            return []
+
+        with patch.object(o, "show_stalls", side_effect=sweep), patch.object(o.time, "sleep", return_value=None):
+            with self.assertRaises(SystemExit):
+                o.cmd_watch(args)
+        self.assertEqual(seen, [{}, {}])
+
+    def test_draft_pull_request_is_in_progress_not_mergeable(self):
+        pull = o.PullRequest(number=1, state="OPEN", mergeable="MERGEABLE", merge_state="CLEAN",
+                             draft=True, files=1)
+        wt = o.Worktree(path=Path("/wt"), repo=Path("/repo"), branch="b", dirty=0, ahead=1,
+                        upstream="origin/b", slug="o/n", pull=pull)
+        self.assertEqual(o.step_for(wt, True, True), "BUILD")
+
+    def test_plan_with_a_trailing_blank_line_still_hardens(self):
+        with tempfile.TemporaryDirectory() as root:
+            path = Path(root)
+            git = lambda *a: subprocess.run(GIT + list(a), cwd=path, capture_output=True, text=True, check=True)
+            git("init", "-q", "-b", "main")
+            (path / "PLAN.md").write_text("# plan\n")
+            git("add", "PLAN.md")
+            git("commit", "-q", "-m", "plan")
+            sha = git("rev-parse", "HEAD").stdout.strip()
+            (path / "PLAN.md").write_text(f"# plan\n\n<!-- hardened: {sha} -->\n")
+            git("commit", "-qam", "marker")
+            self.assertTrue(o.plan_hardened(path))
+            self.assertFalse(o.plan_hardened(Path("/tmp")) or o.plan_hardened(path / "nope"))
+
+    def test_classifier_guard_refuses_empty_and_unreadable_evidence(self):
+        self.assertEqual(o.classify("BUILD", ""), ("not_sure", "empty pane"))
+        self.assertEqual(o.classify("BUILD", "   \n"), ("not_sure", "empty pane"))
+        self.assertEqual(o.classify("BUILD", "<unreadable: pane gone>"), ("not_sure", "unreadable pane"))
+        self.assertEqual(o.classify("BUILD", "some evidence"), ("not_sure", "no classifier client configured"))
+
+    def test_classifier_prompt_ships_the_glossary(self):
+        prompt = o.classifier_prompt("MRG", "PR #13 merged")
+        for step in ("PLAN", "HRD", "BUILD", "REV", "REB", "MRG", "DONE", "IDLE"):
+            self.assertIn(f"{step}:", prompt)
+        self.assertIn("PR #13 merged", prompt)
+
+    def test_known_registry_entry_is_updated_not_silently_kept(self):
+        entries: dict = {}
+        o.register_entry(entries, "/tmp/x", {"repo": "/r", "task": "first"})
+        o.register_entry(entries, "/tmp/x", {"repo": "/r", "task": "second"})
+        self.assertEqual(entries["/tmp/x"]["task"], "second")
+        self.assertEqual(entries["/tmp/x"]["name"], "m1")
+        self.assertEqual(entries["next_name"], 2)
+
+    def test_alert_state_survives_a_truncated_file(self):
+        with tempfile.TemporaryDirectory() as state:
+            alert_file = Path(state) / "alerted.json"
+            alert_file.write_text("{not json")
+            with patch.object(o, "ALERT_FILE", alert_file), patch.object(o, "STATE_DIR", Path(state)), patch.object(o, "ok", return_value=True):
+                o.alert_new([{
+                    "name": "m1", "step": "BUILD", "title": "t", "idle_seconds": 90,
+                    "last_commit": "s", "commit_age": 120, "dirty": 0, "pr": "none",
+                    "checks": "none", "question": "no", "tail": "-",
+                }])
+            self.assertEqual(json.loads(alert_file.read_text()), {"m1:BUILD": ["m1", "BUILD"]})
 if __name__ == "__main__":
     unittest.main()

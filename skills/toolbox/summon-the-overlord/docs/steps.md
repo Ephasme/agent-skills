@@ -1,12 +1,14 @@
 # Worktree steps
 
 A label is `<symbol> <STEP> <name> <title>`, built only from step facts and the registry identity
-recorded at birth: `⚒ BUILD m2 feat-prompt-and-spawn-labelling`. Identity is the `name` field and the
-label is the only place it is rendered; registry titles never carry it. herdr's agent state stays in
-herdr: it is never copied into a label or a registry field.
+recorded at birth: `⚒ WORK m1 overlord-rust-port`. The left panel prints that workspace label
+verbatim; the agent panel prints the `step`, `name` and `title` tokens, which carry the same content
+with no parentheses. herdr's agent state stays in herdr: it is never copied into a label or a
+registry field.
 
-A pull request title is the one place the id appears in parentheses, appended by whoever opens the
-PR: `summon-the-overlord: enforced plan mode (m2)`, never twice.
+The minion id in parentheses belongs to one place only, the pull request title, appended by the
+minion that opens it: `summon-the-overlord: enforced plan mode (m2)`. Never in a label, a pane token
+or a registry title.
 
 Slugs are tool-first, target second: `ocr-review-pr13`. Spawn derives the title from the task's first
 words; pass `--title` when the job is better named than its brief.
@@ -84,6 +86,24 @@ state directory and cleared when agent state or step changes. The tool alerts on
 respawns or kills on its own. Ask a human only for genuinely irreversible actions or conflicting
 evidence: force-push, merge with failing or unknown checks, deleting uncommitted work, an ambiguous
 target.
+
+## Stale-label classifier
+
+Primary `deepseek/deepseek-v4.1-flash-1017`, fallback `openai/gpt-5-mini`, both in `models.allowed`
+and both printed by `models`. The pick rests on error direction and cost, not on an accuracy win:
+batch 0.960 [0.902-0.984] against Mini's 0.890 [0.814-0.937], false-updated 11 against 22 per 1000
+(the silent error, at half the rate), 11.6 against 95.6 micro-USD per 1000 bare-API calls. Those
+intervals overlap; do not claim an accuracy win.
+
+The step glossary ships inside the prompt. It fixed MRG-with-merged-PR for both finalists and broke
+the completed-rebase case: on the 40-case fixture DeepSeek went 0.900 to 0.970 and Mini stayed
+neutral, so the glossary is a requirement with a known cost.
+
+The guard is code, before any call: no pane, an empty pane or an unreadable one returns `not_sure`
+with its reason and never reaches a model, because both finalists answer `updated` on empty
+evidence — the one failure that leaves a stale label lying. A sweep with nothing stale spends
+nothing; cost per sweep is `stale minions × 11.6 micro-USD`. The call has its own timeout (median
+7.3 s, tail past 100 s) and never blocks the sweep from finishing.
 
 ## Test cases
 
