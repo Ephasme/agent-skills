@@ -541,6 +541,61 @@ def paint(step: str, title: str) -> str:
     return f"{symbol} {step} {title} [{colour}]"[:64]
 
 
+BUG_WORDS = ("fix", "bug", "crash", "broken", "regression", "panic", "error", "flake", "hotfix")
+FEATURE_WORDS = ("feat", "add", "implement", "design", "redesign", "support", "introduce")
+ASK_WORDS = ("explain", "what is", "why does", "how does", "compare", "cite", "fact-check")
+
+
+def recent_text(wt: Worktree, args: argparse.Namespace) -> str:
+    """Deterministic evidence: commit subjects since the base, plus an optional transcript tail."""
+    parts = [run(["git", "-C", str(wt.path), "log", "--format=%s", f"origin/{args.base}..HEAD"])]
+    parts.append(str(wt.pull.head if wt.pull else ""))
+    if args.transcript:
+        try:
+            tail = Path(args.transcript).read_text(errors="ignore")[-20000:]
+        except OSError:
+            tail = ""
+        parts.append(tail)
+    return " ".join(parts).lower()
+
+
+def pick_mode(wt: Worktree, text: str, proposed: bool, args: argparse.Namespace) -> tuple[str, str]:
+    """Mode and step from evidence alone: same facts in, same answer out."""
+    words = sum(1 for _ in text.split())
+    small = wt.ahead <= 1 and wt.dirty <= 2 and (wt.pull.files if wt.pull else 0) <= 3
+    bug = any(word in text for word in BUG_WORDS)
+    feature = any(word in text for word in FEATURE_WORDS) or proposed
+    if wt.dirty == 0 and wt.ahead == 0 and not wt.pull and not proposed:
+        return "ask", "SEE"
+    if bug and small and not proposed:
+        return "hotfix", "WORK"
+    if feature and (proposed or wt.ahead > 1 or words > 40):
+        return "feat", "WORK"
+    return "fast", "WORK"
+
+
+def cmd_mode(args: argparse.Namespace) -> int:
+    """Say which mode a piece of work belongs to and which step it is at."""
+    print("#path\tmode\tstep\tevidence")
+    overall = "ask"
+    for wt in collect(args.repo, args.base):
+        proposed, hardened, pane_text = plan_state(wt)
+        text = recent_text(wt, args) + " " + pane_text
+        mode, chosen = pick_mode(wt, text, proposed, args)
+        step = step_for(wt, proposed, hardened, pane_text)
+        if mode != "ask" and step in {"SEE", "DONE"}:
+            step = chosen
+        if mode == "feat" and overall in {"ask", "fast", "hotfix"}:
+            overall = "feat"
+        elif mode == "hotfix" and overall == "ask":
+            overall = "hotfix"
+        elif mode == "fast" and overall == "ask":
+            overall = "fast"
+        print(f"{wt.path}\t{mode}\t{step}\t{wt.branch} dirty {wt.dirty} ahead {wt.ahead}")
+    print(f"overall\t{overall}")
+    return 0
+
+
 def cmd_rename(args: argparse.Namespace) -> int:
     """Prefix every worktree and pane with its step symbol, then say what it is about."""
     by_path, _by_ws = herdr_facts()
@@ -756,6 +811,9 @@ def main(argv: list[str]) -> int:
     ):
         subs.add_parser(name, help=help_text, add_help=False)
 
+    mode = subs.add_parser("mode", help="which mode a worktree belongs to, and its step")
+    mode.add_argument("--transcript", default="", help="session transcript to read for intent keywords")
+
     adopt = subs.add_parser("adopt", help="take over existing worktrees or workspaces")
     adopt.add_argument("targets", nargs="+", help="workspace id (w1) or checkout path")
     adopt.add_argument("--task", default="", help="what the worktree is for")
@@ -798,6 +856,7 @@ def main(argv: list[str]) -> int:
         "preflight": cmd_preflight,
         "registry": cmd_registry,
         "adopt": cmd_adopt,
+        "mode": cmd_mode,
         "spawn": cmd_spawn,
         "inventory": cmd_inventory,
         "order": cmd_order,

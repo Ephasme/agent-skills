@@ -29,6 +29,25 @@ into the next pass.
 Starting a job means creating a worktree and giving one worker the task: `git worktree add -b
 worktree/<slug> <path> origin/<base>`, then start an agent there and hand it the task. In `hotfix`
 the repro comes first, as the first instruction, so the worker watches the failure before fixing it.
+## Pick the mode yourself
+
+```bash
+"$SKILL_DIR/scripts/overlord.py" mode [--transcript SESSION.jsonl]
+```
+
+Never ask which mode a job is: derive it. `mode` reads the work itself — branch, commits since the
+base, dirty count, PR size, plan banners, and the transcript when one is given — and prints the mode
+plus the step per worktree, with the evidence it used:
+
+|signal|mode|step|
+|---|---|---|
+|nothing dirty, nothing ahead, no PR, no plan|`ask`|`SEE`|
+|bug words in the commits or the conversation, one commit or two files, no plan|`hotfix`|`WORK`, with the repro unanswered|
+|a plan, several commits, review evidence, more than one worktree|`feat`|the pipeline step|
+|anything else already in motion|`fast`|`WORK`|
+
+Same facts in, same answer out: the rules are ordered and fixed, and every row prints why it chose.
+
 ## Preflight
 
 ```bash
