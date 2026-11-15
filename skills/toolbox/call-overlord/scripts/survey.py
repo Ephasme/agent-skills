@@ -141,47 +141,53 @@ def pane_facts(pane, lines):
 
 
 def git_facts(path):
-    facts = {"checkout": path}
-    rc, out, _ = git(path, "branch", "--show-current")
+    facts = {"checkout": path, "dirty": 0, "commits": [], "status": []}
+    code, out, err = git(path, "branch", "--show-current")
     facts["branch"] = out or None
-    rc, out, _ = git(path, "log", "--oneline", "-8", "--no-decorate")
-    facts["commits"] = [line for line in out.splitlines() if line]
-    rc, out, _ = git_raw(path, "status", "--short")
-    rows = [line.rstrip() for line in out.splitlines() if line.strip()]
-    facts["status"] = rows[:20]
-    facts["dirty"] = len(rows)
-    rc, out, _ = git(path, "rev-parse", "--abbrev-ref", "@{u}")
-    facts["upstream"] = out if rc == 0 else None
+    if code != 0:
+        facts["error"] = err or "cannot read branch"
+    code, out, err = git(path, "log", "--oneline", "-8", "--no-decorate")
+    if code == 0:
+        facts["commits"] = [line for line in out.splitlines() if line]
+    elif "error" not in facts:
+        facts["error"] = err or "cannot read commits"
+    code, out, err = git_raw(path, "status", "--short")
+    if code == 0:
+        rows = [line.rstrip() for line in out.splitlines() if line.strip()]
+        facts["status"] = rows[:20]
+        facts["dirty"] = len(rows)
+    elif "error" not in facts:
+        facts["error"] = err or "cannot read status"
+    code, out, _ = git(path, "rev-parse", "--abbrev-ref", "@{u}")
+    facts["upstream"] = out if code == 0 else None
     if facts["upstream"]:
-        rc, out, _ = git(path, "rev-list", "--left-right", "--count", "@{u}...HEAD")
-        if rc == 0 and out:
-            behind, ahead = out.split()
-            facts["behind"], facts["ahead"] = int(behind), int(ahead)
+        code, out, _ = git(path, "rev-list", "--left-right", "--count", "@{u}...HEAD")
+        parts = out.split() if code == 0 else []
+        if len(parts) == 2 and all(part.isdigit() for part in parts):
+            facts["behind"], facts["ahead"] = int(parts[0]), int(parts[1])
         else:
             facts["behind"] = facts["ahead"] = 0
     return facts
 
 
-STEP_LABEL = re.compile(
-    r"^(?:\U0001F441|\U0001F5FA|\U0001F6E1|\u2692|\U0001F50D|\u27F3|\u2935|\u2714)\s+(SEE|PLAN|HRD|WORK|REV|REB|MRG|DONE)\b"
-)
-
-REGISTRY = Path.home() / ".local" / "state" / "call-overlord" / "worktrees.json"
+REGISTRY = Path(os.environ.get("XDG_STATE_HOME", Path.home() / ".local" / "state")) / "call-overlord" / "worktrees.json"
 
 
 def owned_paths():
     """Worktrees the overlord registers as its own; empty when it has spawned none."""
-    try:
-        return {str(Path(path)) for path in json.loads(REGISTRY.read_text())}
-    except (OSError, json.JSONDecodeError):
+    if not REGISTRY.exists():
         return set()
-
-def is_mine(entry):
-    """True for a worktree the overlord maintains: its label carries a step prefix."""
-    return bool(STEP_LABEL.match(entry.get("label") or ""))
+    try:
+        data = json.loads(REGISTRY.read_text())
+    except (OSError, json.JSONDecodeError) as error:
+        raise SystemExit("registry unreadable (%s): %s" % (REGISTRY, error))
+    if not isinstance(data, dict):
+        raise SystemExit("registry is not an object (%s)" % REGISTRY)
+    return {str(Path(path)) for path in data}
 
 def survey(lines, only, mine=False):
     out = {"generated_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"), "targets": [], "skipped": []}
+    owned = owned_paths() if mine else set()
     for ws in herdr_json("workspace", "list")["workspaces"]:
         worktree = ws.get("worktree") or {}
         entry = {
@@ -199,14 +205,29 @@ def survey(lines, only, mine=False):
         if only and entry["workspace_id"] not in only:
             continue
         path = worktree.get("checkout_path")
-        if mine and str(Path(path or "").resolve()) not in owned_paths():
+        if mine and str(Path(path or "").resolve()) not in owned:
             out["skipped"].append(dict(entry, why="not registered as an overlord worktree"))
             continue
         if not path or not os.path.isdir(path):
             out["skipped"].append(dict(entry, why="checkout folder missing: %s" % path))
             continue
         entry.update(git_facts(path))
-        entry["panes"] = [pane_facts(p, lines) for p in herdr_json("pane", "list", "--workspace", entry["workspace_id"])["panes"]]
+        panes = []
+        try:
+            listed = herdr_json("pane", "list", "--workspace", entry["workspace_id"])["panes"]
+        except SystemExit as error:
+            listed = []
+            entry["error"] = str(error)
+        for pane in listed:
+            try:
+                panes.append(pane_facts(pane, lines))
+            except SystemExit as error:
+                panes.append({
+                    "pane_id": pane.get("pane_id"), "agent": pane.get("agent"),
+                    "agent_status": pane.get("agent_status"), "title": "",
+                    "todo": [], "marked": [], "tail": [], "error": str(error),
+                })
+        entry["panes"] = panes
         out["targets"].append(entry)
     return out
 
