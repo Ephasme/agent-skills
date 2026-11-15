@@ -86,13 +86,15 @@ def cmd_adopt(args: argparse.Namespace) -> int:
         if not path.is_dir():
             print(f"{target}\t{path}\t-\tmissing")
             continue
-        repo = Path(run(["git", "-C", str(path), "rev-parse", "--show-toplevel"]) or path)
-        branch = run(["git", "-C", str(path), "rev-parse", "--abbrev-ref", "HEAD"]) or "-"
+        toplevel = run(["git", "-C", str(path), "rev-parse", "--show-toplevel"])
+        repo = Path(toplevel) if toplevel else path
+        branch = run(["git", "-C", str(path), "rev-parse", "--abbrev-ref", "HEAD"]) or "-" if toplevel else "-"
         resolved = str(path.resolve())
         if resolved in entries:
             print(f"{target}\t{path}\t{branch}\talready owned")
             continue
-        entries[resolved] = {"repo": str(repo), "branch": branch, "mode": "adopted", "task": args.task}
+        kind = "git" if toplevel else "dir"
+        entries[resolved] = {"repo": str(repo), "branch": branch, "mode": "adopted", "task": args.task, "kind": kind}
         adopted += 1
         print(f"{target}\t{path}\t{branch}\tadopted")
     if adopted:
@@ -312,6 +314,7 @@ class Worktree:
     pull: PullRequest | None
     agent: str = "-"
     pane: str = "-"
+    vcs: bool = True
 
 
 def registry_repos() -> list[Path]:
@@ -330,6 +333,20 @@ def collect(repos: list[Path], base: str) -> list[Worktree]:
             print(f"not a git repository: {repo}", file=sys.stderr)
             continue
         registry_paths = {Path(path) for path in registry()}
+        for path in sorted(registry_paths):
+            if path in seen or not path.is_dir():
+                continue
+            if run(["git", "-C", str(path), "rev-parse", "--git-dir"]):
+                continue
+            seen.add(path)
+            workspace = by_path.get(str(path.resolve()), "")
+            agent, pane = by_ws.get(workspace, ("-", "-")) if workspace else ("-", "-")
+            rows.append(
+                Worktree(
+                    path=path, repo=path, branch="-", dirty=0, ahead=0, upstream="none",
+                    slug="", pull=None, agent=agent, pane=pane, vcs=False,
+                )
+            )
         for path in worktree_paths(repo) + [p for p in registry_paths if p.parent.parent == repo.parent or True]:
             if not path.is_dir() or path in seen:
                 continue
@@ -360,6 +377,8 @@ def collect(repos: list[Path], base: str) -> list[Worktree]:
 
 def landable(wt: Worktree) -> str:
     """Empty when landed or empty; otherwise why it still holds work."""
+    if not wt.vcs:
+        return ""
     if wt.dirty:
         return "dirty"
     if wt.pull and wt.pull.state == "OPEN":
@@ -514,6 +533,12 @@ def short_title(wt: Worktree) -> str:
 
 def step_for(wt: Worktree, proposed: bool, hardened: bool, pane_text: str) -> str:
     """The one stage this worktree is at, from landed back to looking around."""
+    if not wt.vcs:
+        if proposed and not hardened:
+            return "HRD"
+        if proposed and hardened:
+            return "REV"
+        return "PLAN" if "plan mode" in pane_text else "WORK"
     if wt.pull and wt.pull.state == "MERGED":
         return "DONE"
     if wt.pull and wt.pull.state == "OPEN":
@@ -683,6 +708,8 @@ def cmd_plans(args: argparse.Namespace) -> int:
 def cmd_prune(args: argparse.Namespace) -> int:
     print("#path\tbranch\tpr\taction")
     for wt in collect(args.repo, args.base):
+        if not wt.vcs:
+            continue
         if not wt.pull or wt.pull.state != "MERGED" or wt.dirty or wt.agent in {"working", "blocked"}:
             continue
         print(f"{wt.path}\t{wt.branch}\t{wt.pull.number}\tremove")

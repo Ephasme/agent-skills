@@ -48,6 +48,22 @@ plus the step per worktree, with the evidence it used:
 
 Same facts in, same answer out: the rules are ordered and fixed, and every row prints why it chose.
 
+## Targets that are not repositories
+
+A directory with no git in it is still a target: `adopt /some/folder` registers it, and the pass
+keeps it in the inventory with its VCS facts off (`branch -`, zero ahead, no PR). What that switches
+off, exactly:
+
+|feature|without git|
+|---|---|
+|branch, ahead, upstream, dirty count, PR state|absent: shown as `-`|
+|merge, rebase, readiness|not applicable: `status` never counts it as landable|
+|prune|never removes it|
+|rename, review, plans, mail, modes|unchanged: they only need herdr and the pane|
+
+The same target stays visible so its agent is still asked, reviewed and renamed — only the merge half
+of the pipeline disappears. Nothing is guessed to fill the gap.
+
 ## Preflight
 
 ```bash
