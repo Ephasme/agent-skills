@@ -478,12 +478,9 @@ class Github:
         """Whether this token can see the repository at all: what makes its PRs invisible."""
         return self.client.get(f"{API}/repos/{slug}").status_code == 200
 
-    def detail(self, slug: str, number: int) -> PullRequest | None:
-        response = self.client.get(f"{API}/repos/{slug}/pulls/{number}")
-        if response.status_code != 200:
-            return None
-        pull = pull_from_json(response.json())
-        files = self.client.get(f"{API}/repos/{slug}/pulls/{number}/files", params={"per_page": 100})
+    def with_paths(self, slug: str, pull: PullRequest) -> PullRequest:
+        """The pull request with its touched files: one request, not a second fetch of the row."""
+        files = self.client.get(f"{API}/repos/{slug}/pulls/{pull.number}/files", params={"per_page": 100})
         if files.status_code == 200:
             pull.paths = [item.get("filename", "") for item in files.json() if item.get("filename")]
         return pull
@@ -725,7 +722,7 @@ def cmd_order(args: argparse.Namespace) -> int:
             checkouts.setdefault(branch, path)
         # every open pull request counts, checked out locally or not: one whose worktree was
         # pruned is still work this pass owes, not a pull request to abandon silently
-        pulls = [pull for pull in (github.detail(slug, pull.number) for pull in github.open_pulls(slug)) if pull]
+        pulls = [github.with_paths(slug, pull) for pull in github.open_pulls(slug)]
         groups = clusters(pulls)
         by_head = {pull.head: pull for pull in pulls}
         for pull in pulls:
