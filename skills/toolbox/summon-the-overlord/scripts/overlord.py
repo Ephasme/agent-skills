@@ -77,7 +77,9 @@ def model_policy() -> tuple[list[str], str]:
         # a scalar would iterate into characters and refuse every model with "use one of: o, p…"
         configured = DEFAULT_ALLOWED
     allowed = [str(name) for name in configured]
-    default = str(models.get("default") or WORKER_MODEL)
+    configured_default = str(models.get("default") or WORKER_MODEL)
+    # a custom allow-list excluding the worker model must still have a usable default
+    default = configured_default if configured_default in allowed else allowed[0]
     return allowed, default
 
 
@@ -126,7 +128,8 @@ def register_entry(entries: dict, path: str, meta: dict, title: str = "") -> Non
     """Register a path, or update the fields a caller supplied: identity is never reassigned."""
     known = entries.get(path)
     if known is not None:
-        known.update({key: value for key, value in meta.items() if value})
+        # callers omit unknown fields; supplied empty values are deliberate clears
+        known.update(meta)
         if title:
             known["title"] = title[:64]
         return
@@ -135,19 +138,19 @@ def register_entry(entries: dict, path: str, meta: dict, title: str = "") -> Non
     meta["title"] = (title or title_slug(meta.get("task", "") or Path(path).name))[:64]
     entries[path] = meta
 
+def registry_paths(entries: dict) -> dict[str, dict]:
+    """Entries keyed by worktree path; next_name is allocator bookkeeping, never a path."""
+    return {key: value for key, value in entries.items() if key != "next_name" and isinstance(value, dict)}
+
 
 def backfill_names(entries: dict) -> bool:
     changed = False
     if "next_name" not in entries:
-        numbers = [int(meta["name"][1:]) for key, meta in entries.items()
-                   if key != "next_name" and isinstance(meta, dict)
-                   and re.fullmatch(r"m[1-9][0-9]*", meta.get("name", ""))]
+        numbers = [int(meta["name"][1:]) for meta in registry_paths(entries).values()
+                   if isinstance(meta.get("name"), str) and re.fullmatch(r"m[1-9][0-9]*", meta["name"])]
         entries["next_name"] = max(numbers, default=0) + 1
         changed = True
-    for path in sorted(key for key in entries if key != "next_name"):
-        meta = entries[path]
-        if not isinstance(meta, dict):
-            continue
+    for path, meta in sorted(registry_paths(entries).items()):
         if "name" not in meta:
             meta["name"] = f"m{entries['next_name']}"
             entries["next_name"] += 1
@@ -367,23 +370,20 @@ def cmd_adopt(args: argparse.Namespace) -> int:
         meta = {"repo": str(repo), "branch": branch, "mode": "adopted", "task": args.task, "kind": kind}
         title = args.task or (run(["git", "-C", str(path), "log", "-1", "--format=%s"]) if toplevel else "") or path.name
         register_entry(entries, resolved, meta, title)
+        save_registry(entries)
         adopted += 1
         print(f"{target}\t{path}\t{branch}\tadopted\t{relocate(path, places, agents, realm)}")
-    if adopted:
-        save_registry(entries)
-    print(f"\nowned worktrees: {len([key for key in entries if key != 'next_name'])}")
-    return 0 if adopted or len(entries) > (1 if "next_name" in entries else 0) else 1
+    print(f"\nowned worktrees: {len(registry_paths(entries))}")
+    return 0 if adopted or registry_paths(entries) else 1
 
 
 def cmd_registry(args: argparse.Namespace) -> int:
     entries = registry()
     if args.path:
-        for path in entries:
-            if path != "next_name":
-                print(path)
+        for path in registry_paths(entries):
+            print(path)
         return 0
     if args.add:
-        entries = registry()
         for path in args.add:
             resolved = str(Path(path).expanduser().resolve())
             register_entry(entries, resolved, {
@@ -408,9 +408,7 @@ def cmd_registry(args: argparse.Namespace) -> int:
             if (ws.get("worktree") or {}).get("checkout_path")
         } if os.environ.get("HERDR_ENV") == "1" else {}
         print("#workspace\tlabel\tpath")
-        for path, meta in sorted(entries.items()):
-            if path == "next_name":
-                continue
+        for path, meta in sorted(registry_paths(entries).items()):
             workspace = by_path.get(str(Path(path).resolve()), "-")
             print(f"{workspace}\t{labels.get(str(Path(path).resolve()), meta.get('task', ''))[:40]}\t{path}")
         return 0
@@ -749,20 +747,20 @@ def _collect(repos: list[Path], base: str) -> list[Worktree]:
     seen: set[Path] = set()
     identities = {
         str(Path(path).resolve()): meta
-        for path, meta in registry().items() if path != "next_name"
+        for path, meta in registry_paths(registry()).items()
     }
     repos = realm_repos(repos)
     for repo in repos:
         if not run(["git", "-C", str(repo), "rev-parse", "--git-dir"]):
             print(f"not a git repository: {repo}", file=sys.stderr)
             continue
-        registry_paths = {Path(path) for path in identities}
+        registered_paths = {Path(path) for path in identities}
         registered = {
             Path(path)
             for path, meta in identities.items()
             if meta.get("repo") and Path(meta["repo"]).resolve() == repo.resolve()
         }
-        for path in sorted(registry_paths):
+        for path in sorted(registered_paths):
             if path in seen or not path.is_dir():
                 continue
             if run(["git", "-C", str(path), "rev-parse", "--git-dir"]):
@@ -1450,7 +1448,7 @@ def cmd_plans(args: argparse.Namespace) -> int:
 
 def cmd_prune(args: argparse.Namespace) -> int:
     print("#path\tbranch\tpr\taction")
-    registered = {str(Path(path).resolve()) for path in registry()}
+    registered = {str(Path(path).resolve()) for path in registry_paths(registry())}
     for wt in collect(args.repo, args.base):
         # the registry is the only source of ownership: a worktree this overlord never
         # adopted or spawned is not its to delete

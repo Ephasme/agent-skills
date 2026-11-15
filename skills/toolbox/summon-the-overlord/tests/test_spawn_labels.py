@@ -894,5 +894,65 @@ class SecondReviewTests(unittest.TestCase):
             ), patch.object(o, "ok", side_effect=writes_nothing), patch("sys.stdout", new_callable=io.StringIO):
                 self.assertEqual(o.cmd_review(argparse.Namespace(repo=[Path("/repo")], base="main")), 1)
             self.assertEqual(o.review_state("o/n", pull), "missing")
-if __name__ == "__main__":
+    def test_default_is_in_custom_allow_list(self):
+        with tempfile.TemporaryDirectory() as home:
+            config = Path(home) / "config.yaml"
+            config.write_text("models:\n  allowed:\n    - openai/gpt-5-mini\n")
+            with patch.object(o, "CONFIG_FILE", config):
+                allowed, default = o.model_policy()
+        self.assertEqual(allowed, ["openai/gpt-5-mini"])
+        self.assertEqual(default, "openai/gpt-5-mini")
+
+    def test_invalid_name_value_does_not_break_registry_backfill(self):
+        entries = {"/bad": {"name": None}, "next_name": 1}
+        self.assertTrue(o.backfill_names(entries))
+        self.assertEqual(entries["/bad"]["name"], "m1")
+
+    def test_empty_fields_clear_a_known_registry_entry(self):
+        entries = {"/x": {"name": "m1", "task": "old", "pr_owner": "m2"}, "next_name": 2}
+        o.register_entry(entries, "/x", {"task": "", "pr_owner": ""})
+        self.assertEqual(entries["/x"]["task"], "")
+        self.assertEqual(entries["/x"]["pr_owner"], "")
+        self.assertEqual(o.registry_paths(entries), {"/x": entries["/x"]})
+
+    def test_relocate_reports_plan_mode_failure_and_still_prompts_resume(self):
+        record = {"agent_session": {"value": "/tmp/s"}}
+        with patch.object(o, "resolve_model", return_value=("m", "")), patch.object(o, "start_agent", return_value=True), patch.object(
+            o, "registry", return_value={"/tmp/w": {"mode": "adopted"}}
+        ), patch.object(o, "plan_hardened", return_value=False), patch.object(
+            o.Path, "is_file", return_value=True
+        ), patch.object(o, "enter_plan_mode", return_value=False), patch.object(
+            o, "ok", return_value=True
+        ) as accepted:
+            result = o.resume_agent(record, "p", Path("/tmp/w"))
+        self.assertIn("plan mode did not engage", result)
+        self.assertTrue(any("agent prompt" in " ".join(call.args[0]) for call in accepted.call_args_list))
+
+    def test_preflight_apply_never_brews_ocr(self):
+        installable = {name: flag for name, _cmd, _fix, flag in o.DEPENDENCIES}
+        self.assertFalse(installable["ocr"])
+        self.assertTrue(installable["uv"])
+
+    def test_review_does_not_route_partial_findings_when_ocr_failed(self):
+        with tempfile.TemporaryDirectory() as state:
+            review_dir = Path(state) / "review"
+            review_dir.mkdir(parents=True)
+            pull = o.PullRequest(number=13, state="OPEN", mergeable="MERGEABLE", merge_state="CLEAN",
+                                 draft=False, files=1, sha="c" * 40, head="h")
+            wt = o.Worktree(path=Path("/wt"), repo=Path("/repo"), branch="b", dirty=0, ahead=1,
+                            upstream="origin/b", slug="o/n", pull=pull, pane="p")
+
+            def write_partial(_argv, **_kwargs):
+                (review_dir / "o-n-13.txt").write_text("partial")
+                return False
+
+            with patch.object(o, "REVIEW_DIR", review_dir), patch.object(o, "ocr_present", return_value=True), patch.object(
+                o, "collect", return_value=[wt]
+            ), patch.object(o, "plan_state", return_value=(False, False)), patch.object(
+                o, "step_for", return_value="REV"
+            ), patch.object(o, "ok", side_effect=write_partial), patch.object(
+                o, "findings", return_value=[("high", "partial defect")]
+            ), patch("sys.stdout", new_callable=io.StringIO) as output:
+                self.assertEqual(o.cmd_review(argparse.Namespace(repo=[Path("/repo")], base="main")), 1)
+            self.assertNotIn("## findings", output.getvalue())
     unittest.main()
