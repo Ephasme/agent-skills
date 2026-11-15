@@ -51,6 +51,7 @@ CONFIG_FILE = OVERLORD_DIR / "config.yaml"
 CACHE_DIR = OVERLORD_DIR / "caches"
 DISCOVERY_CACHE = CACHE_DIR / "discovery.yaml"
 DISCOVERY_TTL_HOURS = 24
+PROMPTS = Path(__file__).resolve().parent.parent / "prompts"
 
 
 def registry() -> dict[str, dict[str, str]]:
@@ -1108,6 +1109,28 @@ def cmd_discover(args: argparse.Namespace) -> int:
 
 
 
+def handover(mode: str, task: str) -> str | None:
+    """The text a worker starts from: preamble, mode prompts, task.
+
+    A prompt file that is missing or empty is reported and returns None: the worker would
+    otherwise start without the rules it is meant to obey.
+    """
+    names = ["preamble", "work"] + (["hotfix"] if mode == "hotfix" else [])
+    parts: list[str] = []
+    for name in names:
+        path = PROMPTS / f"{name}.md"
+        try:
+            text = path.read_text(encoding="utf-8").strip()
+        except OSError as exc:
+            print(f"prompt file unreadable: {path} ({exc.strerror})", file=sys.stderr)
+            return None
+        if not text:
+            print(f"prompt file empty: {path}", file=sys.stderr)
+            return None
+        parts.append(text)
+    return "\n\n".join(parts + [task])
+
+
 def cmd_spawn(args: argparse.Namespace) -> int:
     """Start a job: create its worktree, then print the one command that hands over the task."""
     if args.mode not in {"fast", "hotfix", "feat"}:
@@ -1116,25 +1139,26 @@ def cmd_spawn(args: argparse.Namespace) -> int:
     if not args.task:
         print("spawn needs --task", file=sys.stderr)
         return 2
+    text = handover(args.mode, args.task)
+    if text is None:
+        return 1
 
     repo = args.repo[0] if args.repo else Path.cwd()
     slug = "-".join(word for word in re.split(r"[^a-z0-9]+", args.task.lower()) if word and word not in STOP_WORDS)[:60] or "job"
     branch = f"worktree/{slug}"
     path = Path(args.dest).expanduser() / slug if args.dest else Path.home() / ".herdr" / "worktrees" / repo.name / slug
-    probe = "First write the failing test or a scripted repro for: " + args.task if args.mode == "hotfix" else ""
     print(f"#worktree\t{path}\nbranch\t{branch}\nmode\t{args.mode}")
     if args.dry_run:
         print(f"would run\tgit -C {repo} worktree add -b {branch} {path} origin/{args.base}")
-        return 0
-    if not ok(["git", "-C", str(repo), "worktree", "add", "-b", branch, str(path), f"origin/{args.base}"]):
+    elif not ok(["git", "-C", str(repo), "worktree", "add", "-b", branch, str(path), f"origin/{args.base}"]):
         print("worktree creation failed", file=sys.stderr)
         return 1
-    handover = " ".join(part for part in (probe, args.task) if part)
-    entries = registry()
-    entries[str(path.resolve())] = {"repo": str(repo), "branch": branch, "mode": args.mode, "task": args.task}
-    save_registry(entries)
-    print("next\tstart an agent in that path, then:")
-    print(f'\therdr agent prompt <pane> "{handover}" --wait --until idle')
+    else:
+        entries = registry()
+        entries[str(path.resolve())] = {"repo": str(repo), "branch": branch, "mode": args.mode, "task": args.task}
+        save_registry(entries)
+        print("next\tstart an agent in that path, then:")
+    print(f'\therdr agent prompt <pane> "{text}" --wait --until idle')
     return 0
 
 
@@ -1206,6 +1230,10 @@ def main(argv: list[str]) -> int:
     spawn.add_argument("--task", default="", help="what the worker should do")
     spawn.add_argument("--dry-run", action="store_true", help="print instead of creating")
     spawn.add_argument("--dest", default="", help="parent directory for the worktree (default ~/.herdr/worktrees/<repo>)")
+    # The same two flags as the top level, so `spawn … --repo PATH` reads as the table says;
+    # SUPPRESS keeps a value given before the subcommand instead of resetting it.
+    spawn.add_argument("--repo", action="append", default=argparse.SUPPRESS, help="repository to start the job in")
+    spawn.add_argument("--base", default=argparse.SUPPRESS, help="base branch for the worktree")
 
     for name, help_text in (
         ("survey", "survey every worktree: branch, commits, panes"),

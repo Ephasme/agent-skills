@@ -115,7 +115,12 @@ requests are named as invisible instead of missing.
 |`ask`|change nothing: answer only, with `/skill:cite-or-refuse` or `/skill:fact-check-document`|
 
 `overlord.py spawn --mode fast|hotfix --task "<what to build>"` creates the worktree and starts the
-worker; without `--task` the script prints the command it would run.
+worker; with `--dry-run` the script prints the command it would run and creates nothing.
+The handover is not the bare task: `spawn` reads `$SKILL_DIR/prompts/` and sends `preamble.md`,
+`work.md`, then the task, inserting `hotfix.md` between the rules and the task in `hotfix` mode so
+the repro is the first instruction the worker reads. A prompt file that is missing or empty stops
+`spawn` with the file named, rather than sending a shorter handover. Those files are runtime
+behaviour: edit them to change how a worker behaves, never as documentation.
 
 ## Reach: anywhere the tools work
 
@@ -215,9 +220,13 @@ herdr agent prompt <pane_id> "<instruction>" --wait --until idle --timeout 18000
 ```
 
 `needs-check`/`needs-pr`: rebase if stale, run the repo gate, commit its way, push, then `gh pr
-create -R <slug> --base <base> --head <branch> --fill`. `conflicting`: rebase, keep both intents,
-gate, `git push --force-with-lease`. `agent_blocked` owns a dialog: report it, type nothing.
-`no-agent`: do the git work yourself and say so.
+create -R <slug> --base <base> --head <branch> --fill`. `conflicting`: send it
+`$SKILL_DIR/prompts/rebase.md` with the two refs, then gate and `git push --force-with-lease`.
+`agent_blocked` owns a dialog: report it, type nothing. `no-agent`: do the git work yourself and say
+so.
+
+Defects are chased with `$SKILL_DIR/prompts/review.md`: trace an input through the change, anchor
+each finding at `file:line`, fix at most twice.
 
 ## Review by OCR, then chase the fixes
 
