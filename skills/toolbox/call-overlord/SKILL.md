@@ -21,6 +21,9 @@ disable-model-invocation: true
 **Explicit invocation only.** A pass merges pull requests, which cannot be undone by a resolver.
 Where `disable-model-invocation` is ignored, this paragraph is the rule.
 
+It merges inside the realm only: what you named, adopted, spawned or opened in herdr. Discovery
+enumerates checkouts and authorizes nothing.
+
 `$SKILL_DIR` is notation, not a set variable: this skill's directory, the one holding this `SKILL.md`.
 
 Every fact and every ordering decision comes from `$SKILL_DIR/scripts/overlord.py`. Run it, read its
@@ -89,7 +92,7 @@ needs a human.
 
 ## Discovery: only the roots you name
 
-A pass covers `--repo`, the ownership registry, and the repositories discovery found. Nothing is
+A pass reports on `--repo`, the ownership registry, and the repositories discovery found. Nothing is
 found until `~/.overlord/config.yaml` names the directories to look in:
 
 ```yaml
@@ -103,6 +106,11 @@ token can read it — and writes `~/.overlord/caches/discovery.yaml`. That cache
 24 h, then a rescan replaces it; `discover --refresh` rescans now, and `--root DIR` scans a root the
 config does not name. A repository the token cannot read stays listed as `gh no`, so its pull
 requests are named as invisible instead of missing.
+
+A repository enters the realm when you name it with `--repo`, adopt it, spawn a job in it, or hold
+it open in herdr — the last without an `adopt`. `order` plans that set alone and names the rest as
+`#note not in realm, not planned: …`; `status` reads the same gate, and `prune` deletes only what the
+registry owns.
 
 
 ## Jobs: pick a mode first
@@ -197,13 +205,13 @@ Never rewrite another agent's plan file; the harden skill carries its own revisi
 
 ## Order by touched files, and merge everything
 
-`order` prints the merge plan: clusters of PRs whose files intersect, smallest file set first, a
-stacked PR after its base, and the blockers that hold each one back. Every open PR of every
-repository in scope is listed, checked out locally or not; the `worktree` column names the local
+`order` prints the merge plan for the realm: clusters of PRs whose files intersect, smallest file set
+first, a stacked PR after its base, and the blockers that hold each one back. Every open PR of every
+realm repository is listed, checked out locally or not; the `worktree` column names the local
 checkout or `-`, which is a PR to adopt a worktree for, not one to skip. Merge in that printed order.
 
-Ordering exists only to minimise conflicts: **every open PR ends merged.** A PR that is not `ready`
-yet is a job for the next pass, never a candidate to abandon.
+Ordering exists only to minimise conflicts: **every open PR of the realm ends merged.** A PR that is
+not `ready` yet is a job for the next pass, never a candidate to abandon.
 
 ```bash
 gh pr merge <n> -R <slug> --squash --delete-branch
