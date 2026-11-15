@@ -53,7 +53,7 @@ def sh(cmd, cwd=None, env=None):
 def gh_token(slug):
     """The token of the gh login that reaches slug, or "" when the resolver is unavailable.
 
-    Who's who is settled by overlord's discovery. A standalone run of this script has no
+    Who's who is settled by overlord's credential(). A standalone run of this script has no
     httpx, so it keeps the active account, as before.
     """
     try:
@@ -304,7 +304,7 @@ def herdr_json(*args):
     return json.loads(done.stdout)["result"]
 
 
-REGISTRY = Path(os.environ.get("XDG_STATE_HOME", Path.home() / ".local" / "state")) / "call-overlord" / "worktrees.json"
+REGISTRY = Path(os.environ.get("XDG_STATE_HOME", Path.home() / ".local" / "state")) / "summon-the-overlord" / "worktrees.json"
 
 
 def owned_paths():

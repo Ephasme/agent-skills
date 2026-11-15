@@ -170,7 +170,7 @@ def git_facts(path):
     return facts
 
 
-REGISTRY = Path(os.environ.get("XDG_STATE_HOME", Path.home() / ".local" / "state")) / "call-overlord" / "worktrees.json"
+REGISTRY = Path(os.environ.get("XDG_STATE_HOME", Path.home() / ".local" / "state")) / "summon-the-overlord" / "worktrees.json"
 
 
 def owned_paths():
