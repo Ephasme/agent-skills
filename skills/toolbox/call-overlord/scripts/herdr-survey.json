@@ -1,0 +1,98 @@
+{
+  "generated_at": "2026-11-15T09:29:14+0100",
+  "targets": [
+    {
+      "workspace_id": "wRC",
+      "label": "audited-line-edit-tool",
+      "agent_status": "working",
+      "repo": "overseer",
+      "checkout": "/Users/loup/.herdr/worktrees/overseer/worktree-quiet-harbor-9ba5",
+      "branch": "worktree/audited-line-edit-tool",
+      "commits": [
+        "939603a feat: start with every tool card collapsed, ctrl+o expands it (#21)",
+        "7c4bf49 fix: keep a streamed paragraph below the tool card that ends it (#20)",
+        "24fff7f fix: close the whole-codebase review findings (#19)",
+        "b88ce78 feat: one agent implementation, a tree of agents under the root (#18)",
+        "231838f feat: load skills and MCP servers the way Oh my Pi does (#17)",
+        "8489a34 feat: paint the TUI for light terminals and hand the mouse back with F5 (#16)",
+        "e68d196 feat: route tool paths through an internal URI table (#15)",
+        "33b5e32 feat: resolve merge conflicts by id instead of rewriting the file (#14)"
+      ],
+      "status": [
+        "?? src/diff.rs"
+      ],
+      "dirty": 1,
+      "upstream": null,
+      "panes": [
+        {
+          "pane_id": "wRC:p1",
+          "agent": "omp",
+          "agent_status": "working",
+          "title": "Audited edit read",
+          "todo": [
+            "completed [{'type': 'reasoning_text', 'text': 'Fix `distance = d;` and `let _ = distance;`. Then simplify render (optional). Also the `while k <= d` loop: if no path found at the max distance, trace e",
+            "completed edit",
+            "completed edit"
+          ],
+          "marked": [
+            "good, but then we'd render from 10, and row 9..10 gap... Actually if the next change is at index 12 with context 3, and previous hunk",
+            "Hmm, but there's a subtle bug: after merging condition, a change 7 rows after with context 3 \u2192 separate hunks, start = next-3. If cursor",
+            "= end_of_prev (which includes 3 context rows after the previous change), then next change at prev+7, start = prev+4... Actually let's not"
+          ],
+          "tail": [
+            "224\u2502    ops.reverse();",
+            "225\u2502    Some(ops)",
+            "\udb84\udeb7 Removing the distance marker",
+            "Audited edit read",
+            "\u276f",
+            "\u280b 1h \u00b7 \udb82\udea3 DeepSeek V4.1 Flash 1017 \u00b7 \uf0e8 overseer/worktree-quiet-harbor-9ba5 \u00b7 \uf126 worktree/audited-line-edit-tool ?1 \u00b7 \ue70f 17.2%/1M \udb80\udc68 \u00b7 $0.04"
+          ]
+        }
+      ]
+    }
+  ],
+  "skipped": [
+    {
+      "workspace_id": "wQZ",
+      "label": "overseer",
+      "agent_status": "unknown",
+      "repo": null,
+      "why": "not a git workspace"
+    },
+    {
+      "workspace_id": "wQD",
+      "label": "overseer",
+      "agent_status": "working",
+      "repo": "overseer",
+      "why": "primary checkout"
+    },
+    {
+      "workspace_id": "wRD",
+      "label": "reserved-url-schemes",
+      "agent_status": "working",
+      "repo": "overseer",
+      "why": "not registered as an overlord worktree"
+    },
+    {
+      "workspace_id": "wRF",
+      "label": "supervisor-only-profiles",
+      "agent_status": "working",
+      "repo": "overseer",
+      "why": "not registered as an overlord worktree"
+    },
+    {
+      "workspace_id": "wRH",
+      "label": "full-tool-commands",
+      "agent_status": "idle",
+      "repo": "overseer",
+      "why": "not registered as an overlord worktree"
+    },
+    {
+      "workspace_id": "wRJ",
+      "label": "harness-comparison-table",
+      "agent_status": "working",
+      "repo": "overseer",
+      "why": "not registered as an overlord worktree"
+    }
+  ]
+}

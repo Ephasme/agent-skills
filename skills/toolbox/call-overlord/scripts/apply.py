@@ -17,9 +17,9 @@ from __future__ import annotations
 
 import argparse
 import json
+import subprocess
 from pathlib import Path
 import re
-import subprocess
 import sys
 import threading
 import time
@@ -253,6 +253,14 @@ def apply_one(entry, label, dry):
 STEP_LABEL = re.compile(
     r"^(?:\U0001F441|\U0001F5FA|\U0001F6E1|\u2692|\U0001F50D|\u27F3|\u2935|\u2714)\s+(SEE|PLAN|HRD|WORK|REV|REB|MRG|DONE)\b"
 )
+
+def herdr_json(*args):
+    """Ask herdr for JSON; the caller's environment decides which session answers."""
+    done = subprocess.run(["herdr", *args], capture_output=True, text=True)
+    if done.returncode != 0:
+        raise SystemExit("herdr %s failed: %s" % (" ".join(args), done.stderr.strip()))
+    return json.loads(done.stdout)["result"]
+
 
 REGISTRY = Path.home() / ".local" / "state" / "call-overlord" / "worktrees.json"
 
