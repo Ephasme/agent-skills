@@ -1,7 +1,7 @@
 # Worktree steps
 
 A left-panel label is `<symbol> <STEP> <name> <title>` and may end with one parenthesised fact:
-`🔍 REV m8 ocr-review-pr13 (PR #13 - m2)` while m8 reviews the PR m2 opened, `⚒ WORK m1
+`🔍 REV m8 ocr-review-pr13 (PR #13 - m2)` while m8 reviews the PR m2 opened, `⚒ BUILD m1
 overlord-rust-port (PR #1)` in any other step, `⤵ MRG m7 overlord-panel-rows (PR #2 · merged)` once
 merged, and no parentheses at all without a PR.
 
@@ -28,7 +28,7 @@ more does not invalidate it; any later edit of the plan does. Same line, same by
 implementation.
 
 A committed plan whose marker is absent or names an older commit is `HRD`. A committed plan whose
-marker is present and current is `WORK`/`BUILD`, and only then may `plans --approve` press `1`;
+marker is present and current is `BUILD`, and only then may `plans --approve` press `1`;
 `plans --inject` keeps sending `/skill:harden-plan` while the plan is unhardened.
 
 ## Step decision table

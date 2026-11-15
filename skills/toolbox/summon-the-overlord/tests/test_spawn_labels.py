@@ -761,5 +761,36 @@ class SecondReviewTests(unittest.TestCase):
             self.assertEqual(o.review_state("o/n", pull), "missing")
 
 
+    def test_a_validated_title_is_kept_verbatim(self):
+        self.assertEqual(o.title_slug("fix"), "untitled")
+        self.assertEqual(o.title_slug("one-two-three-four-five"), "one-two-three-four")
+
+    def test_a_scalar_allowed_list_does_not_become_characters(self):
+        with tempfile.TemporaryDirectory() as home:
+            config = Path(home) / "config.yaml"
+            config.write_text("models:\n  allowed: openai/gpt-5-mini\n")
+            with patch.object(o, "CONFIG_FILE", config):
+                allowed, default = o.model_policy()
+        self.assertEqual(allowed, o.DEFAULT_ALLOWED)
+        self.assertEqual(default, o.WORKER_MODEL)
+
+    def test_a_marker_followed_by_a_blank_line_still_hardens(self):
+        with tempfile.TemporaryDirectory() as root:
+            path = Path(root)
+            git = lambda *a: subprocess.run(GIT + list(a), cwd=path, capture_output=True, text=True, check=True)
+            git("init", "-q", "-b", "main")
+            (path / "PLAN.md").write_text("# plan\n")
+            git("add", "PLAN.md")
+            git("commit", "-q", "-m", "plan")
+            sha = git("rev-parse", "HEAD").stdout.strip()
+            (path / "PLAN.md").write_text(f"# plan\n\n<!-- hardened: {sha} -->\n\n")
+            git("commit", "-qam", "marker")
+            self.assertTrue(o.plan_hardened(path))
+
+    def test_ocr_is_reported_but_not_brewed(self):
+        installable = {name: flag for name, _command, _fix, flag in o.DEPENDENCIES}
+        self.assertFalse(installable["ocr"])
+        self.assertTrue(installable["git"])
+
 if __name__ == "__main__":
     unittest.main()

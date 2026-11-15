@@ -113,9 +113,9 @@ the mode, the step per worktree, and the evidence it used.
 |signal|mode|step|
 |---|---|---|
 |nothing dirty, nothing ahead, no PR, no plan|`ask`|`IDLE`|
-|bug words in the commits or the conversation, one commit or two files, no plan|`hotfix`|`WORK`, repro unanswered|
+|bug words in the commits or the conversation, one commit or two files, no plan|`hotfix`|`BUILD`, repro unanswered|
 |a plan, several commits, review evidence, more than one worktree|`feat`|the pipeline step|
-|anything else already in motion|`fast`|`WORK`|
+|anything else already in motion|`fast`|`BUILD`|
 
 ```bash
 "$SKILL_DIR/scripts/overlord.py" spawn --mode fast|hotfix --task "<what to build>"

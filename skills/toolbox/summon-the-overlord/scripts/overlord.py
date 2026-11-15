@@ -72,7 +72,11 @@ def model_policy() -> tuple[list[str], str]:
     if not isinstance(models, dict):
         # a hand-edited list instead of a mapping must not crash spawn, models or resume
         models = {}
-    allowed = [str(name) for name in (models.get("allowed") or DEFAULT_ALLOWED)]
+    configured = models.get("allowed")
+    if not isinstance(configured, list) or not configured:
+        # a scalar would iterate into characters and refuse every model with "use one of: o, p…"
+        configured = DEFAULT_ALLOWED
+    allowed = [str(name) for name in configured]
     default = str(models.get("default") or WORKER_MODEL)
     return allowed, default
 
@@ -294,16 +298,18 @@ def resume_agent(record: dict, pane: str, path: Path) -> str:
     if not start_agent(agent_name(path), pane, model):
         return "agent restart failed"
     # adopt registers everything as "adopted", so the mode field never says feat here; the plan
-    # itself does: a committed plan without a current marker means the hardening work is unfinished
+    # itself does. A failed chord is reported, but the session resume below still runs: that
+    # minion has work to pick up and no prompt would leave it with none.
+    plan_mode_note = ""
     if (path / PLAN_FILE).is_file() and not plan_hardened(path) and not enter_plan_mode(pane):
-        return "agent restarted, plan mode did not engage"
+        plan_mode_note = ", plan mode did not engage"
     session = (record.get("agent_session") or {}).get("value", "")
     if not session:
         return "agent restarted, no session file to resume"
     instruction = f"Your pane moved to a new workspace. Resume the session at {session} and carry on where you left off."
     if not ok(["herdr", "agent", "prompt", pane, instruction]):
         return "agent restarted, resume prompt failed"
-    return "agent resumed"
+    return f"agent resumed{plan_mode_note}"
 
 
 def relocate(path: Path, places: dict[str, list[str]], agents: dict[str, dict], realm: str) -> str:
@@ -986,7 +992,9 @@ def plan_hardened(path: Path) -> bool:
     if not plan.is_file():
         return False
     lines = plan.read_text(errors="replace").splitlines()
-    match = HARDENED_RE.fullmatch(lines[-1].strip()) if lines else None
+    # the last non-empty line: a trailing blank line is whitespace, not a plan edit
+    kept = [line for line in lines if line.strip()]
+    match = HARDENED_RE.fullmatch(kept[-1].strip()) if kept else None
     if not match:
         return False
     if not run(["git", "-C", str(path), "rev-parse", "--git-dir"]):
@@ -994,10 +1002,10 @@ def plan_hardened(path: Path) -> bool:
         return True
     if not run(["git", "-C", str(path), "ls-files", "--error-unmatch", PLAN_FILE]):
         return False
-    # both sides stripped: a trailing blank line is whitespace, not a plan edit, and an empty
-    # `git show` (unknown sha) must never read as a match
+    # both sides stripped so spacing never decides it, and an empty `git show` (unknown sha)
+    # must never read as a match
     shown = run(["git", "-C", str(path), "show", f"{match.group(1)}:{PLAN_FILE}"]).strip()
-    return bool(shown) and shown == "\n".join(lines[:-1]).strip()
+    return bool(shown) and shown == "\n".join(kept[:-1]).strip()
 
 
 def plan_state(wt: Worktree) -> tuple[bool, bool]:
@@ -1637,10 +1645,11 @@ def cmd_watch(args: argparse.Namespace) -> int:
         time.sleep(args.interval)
 
 DEPENDENCIES = (
-    ("git", "git", "brew install git"),
-    ("gh", "gh", "brew install gh"),
-    ("uv", "uv", "brew install uv"),
-    ("ocr", "ocr", "install the open-code-review CLI: its artifact gates every merge"),
+    # (name, command, fix, installable): `preflight --apply` only brews what brew actually has
+    ("git", "git", "brew install git", True),
+    ("gh", "gh", "brew install gh", True),
+    ("uv", "uv", "brew install uv", True),
+    ("ocr", "ocr", "install the open-code-review CLI: its artifact gates every merge", False),
 )
 
 
@@ -1648,7 +1657,7 @@ def preflight_rows() -> tuple[list[dict[str, str]], list[str]]:
     """Every check this skill needs, as rows a stored verdict can reprint unchanged."""
     rows: list[dict[str, str]] = []
     missing: list[str] = []
-    for name, command, fix in DEPENDENCIES:
+    for name, command, fix, _installable in DEPENDENCIES:
         present = bool(run(["which", command]))
         rows.append({"check": name, "state": "ok" if present else "missing", "fix": fix})
         if not present:
@@ -1693,8 +1702,8 @@ def cmd_preflight(args: argparse.Namespace) -> int:
         return 0 if not cached.get("missing") else 1
 
     if args.apply:
-        for name, command, _fix in DEPENDENCIES:
-            if not run(["which", command]):
+        for name, command, _fix, installable in DEPENDENCIES:
+            if installable and not run(["which", command]):
                 run(["brew", "install", name])
 
     rows, missing = preflight_rows()
@@ -1817,6 +1826,11 @@ def cmd_spawn(args: argparse.Namespace) -> int:
     register_entry(entries, str(path.resolve()), {"repo": str(repo), "branch": branch, "mode": args.mode, "task": args.task}, slug)
     save_registry(entries)
     identity = entries[str(path.resolve())]
+    if title:
+        # a validated --title is the frozen title verbatim: re-slugging it turns "fix" into
+        # "untitled" and drops a fifth word the branch name still carries
+        identity["title"] = birth = title[:64]
+    save_registry(entries)
     label = paint(step, identity["name"], birth)
     workspace, minion = open_workspace(path, model)
     if not minion:
