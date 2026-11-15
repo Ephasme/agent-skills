@@ -766,11 +766,11 @@ def stack_depth(pull: PullRequest, by_head: dict[str, PullRequest]) -> int:
     return depth
 
 
-def cmd_order(args: argparse.Namespace) -> int:
+def order_plan(args: argparse.Namespace) -> list[tuple[int, str, PullRequest, bool, str, int, int, str]]:
+    """The merge plan as data: (files, slug, pull, ready, blockers, cluster, depth, worktree)."""
     github = shared("github", Github)
-    realm = realm_repos(args.repo)
     plan: list[tuple[int, str, PullRequest, bool, str, int, int, str]] = []
-    for repo in realm:
+    for repo in realm_repos(args.repo):
         slug = repo_slug(repo)
         if not slug:
             continue
@@ -805,9 +805,13 @@ def cmd_order(args: argparse.Namespace) -> int:
     # stack depth first so a stacked pull stays behind its base, then cluster,
     # smallest diff first, then PR number
     plan.sort(key=lambda row: (row[6], row[5], row[0], row[2].number))
+    return plan
 
+
+def cmd_order(args: argparse.Namespace) -> int:
+    github = shared("github", Github)
     print("#rank\trepo\taccount\tpr\tbranch\tbase\tfiles\tcluster\tworktree\tready\tblockers")
-    for index, (_files, slug, pull, ready, blocker, cluster, _depth, worktree) in enumerate(plan, start=1):
+    for index, (_files, slug, pull, ready, blocker, cluster, _depth, worktree) in enumerate(order_plan(args), start=1):
         print(
             f"{index}\t{slug}\t{github.account(slug)}\t{pull.number}\t{pull.head}\t{pull.base}\t"
             f"{len(pull.paths)}\t{cluster}\t{worktree}\t{'yes' if ready else 'no'}\t{blocker or '-'}"
@@ -1253,6 +1257,89 @@ def cmd_spawn(args: argparse.Namespace) -> int:
 
 
 
+def merge(slug: str, number: int) -> str:
+    """Squash-merge one pull request as the gh account that reaches its repository."""
+    login = shared("github", Github).account(slug)
+    token = next((token for name, token, _active in gh_accounts() if name == login), "")
+    env = {**os.environ, **({"GH_TOKEN": token} if token else {})}
+    try:
+        proc = subprocess.run(
+            ["gh", "pr", "merge", str(number), "-R", slug, "--squash", "--delete-branch"],
+            capture_output=True, text=True, env=env, timeout=180,
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        return f"failed: {exc}"
+    if proc.returncode == 0:
+        return "merged"
+    lines = (proc.stderr or proc.stdout).strip().splitlines()
+    return f"failed: {lines[-1] if lines else 'no output'}"
+
+
+def asks(args: argparse.Namespace) -> list[str]:
+    """The one prompt each worktree still owes, as a ready command: fixed wording, no judgement.
+
+    A worker with no pane is skipped here and reported by `inventory`: printing a prompt
+    addressed to nobody would read as an instruction that was sent.
+    """
+    base = args.base
+    out: list[str] = []
+    for wt in collect(args.repo, base):
+        pull = wt.pull
+        if wt.pane in {"-", ""} or (pull and pull.state == "MERGED"):
+            continue
+        if pull and pull.merge_state == "DIRTY":
+            text = (f"Pull request {pull.number} conflicts with {base}. Rebase onto origin/{base}, "
+                    f"keep both sides' intent, then git push --force-with-lease.")
+        elif pull and pull.state == "OPEN":
+            text = (f"Pull request {pull.number} is not green yet, or still a draft. Make the checks "
+                    f"pass, commit and push.")
+        elif wt.dirty:
+            text = "Commit or revert the uncommitted changes in this worktree, then push."
+        elif wt.ahead > 0:
+            text = (f"Push {wt.branch} and open the pull request against origin/{base}: "
+                    f"gh pr create --base {base} --head {wt.branch} --fill.")
+        else:
+            continue
+        out.append(f'herdr agent prompt {wt.pane} "{text}"')
+    return out
+
+
+def cmd_pass(args: argparse.Namespace) -> int:
+    """The whole pass in one process: every table, then every step that needs no judgement.
+
+    Merges, plan keys, renames and prunes are decided by the rules above, so they run here
+    and the model reads the last section only: the prompts still owed, already worded.
+    """
+    code = cmd_bootstrap(args)
+    if getattr(args, "dry_run", False):
+        print("## plans\nwould run\tplans --inject --approve")
+        print("## rename\nwould run\trename --apply")
+        print("## merge")
+        for _files, slug, pull, ready, blocker, _cluster, _depth, _worktree in order_plan(args):
+            print(f"{slug}\t{pull.number}\t{'would merge' if ready else 'skipped: ' + blocker}")
+        print("## prune\nwould run\tprune --apply")
+        print("## ask")
+        for line in asks(args):
+            print(line)
+        return code
+    print("## plans --inject --approve")
+    cmd_plans(argparse.Namespace(**{**vars(args), "inject": True, "approve": True}))
+    print("## rename --apply")
+    cmd_rename(argparse.Namespace(**{**vars(args), "apply": True, "label_self": True}))
+    print("## merge")
+    for _files, slug, pull, ready, blocker, _cluster, _depth, _worktree in order_plan(args):
+        if not ready:
+            print(f"{slug}\t{pull.number}\tskipped\t{blocker}")
+            continue
+        print(f"{slug}\t{pull.number}\t{merge(slug, pull.number)}")
+    print("## prune --apply")
+    cmd_prune(argparse.Namespace(**{**vars(args), "apply": True}))
+    print("## ask")
+    for line in asks(args):
+        print(line)
+    return code
+
+
 def cmd_bootstrap(args: argparse.Namespace) -> int:
     """Every read-only table a pass needs, in one process: one GitHub round trip, one git probe.
 
@@ -1353,6 +1440,8 @@ def main(argv: list[str]) -> int:
     preflight.add_argument("--refresh", action="store_true", help="re-check even when a verdict is stored")
 
     subs.add_parser("bootstrap", help="every read-only table a pass needs, in one process")
+    run_pass = subs.add_parser("pass", help="the whole pass: tables, plans, renames, merges, prune, asks")
+    run_pass.add_argument("--dry-run", action="store_true", help="print what it would do, change nothing")
     subs.add_parser("inventory", help="one row per worktree")
     subs.add_parser("order", help="merge plan for the open pull requests")
 
@@ -1386,6 +1475,7 @@ def main(argv: list[str]) -> int:
         "mode": cmd_mode,
         "spawn": cmd_spawn,
         "bootstrap": cmd_bootstrap,
+        "pass": cmd_pass,
         "inventory": cmd_inventory,
         "order": cmd_order,
         "status": cmd_status,

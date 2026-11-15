@@ -172,12 +172,26 @@ The `realm` column says what happened: `<held>→<new>, agent resumed`, `opened 
 `in realm <ws>`, `kept: <ws> refused to close`, and `no herdr: not moved` without `HERDR_ENV=1`,
 where the registry is written but nothing moves.
 
-## The feat pipeline, in six commands
+## One command runs the pass
 
-`bootstrap` names the overlord's own pane and workspace `👁 OVERLORD`, then prints every read-only
-table — preflight, inventory, mode, order, plans, and the worktree labels `rename` would set — in
-one process: one GitHub round trip and one git probe per worktree, instead of one of each per
-command. Worktree labels are only applied by `rename --apply`. Run the single commands when you need one answer.
+```bash
+"$SKILL_DIR/scripts/overlord.py" pass             # everything below, in one process
+"$SKILL_DIR/scripts/overlord.py" pass --dry-run   # the same report, changing nothing
+```
+
+`pass` runs the scripted pipeline: it names the overlord's own pane and workspace `👁 OVERLORD`,
+prints every table — preflight, inventory, mode, order, plans, rename — then does the steps no
+judgement is needed for: the plan keys (`--inject --approve`), `rename --apply`, the merge of every
+ready PR in the printed order with the account that reaches its repository, and `prune --apply`.
+It ends with `## ask`: the prompt each worker still owes, already worded, one
+`herdr agent prompt <pane> "…"` line per worktree.
+
+That last section is the model's whole job: run those commands, then read the tables for what a
+failure means. Never re-derive a decision the script already printed, and never invent a prompt it
+already worded. One GitHub round trip and one git probe per worktree, instead of one of each per
+command.
+
+Each step stays runnable alone, when one answer is needed or a failure needs a judgement:
 
 ```bash
 "$SKILL_DIR/scripts/overlord.py" bootstrap                  # 1. where everything stands
