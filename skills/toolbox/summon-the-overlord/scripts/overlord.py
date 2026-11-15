@@ -48,11 +48,26 @@ STATE_DIR = Path(os.environ.get("XDG_STATE_HOME", Path.home() / ".local" / "stat
 REGISTRY = STATE_DIR / "worktrees.json"
 OVERLORD_DIR = Path(os.environ.get("OVERLORD_HOME", Path.home() / ".overlord"))
 CONFIG_FILE = OVERLORD_DIR / "config.yaml"
-PROMPTS = Path(__file__).resolve().parent.parent / "prompts"
+PROMPTS = Path(os.environ.get("OVERLORD_PROMPTS", Path(__file__).resolve().parent.parent / "prompts"))
 # `herdr agent start` takes the model on its own command line: this machine's config.yml
 # leaves every modelRole at `nothing`, so an agent started without one dies on its first
-# request with a 400 naming the value.
-WORKER_MODEL = os.environ.get("OVERLORD_MODEL", "omniroute/anthropic/claude-opus-4.5")
+HARDENED_RE = re.compile(r"^<!-- hardened: ([0-9a-f]{40,64}) -->$")
+PLAN_TOGGLE = "Alt+Shift+P"
+
+
+def model_policy() -> tuple[list[str], str]:
+    models = read_yaml(CONFIG_FILE, "config").get("models") or {}
+    allowed = [str(name) for name in (models.get("allowed") or [])]
+    default = str(models.get("default") or (allowed[0] if allowed else WORKER_MODEL))
+    return allowed, default
+
+
+def resolve_model(requested: str) -> tuple[str, str]:
+    allowed, default = model_policy()
+    model = requested or default
+    if allowed and model not in allowed:
+        return "", f"model {model!r} is not allowed; use one of: {', '.join(allowed)}"
+    return model, ""
 
 
 def registry() -> dict[str, dict[str, str]]:
@@ -69,7 +84,47 @@ def registry() -> dict[str, dict[str, str]]:
         raise SystemExit(f"registry unreadable ({REGISTRY}): {error}")
     if not isinstance(data, dict):
         raise SystemExit(f"registry is not an object ({REGISTRY})")
+    if backfill_names(data):
+        save_registry(data)
     return data
+
+
+def title_slug(source: str) -> str:
+    words = [word for word in re.split(r"[^a-z0-9]+", source.lower()) if word]
+    kept = [word for word in words if word not in STOP_WORDS][:4]
+    return "-".join(kept) or "untitled"
+
+
+def register_entry(entries: dict, path: str, meta: dict, title: str = "") -> None:
+    if path in entries:
+        return
+    meta["name"] = f"m{entries.get('next_name', 1)}"
+    entries["next_name"] = int(entries.get("next_name", 1)) + 1
+    meta["title"] = title_slug(title or meta.get("task", "") or Path(path).name)
+    entries[path] = meta
+
+
+def backfill_names(entries: dict) -> bool:
+    changed = False
+    if "next_name" not in entries:
+        numbers = [int(meta["name"][1:]) for key, meta in entries.items()
+                   if key != "next_name" and isinstance(meta, dict)
+                   and re.fullmatch(r"m[1-9][0-9]*", meta.get("name", ""))]
+        entries["next_name"] = max(numbers, default=0) + 1
+        changed = True
+    for path in sorted(key for key in entries if key != "next_name"):
+        meta = entries[path]
+        if "name" not in meta:
+            meta["name"] = f"m{entries['next_name']}"
+            entries["next_name"] += 1
+            changed = True
+        if "title" not in meta:
+            source = meta.get("task", "")
+            if not source and meta.get("kind") == "git":
+                source = run(["git", "-C", path, "log", "-1", "--format=%s"])
+            meta["title"] = title_slug(source or Path(path).name)
+            changed = True
+    return changed
 
 
 def save_registry(entries: dict[str, dict[str, str]]) -> None:
@@ -154,42 +209,53 @@ def herdr_places() -> dict[str, list[str]]:
 
 
 def agent_name(path: Path) -> str:
-    """A live agent name herdr accepts: [a-z][a-z0-9_-]{0,31}, from the checkout name."""
+    """A live herdr identity: the registered minion name, else the checkout slug."""
+    meta = registry().get(str(path.resolve()))
+    if meta and meta.get("name"):
+        return meta["name"]
     slug = re.sub(r"[^a-z0-9-]+", "-", path.name.lower()).strip("-") or "adopted"
     return (slug if slug[:1].isalpha() else f"a-{slug}")[:32].rstrip("-") or "adopted"
 
 
-def start_agent(name: str, pane: str) -> bool:
-    """Oh My Pi, never another kind, with the model it must be given to run at all.
+def enter_plan_mode(pane: str) -> bool:
+    """Toggle omp plan mode with its own keybinding, then prove it took from the pane banner.
 
-    A fresh workspace's shell needs a moment before it accepts a program, so the start is
-    retried while it is refused, and a start that succeeds is never issued twice.
+    A chord sent while the shell is still starting is swallowed, hence the retry: `spawn` must
+    never hand feat work over in normal mode, where the minion implements before any plan.
     """
     for _ in range(10):
-        if ok(["herdr", "agent", "start", name, "--kind", "omp", "--pane", pane, "--", "--model", WORKER_MODEL], timeout=120):
+        if ok(["herdr", "agent", "send-keys", pane, PLAN_TOGGLE]) and "plan mode" in run(
+            ["herdr", "pane", "read", pane, "--source", "recent", "--lines", "40"]
+        ).lower():
             return True
         time.sleep(1)
     return False
 
 
-def open_workspace(path: Path) -> tuple[str, str]:
-    """A plain herdr workspace on this checkout, with a worker started in its root pane.
+def start_agent(name: str, pane: str, model: str) -> bool:
+    """Start omp with explicit main, plan and smol models; nothing is never inherited."""
+    for _ in range(10):
+        if ok(["herdr", "agent", "start", name, "--kind", "omp", "--pane", pane, "--", "--model", model, "--plan", model, "--smol", model], timeout=120):
+            return True
+        time.sleep(1)
+    return False
 
-    herdr's own worktree workspaces are never used: they claim the checkout and the branch,
-    which this skill manages itself. Returns (workspace, pane), either empty on failure.
-    """
+
+def open_workspace(path: Path, model: str) -> tuple[str, str]:
+    """Open a plain herdr workspace on this checkout and start its minion."""
     created = herdr_json(["herdr", "workspace", "create", "--cwd", str(path), "--no-focus"])
     pane = (created.get("root_pane") or {}).get("pane_id", "")
     workspace = ((created.get("workspace") or {}).get("workspace_id")
                  or (created.get("root_pane") or {}).get("workspace_id", ""))
     if not pane:
         return workspace, ""
-    return workspace, (pane if start_agent(agent_name(path), pane) else "")
+    return workspace, (pane if start_agent(agent_name(path), pane, model) else "")
 
 
 def resume_agent(record: dict, pane: str, path: Path) -> str:
     """Start the moved agent again and point it at the session file it lost."""
-    if not start_agent(agent_name(path), pane):
+    model, refusal = resolve_model("")
+    if refusal or not start_agent(agent_name(path), pane, model):
         return "agent restart failed"
     session = (record.get("agent_session") or {}).get("value", "")
     if not session:
@@ -252,7 +318,9 @@ def cmd_adopt(args: argparse.Namespace) -> int:
             print(f"{target}\t{path}\t{branch}\talready owned\t-")
             continue
         kind = "git" if toplevel else "dir"
-        entries[resolved] = {"repo": str(repo), "branch": branch, "mode": "adopted", "task": args.task, "kind": kind}
+        meta = {"repo": str(repo), "branch": branch, "mode": "adopted", "task": args.task, "kind": kind}
+        title = args.task or (run(["git", "-C", str(path), "log", "-1", "--format=%s"]) if toplevel else "") or path.name
+        register_entry(entries, resolved, meta, title)
         adopted += 1
         print(f"{target}\t{path}\t{branch}\tadopted\t{relocate(path, places, agents, realm)}")
     if adopted:
@@ -265,12 +333,14 @@ def cmd_registry(args: argparse.Namespace) -> int:
     entries = registry()
     if args.path:
         for path in entries:
-            print(path)
+            if path != "next_name":
+                print(path)
         return 0
     if args.add:
         entries = registry()
         for path in args.add:
-            entries[str(Path(path).expanduser().resolve())] = {"repo": args.source_repo or "", "task": args.task or ""}
+            resolved = str(Path(path).expanduser().resolve())
+            register_entry(entries, resolved, {"repo": args.source_repo or "", "task": args.task or ""})
         save_registry(entries)
         print(f"registered {len(args.add)} path(s)")
         return 0
@@ -290,6 +360,8 @@ def cmd_registry(args: argparse.Namespace) -> int:
         } if os.environ.get("HERDR_ENV") == "1" else {}
         print("#workspace\tlabel\tpath")
         for path, meta in sorted(entries.items()):
+            if path == "next_name":
+                continue
             workspace = by_path.get(str(Path(path).resolve()), "-")
             print(f"{workspace}\t{labels.get(str(Path(path).resolve()), meta.get('task', ''))[:40]}\t{path}")
         return 0
@@ -448,6 +520,7 @@ class PullRequest:
     base: str = ""
     sha: str = ""
     paths: list[str] = field(default_factory=list)
+    updated_at: str = ""
 
 
 def pull_from_json(pull: dict) -> PullRequest:
@@ -463,6 +536,7 @@ def pull_from_json(pull: dict) -> PullRequest:
         head=((pull.get("head") or {}).get("ref") or ""),
         base=((pull.get("base") or {}).get("ref") or ""),
         sha=((pull.get("head") or {}).get("sha") or ""),
+        updated_at=str(pull.get("updated_at") or pull.get("merged_at") or ""),
     )
 
 
@@ -561,11 +635,17 @@ class Worktree:
     pane: str = "-"
     vcs: bool = True
     linked: bool = False
+    name: str = "-"
+    title: str = ""
+    agent_status: str = "unknown"
+    last_subject: str = ""
+    last_commit_at: str = ""
+    checks: str = "none"
 
 
 def registry_repos() -> list[Path]:
     """Repositories of adopted worktrees, so a target outside --repo is still overseen."""
-    return sorted({Path(meta["repo"]) for meta in registry().values() if meta.get("repo") and Path(meta["repo"]).is_dir()})
+    return sorted({Path(meta["repo"]) for key, meta in registry().items() if key != "next_name" and meta.get("repo") and Path(meta["repo"]).is_dir()})
 
 
 def herdr_open_repos() -> set[Path]:
@@ -616,11 +696,11 @@ def _collect(repos: list[Path], base: str) -> list[Worktree]:
         if not run(["git", "-C", str(repo), "rev-parse", "--git-dir"]):
             print(f"not a git repository: {repo}", file=sys.stderr)
             continue
-        registry_paths = {Path(path) for path in registry_entries}
+        registry_paths = {Path(path) for path in registry_entries if path != "next_name"}
         registered = {
             Path(path)
             for path, meta in registry_entries.items()
-            if meta.get("repo") and Path(meta["repo"]).resolve() == repo.resolve()
+            if path != "next_name" and meta.get("repo") and Path(meta["repo"]).resolve() == repo.resolve()
         }
         for path in sorted(registry_paths):
             if path in seen or not path.is_dir():
@@ -629,13 +709,14 @@ def _collect(repos: list[Path], base: str) -> list[Worktree]:
                 continue
             seen.add(path)
             workspace = by_path.get(str(path.resolve()), "")
+            meta = registry_entries.get(str(path.resolve()), {})
             agent, pane = by_ws.get(workspace, ("-", "-")) if workspace else ("-", "-")
-            rows.append(
-                Worktree(
-                    path=path, repo=path, branch="-", dirty=0, ahead=0, upstream="none",
-                    slug="", pull=None, agent=agent, pane=pane, vcs=False,
-                )
-            )
+            rows.append(Worktree(
+                path=path, repo=path, branch="-", dirty=0, ahead=0, upstream="none",
+                slug="", pull=None, agent=agent, pane=pane, vcs=False,
+                name=meta.get("name", "-"), title=meta.get("title", ""),
+                agent_status=by_ws.get(workspace, ("unknown", "-"))[0] if workspace else "unknown",
+            ))
         for path in worktree_paths(repo) + sorted(registered):
             if not path.is_dir() or path in seen:
                 continue
@@ -646,23 +727,22 @@ def _collect(repos: list[Path], base: str) -> list[Worktree]:
             ahead_text = run(["git", "-C", str(path), "rev-list", "--count", f"origin/{base}..HEAD"])
             slug = repo_slug(path)
             workspace = by_path.get(str(path.resolve()), "")
+            meta = registry_entries.get(str(path.resolve()), {})
             agent, pane = by_ws.get(workspace, ("-", "-")) if workspace else ("-", "-")
-            rows.append(
-                Worktree(
-                    path=path,
-                    repo=repo,
-                    branch=branch,
-                    dirty=dirty,
-                    ahead=int(ahead_text) if ahead_text.isdigit() else 0,
-                    upstream=run(["git", "-C", str(path), "rev-parse", "--abbrev-ref", "@{u}"]) or "none",
-                    slug=slug,
-                    pull=github.branch_pulls(slug).get(branch) if slug else None,
-                    agent=agent,
-                    pane=pane,
-                    linked=path.resolve() != repo.resolve(),
-                )
-            )
-    return rows
+            pull = github.branch_pulls(slug).get(branch) if slug else None
+            rows.append(Worktree(
+                path=path, repo=repo, branch=branch, dirty=dirty,
+                ahead=int(ahead_text) if ahead_text.isdigit() else 0,
+                upstream=run(["git", "-C", str(path), "rev-parse", "--abbrev-ref", "@{u}"]) or "none",
+                slug=slug, pull=pull,
+                agent=agent, pane=pane, linked=path.resolve() != repo.resolve(),
+                name=meta.get("name", "-"), title=meta.get("title", ""),
+                agent_status=by_ws.get(workspace, ("unknown", "-"))[0] if workspace else "unknown",
+                last_subject=run(["git", "-C", str(path), "log", "-1", "--format=%s"]),
+                last_commit_at=run(["git", "-C", str(path), "log", "-1", "--format=%cI"]),
+                checks=(shared(("checks", slug, pull.number), lambda: github.checks_green(slug, pull.number, pull.sha)[1] or "green")
+                        if pull and pull.state == "OPEN" else "none"),
+            ))
 
 
 def landable(wt: Worktree) -> str:
@@ -823,19 +903,31 @@ STOP_WORDS = {
 }
 
 
+def plan_hardened(path: Path) -> bool:
+    """True when PLAN.md's last line names the commit holding exactly this plan text.
+
+    The marker is `<!-- hardened: <sha> -->`, the sha of the plan commit. Appending the marker
+    commits once more, so the sha cannot name the commit that carries the marker: it names the
+    commit whose PLAN.md equals the current file without that last line. Any later edit of the
+    plan makes the marker stale, which is what sends the worktree back to HRD.
+    """
+    plan = path / PLAN_FILE
+    if not plan.is_file() or not run(["git", "-C", str(path), "ls-files", "--error-unmatch", PLAN_FILE]):
+        return False
+    lines = plan.read_text(errors="replace").splitlines()
+    match = HARDENED_RE.fullmatch(lines[-1]) if lines else None
+    if not match:
+        return False
+    shown = run(["git", "-C", str(path), "show", f"{match.group(1)}:{PLAN_FILE}"]).splitlines()
+    return shown == lines[:-1]
+
+
 def plan_state(wt: Worktree) -> tuple[bool, bool, str]:
-    """(proposed, hardened, pane text). A plan file counts, and so does the pane banner."""
-    return shared(("plan_state", str(wt.path), wt.pane), lambda: _plan_state(wt))
-
-
-def _plan_state(wt: Worktree) -> tuple[bool, bool, str]:
     proposed = (wt.path / PLAN_FILE).is_file()
-    hardened = False
+    hardened = plan_hardened(wt.path)
     text = ""
     if wt.pane not in {"-", ""}:
-        text = run(["herdr", "pane", "read", wt.pane, "--source", "recent", "--lines", "300"]).lower()
-        hardened = "harden-plan" in text
-        proposed = proposed or "plan ready for review" in text or "exit plan mode" in text or "plan mode" in text
+        text = run(["herdr", "pane", "read", wt.pane, "--source", "recent", "--lines", "300"])
     return proposed, hardened, text
 
 
@@ -857,29 +949,26 @@ def short_title(wt: Worktree) -> str:
     return "-".join(kept) or "untitled"
 
 
-def step_for(wt: Worktree, proposed: bool, hardened: bool, pane_text: str) -> str:
-    """The one stage this worktree is at, from landed back to looking around."""
-    if not wt.vcs:
-        if proposed and not hardened:
-            return "HRD"
-        if proposed and hardened:
-            return "REV"
-        return "PLAN" if "plan mode" in pane_text else "WORK"
+def step_for(wt: Worktree, proposed: bool, hardened: bool, pane_text: str = "") -> str:
+    """Select step from plan commit marker, git and PR facts only."""
     if wt.pull and wt.pull.state == "MERGED":
-        return "DONE"
-    if wt.pull and wt.pull.draft:
-        return "WORK"
+        return "DONE" if wt.dirty == 0 else "BUILD"
     if wt.pull and wt.pull.state == "OPEN":
-        return "REB" if wt.pull.merge_state == "DIRTY" else "MRG"
-    if proposed and not hardened:
-        return "HRD"
-    if proposed and hardened:
-        return "REV"
-    if "plan mode" in pane_text:
+        if wt.pull.merge_state == "DIRTY":
+            return "REB"
+        if not check_green(wt) or review_marker(wt) == "REVIEWING":
+            return "REV"
+        return "MRG"
+    committed_plan = bool(run(["git", "-C", str(wt.path), "ls-files", "--error-unmatch", PLAN_FILE]))
+    if proposed and not committed_plan:
         return "PLAN"
-    if wt.dirty or wt.ahead > 0:
-        return "WORK"
-    return "IDLE"
+    if committed_plan and not hardened:
+        return "HRD"
+    if committed_plan and hardened:
+        return "BUILD"
+    if wt.ahead > 0 or wt.dirty:
+        return "BUILD"
+    return "PLAN" if str(wt.path.resolve()) in registry() else "IDLE"
 
 
 # symbol, colour and what the label says the worktree is doing
@@ -887,17 +976,17 @@ STEP_STYLE: dict[str, tuple[str, str]] = {
     "IDLE": ("💤", "#56b6c2"),
     "PLAN": ("🗺", "#61afef"),
     "HRD": ("🛡", "#c678dd"),
-    "WORK": ("⚒", "#e5c07b"),
+    "BUILD": ("⚒", "#e5c07b"),
     "REV": ("🔍", "#d19a66"),
     "REB": ("⟳", "#c678dd"),
     "MRG": ("⤵", "#98c379"),
     "DONE": ("✔", "#7f8c8d"),
 }
 
-def paint(step: str, title: str) -> str:
-    """The visible label. Colour is herdr's config, never text: a hex code in a label is noise."""
+def paint(step: str, name: str, title: str) -> str:
+    """Stable label from stage and frozen registry identity."""
     symbol, _colour = STEP_STYLE.get(step, ("•", "#888888"))
-    return f"{symbol} {step} {title}"[:64]
+    return f"{symbol} {step} {name} {title}"[:64]
 
 
 BUG_WORDS = ("fix", "bug", "crash", "broken", "regression", "panic", "error", "flake", "hotfix")
@@ -926,10 +1015,10 @@ def pick_mode(wt: Worktree, text: str, proposed: bool) -> tuple[str, str]:
     if wt.dirty == 0 and wt.ahead == 0 and not wt.pull and not proposed:
         return "ask", "IDLE"
     if bug and small and not proposed:
-        return "hotfix", "WORK"
+        return "hotfix", "BUILD"
     if feature and (proposed or wt.ahead > 1 or words > 40):
-        return "feat", "WORK"
-    return "fast", "WORK"
+        return "feat", "BUILD"
+    return "fast", "BUILD"
 
 
 def cmd_mode(args: argparse.Namespace) -> int:
@@ -978,28 +1067,25 @@ def label_self(own_pane: str) -> str:
 
 
 def cmd_rename(args: argparse.Namespace) -> int:
-    """Prefix every worktree and pane with its step symbol, then say what it is about."""
+    """Rename every registered worktree using its stored identity and current step."""
     by_path, _by_ws = herdr_facts()
-    print("#path\tworkspace\tpane\tstep\tsymbol\tlabel")
+    print("#path\tworkspace\tpane\tname\tstep\tsymbol\tlabel")
     own_pane = os.environ.get("HERDR_PANE_ID", "")
     if own_pane:
         workspace = label_self(own_pane) if args.apply or args.label_self else own_workspace()
-        print(f"self\t{workspace or '-'}\t{own_pane}\t-\t👁\t👁 OVERLORD")
+        print(f"self\t{workspace or '-'}\t{own_pane}\t-\t-\t👁\t👁 OVERLORD")
     for wt in collect(args.repo, args.base):
-        proposed, hardened, text = plan_state(wt)
-        step = step_for(wt, proposed, hardened, text)
+        proposed, hardened, _text = plan_state(wt)
+        step = step_for(wt, proposed, hardened)
         symbol = STEP_STYLE.get(step, ("•", "#888888"))[0]
-        label = paint(step, short_title(wt))
+        label = paint(step, wt.name, wt.title or short_title(wt))
         workspace = by_path.get(str(wt.path.resolve()), "")
-        print(f"{wt.path}\t{workspace or '-'}\t{wt.pane}\t{step}\t{symbol}\t{label}")
+        print(f"{wt.path}\t{workspace or '-'}\t{wt.pane}\t{wt.name}\t{step}\t{symbol}\t{label}")
         if not args.apply:
             continue
         if workspace:
             herdr_apply(["herdr", "workspace", "rename", workspace, label])
-            herdr_apply(
-                ["herdr", "workspace", "report-metadata", workspace, "--source", "overlord",
-                 "--token", f"step={step}"]
-            )
+            herdr_apply(["herdr", "workspace", "report-metadata", workspace, "--source", "overlord", "--token", f"step={step}"])
         if wt.pane not in {"-", ""}:
             herdr_apply(["herdr", "pane", "rename", wt.pane, label])
             herdr_apply(["herdr", "pane", "report-metadata", wt.pane, "--source", "overlord", "--token", f"step={step}"])
@@ -1031,12 +1117,7 @@ def cmd_plans(args: argparse.Namespace) -> int:
     print("#path\tpane\tagent\tproposed\thardened\taction")
     for wt in collect(args.repo, args.base):
         proposed = (wt.path / PLAN_FILE).is_file()
-        hardened = False
-        if wt.pane not in {"-", ""}:
-            pane_output = run(["herdr", "pane", "read", wt.pane, "--source", "recent", "--lines", "300"]).lower()
-            hardened = "harden-plan" in pane_output
-            proposed = proposed or "plan ready for review" in pane_output or "exit plan mode" in pane_output
-
+        hardened = plan_hardened(wt.path)
         action = "none"
         if proposed and not hardened:
             action = "harden"
@@ -1049,7 +1130,10 @@ def cmd_plans(args: argparse.Namespace) -> int:
         if args.inject and action == "harden":
             run(["herdr", "pane", "run", wt.pane, HARDEN])
             print(f"sent {HARDEN} to {wt.pane}", file=sys.stderr)
-        if args.approve and action == "approve":
+        if args.approve:
+            if action != "approve":
+                print(f"refused to approve {wt.path}: PLAN.md is not hardened (no current marker)", file=sys.stderr)
+                continue
             # the first option runs the plan and drops the current context
             run(["herdr", "pane", "send-keys", wt.pane, "1"])
             print(f"approved the plan in {wt.pane} (option 1)", file=sys.stderr)
@@ -1086,6 +1170,110 @@ def cmd_prune(args: argparse.Namespace) -> int:
                     run(["herdr", "workspace", "close", workspace])
                     break
     return 0
+
+
+STALLED_STEPS = {"HRD", "BUILD", "REV", "REB", "MRG"}
+ALERT_FILE = STATE_DIR / "alerted.json"
+IDLE_RE = re.compile(r"^\s*(?:>\s*)?(.+?)\?\s*$")
+
+
+def seconds_since(moment: str) -> int:
+    """Seconds from an ISO-8601 stamp to now: -1 when the stamp is missing or unreadable."""
+    if not moment:
+        return -1
+    try:
+        then = datetime.fromisoformat(moment.replace("Z", "+00:00"))
+    except ValueError:
+        return -1
+    return max(0, int((datetime.now(timezone.utc) - then).total_seconds()))
+
+
+def last_line(pane: str) -> str:
+    """The last non-empty line a minion printed, clipped: the tail of the conversation."""
+    if pane in {"-", ""}:
+        return ""
+    rows = [row.strip() for row in run(["herdr", "pane", "read", pane, "--source", "recent-unwrapped", "--lines", "40"]).splitlines()]
+    return next((row for row in reversed(rows) if row), "")[:160]
+
+
+def stall_rows(args: argparse.Namespace) -> list[dict[str, str]]:
+    """One row per minion that is idle while its step still implies work."""
+    rows: list[dict[str, str]] = []
+    for wt in collect(args.repo, args.base):
+        if wt.agent_status != "idle":
+            continue
+        proposed, hardened, _text = plan_state(wt)
+        step = step_for(wt, proposed, hardened)
+        if step not in STALLED_STEPS:
+            continue
+        tail = last_line(wt.pane)
+        pull = wt.pull
+        rows.append({
+            "name": wt.name,
+            "step": step,
+            "title": wt.title or short_title(wt),
+            "idle_seconds": min(ages) if (ages := [age for age in (
+                seconds_since(pull.updated_at if pull else ""),
+                seconds_since(wt.last_commit_at),
+            ) if age >= 0]) else -1,
+            "last_commit": wt.last_subject or "-",
+            "commit_age": seconds_since(wt.last_commit_at),
+            "dirty": wt.dirty,
+            "pr": f"#{pull.number} {pull.state} {pull.mergeable}" if pull else "none",
+            "checks": wt.checks,
+            "question": "yes" if IDLE_RE.match(tail) else "no",
+            "tail": tail or "-",
+            "pane": wt.pane,
+        })
+    return rows
+
+
+def show_stalls(args: argparse.Namespace) -> list[dict]:
+    rows = stall_rows(args)
+    print("#name\tstep\ttitle\tidle_seconds\tlast_commit\tcommit_age\tdirty\tpr\tchecks\tquestion\ttail")
+    for row in rows:
+        print("\t".join(str(row[key]) for key in (
+            "name", "step", "title", "idle_seconds", "last_commit", "commit_age",
+            "dirty", "pr", "checks", "question", "tail",
+        )))
+    return rows
+
+
+def alert_text(row: dict) -> str:
+    """The evidence the overlord decides on: everything it needs in one prompt."""
+    return (
+        f"Stall: minion {row['name']} is idle at {row['step']} ({row['title']}). "
+        f"{row['idle_seconds']}s idle, last commit {row['last_commit']!r} {row['commit_age']}s ago, "
+        f"{row['dirty']} dirty paths, PR {row['pr']}, checks {row['checks']}, "
+        f"last pane line a question: {row['question']} — {row['tail']}. "
+        f"Decide: resume it, answer it, merge it, prune it, respawn it, or leave a legitimate wait."
+    )
+
+
+def alert_new(rows: list[dict]) -> None:
+    """Prompt this pane once per stall, keyed by minion+step and cleared once that stall is gone."""
+    alerted = json.loads(ALERT_FILE.read_text()) if ALERT_FILE.exists() else {}
+    live = {f"{row['name']}:{row['step']}" for row in rows}
+    for row in rows:
+        key = f"{row['name']}:{row['step']}"
+        if key in alerted:
+            continue
+        if ok(["herdr", "agent", "prompt", os.environ.get("HERDR_PANE_ID", ""), alert_text(row)]):
+            alerted[key] = [row["name"], row["step"]]
+    alerted = {key: value for key, value in alerted.items() if key in live}
+    STATE_DIR.mkdir(parents=True, exist_ok=True)
+    ALERT_FILE.write_text(json.dumps(alerted, indent=2, sort_keys=True))
+
+
+def cmd_watch(args: argparse.Namespace) -> int:
+    """Print stalls, alert this pane once per new one, and repeat until --once or --stop."""
+    while True:
+        rows = show_stalls(args)
+        if args.alert:
+            alert_new(rows)
+        if args.once or not args.interval:
+            return 0
+        time.sleep(args.interval)
 
 DEPENDENCIES = (
     ("git", "git", "brew install git"),
@@ -1188,12 +1376,12 @@ def credential_note(repo: Path) -> str:
 
 
 def handover(mode: str, task: str, clause: str, note: str = "") -> str | None:
-    """The text a worker starts from: preamble, mode prompts, credential note, task, completion clause.
+    """The text a minion starts from: preamble, mode prompts, credential note, task, completion clause.
 
-    A prompt file that is missing or empty is reported and returns None: the worker would
+    A prompt file that is missing or empty is reported and returns None: the minion would
     otherwise start without the rules it is meant to obey.
     """
-    names = ["preamble"] + (["hotfix"] if mode == "hotfix" else []) + ["work"]
+    names = ["preamble"] + (["hotfix"] if mode == "hotfix" else ["feat"] if mode == "feat" else []) + ["work"]
     parts: list[str] = []
     for name in names:
         path = PROMPTS / f"{name}.md"
@@ -1208,22 +1396,40 @@ def handover(mode: str, task: str, clause: str, note: str = "") -> str | None:
         parts.append(text)
     return "\n\n".join(parts + ([note] if note else []) + [task] + ([clause] if clause else []))
 
+def cmd_models(args: argparse.Namespace) -> int:
+    allowed, default = model_policy()
+    print("#model\tdefault")
+    for name in allowed or [default]:
+        print(f"{name}\t{'yes' if name == default else 'no'}")
+    return 0
+
 
 def cmd_spawn(args: argparse.Namespace) -> int:
-    """Start a job: create its worktree, then print the one command that hands over the task."""
+    """Start a minion's job in a fresh worktree."""
     if args.mode not in {"fast", "hotfix", "feat"}:
         print("mode must be fast, hotfix or feat", file=sys.stderr)
         return 2
     if not args.task:
         print("spawn needs --task", file=sys.stderr)
         return 2
+    model, refusal = resolve_model(getattr(args, "model", "") or os.environ.get("OVERLORD_MODEL", ""))
+    if refusal:
+        print(refusal, file=sys.stderr)
+        return 2
 
     repo = args.repo[0] if args.repo else Path.cwd()
-    slug = "-".join(word for word in re.split(r"[^a-z0-9]+", args.task.lower()) if word and word not in STOP_WORDS)[:60] or "job"
+    title = getattr(args, "title", "") or ""
+    if title and not re.fullmatch(r"[a-z0-9]+(-[a-z0-9]+)*", title):
+        print("--title must be lowercase letters, digits and single hyphens", file=sys.stderr)
+        return 2
+    if title:
+        slug = title
+    else:
+        words = [word for word in re.split(r"\s+", args.task) if word and not word.endswith(":")]
+        words = [word for word in words if word.lower().strip(".:,;!?()[]{}") not in {"job", "task", "brief"}]
+        slug = "-".join(word for word in re.split(r"[^a-z0-9]+", " ".join(words).lower()) if word and word not in STOP_WORDS)[:60] or "job"
     branch = f"worktree/{slug}"
     path = Path(args.dest).expanduser() / slug if args.dest else Path.home() / ".herdr" / "worktrees" / repo.name / slug
-    # The worker reports into this pane; without it there is no address to bake in, and a
-    # guessed one would send a completion line nowhere.
     pane = os.environ.get("HERDR_PANE_ID", "")
     if not pane:
         print("#warning\tHERDR_PANE_ID unset: completion clause omitted", file=sys.stderr)
@@ -1231,27 +1437,43 @@ def cmd_spawn(args: argparse.Namespace) -> int:
     if text is None:
         return 1
 
-    print(f"#worktree\t{path}\nbranch\t{branch}\nmode\t{args.mode}")
+    step = "PLAN" if args.mode == "feat" else "BUILD"
+    birth = title_slug(slug)
+    preview = paint(step, f"m{registry().get('next_name', 1)}", birth)
+    print(f"#worktree\t{path}\nbranch\t{branch}\nmode\t{args.mode}\nmodel\t{model}\ntitle\t{birth}")
     if args.dry_run:
         print(f"would run\tgit -C {repo} worktree add -b {branch} {path} origin/{args.base}")
         print(f"would run\therdr workspace create --cwd {path} --no-focus")
-        print(f"would run\therdr agent start {agent_name(path)} --kind omp --pane <pane> -- --model {WORKER_MODEL}")
+        print(f"would run\therdr agent start {agent_name(path)} --kind omp --pane <pane> -- --model {model} --plan {model} --smol {model}")
+        if args.mode == "feat":
+            print(f"would run\therdr agent send-keys <pane> {PLAN_TOGGLE}")
+            print("would run\tverify plan mode from the pane banner, fail the spawn otherwise")
         print("would run\therdr agent prompt <pane> <handover>")
+        print(f"would run\therdr workspace rename <workspace> {preview}")
+        print(f"would run\therdr pane rename <pane> {preview}")
         return 0
     if not ok(["git", "-C", str(repo), "worktree", "add", "-b", branch, str(path), f"origin/{args.base}"]):
         print("worktree creation failed", file=sys.stderr)
         return 1
     entries = registry()
-    entries[str(path.resolve())] = {"repo": str(repo), "branch": branch, "mode": args.mode, "task": args.task}
+    register_entry(entries, str(path.resolve()), {"repo": str(repo), "branch": branch, "mode": args.mode, "task": args.task})
     save_registry(entries)
-    workspace, worker = open_workspace(path)
-    if not worker:
-        print(f"worktree ready, no worker started in {workspace or 'herdr'}: start one there", file=sys.stderr)
+    label = paint(step, entries[str(path.resolve())]["name"], birth)
+    workspace, minion = open_workspace(path, model)
+    if not minion:
+        print(f"worktree ready, no minion started in {workspace or 'herdr'}: start one there", file=sys.stderr)
         return 1
-    print(f"worker\t{workspace}:{worker}")
-    if not ok(["herdr", "agent", "prompt", worker, text], timeout=120):
+    print(f"worker\t{workspace}:{minion}")
+    if args.mode == "feat" and not enter_plan_mode(minion):
+        print(f"plan mode did not engage in {minion}: spawn failed before the handover", file=sys.stderr)
+        return 1
+    if not ok(["herdr", "agent", "prompt", minion, text], timeout=120):
         print("handover prompt failed", file=sys.stderr)
         return 1
+    if workspace and not herdr_apply(["herdr", "workspace", "rename", workspace, label]):
+        print(f"minion label failed for workspace {workspace}", file=sys.stderr)
+    if not herdr_apply(["herdr", "pane", "rename", minion, label]):
+        print(f"minion label failed for pane {minion}", file=sys.stderr)
     return 0
 
 
@@ -1311,6 +1533,10 @@ def cmd_pass(args: argparse.Namespace) -> int:
     and the model reads the last section only: the prompts still owed, already worded.
     """
     code = cmd_bootstrap(args)
+    print("## stalls")
+    rows = show_stalls(args)
+    if not getattr(args, "dry_run", False):
+        alert_new(rows)
     if getattr(args, "dry_run", False):
         print("## plans\nwould run\tplans --inject --approve")
         print("## rename\nwould run\trename --apply")
@@ -1404,13 +1630,15 @@ def main(argv: list[str]) -> int:
 
     spawn = subs.add_parser("spawn", help="start a job in a fresh worktree")
     spawn.add_argument("--mode", default="feat", help="fast, hotfix or feat")
-    spawn.add_argument("--task", default="", help="what the worker should do")
+    spawn.add_argument("--task", default="", help="what the minion should do")
+    spawn.add_argument("--title", default="", help="frozen title slug (lowercase letters, digits, hyphens)")
     spawn.add_argument("--dry-run", action="store_true", help="print instead of creating")
     spawn.add_argument("--dest", default="", help="parent directory for the worktree (default ~/.herdr/worktrees/<repo>)")
     # The same two flags as the top level, so `spawn … --repo PATH` reads as the table says;
     # SUPPRESS keeps a value given before the subcommand instead of resetting it.
     spawn.add_argument("--repo", action="append", default=argparse.SUPPRESS, help="repository to start the job in")
     spawn.add_argument("--base", default=argparse.SUPPRESS, help="base branch for the worktree")
+    spawn.add_argument("--model", default="", help="allowed model for this minion")
 
     for name, help_text in (
         ("survey", "survey every worktree: branch, commits, panes"),
@@ -1434,6 +1662,8 @@ def main(argv: list[str]) -> int:
     reg.add_argument("--task", default="", help="what the worktree is for")
     reg.add_argument("--source-repo", default="", help="repository path the worktree came from")
     reg.add_argument("--rename-list", action="store_true", help="workspace, label and path of every owned worktree")
+
+    subs.add_parser("models", help="the models a minion may use, and the default")
 
     preflight = subs.add_parser("preflight", help="verify dependencies once, then reprint the verdict")
     preflight.add_argument("--apply", action="store_true", help="install what is absent, then re-check")
@@ -1464,6 +1694,11 @@ def main(argv: list[str]) -> int:
     review = subs.add_parser("review", help="capture the screen of worktrees awaiting review")
     review.add_argument("--capture", default="", help="directory for the captures")
 
+    watch = subs.add_parser("watch", help="stalls: idle minions whose step still implies work")
+    watch.add_argument("--alert", action="store_true", help="prompt this pane once per new stall")
+    watch.add_argument("--once", action="store_true", help="one sweep, then exit")
+    watch.add_argument("--interval", type=int, default=0, help="seconds between sweeps; 0 runs one")
+
     args = parser.parse_args(argv)
     args.repo = [Path(path).expanduser() for path in args.repo]
     if not args.repo and run(["git", "-C", str(Path.cwd()), "rev-parse", "--git-dir"]):
@@ -1471,7 +1706,7 @@ def main(argv: list[str]) -> int:
     handlers = {
         "preflight": cmd_preflight,
         "registry": cmd_registry,
-        "adopt": cmd_adopt,
+        "models": cmd_models,
         "mode": cmd_mode,
         "spawn": cmd_spawn,
         "bootstrap": cmd_bootstrap,
@@ -1483,6 +1718,7 @@ def main(argv: list[str]) -> int:
         "prune": cmd_prune,
         "rename": cmd_rename,
         "review": cmd_review,
+        "watch": cmd_watch,
     }
     return handlers[args.command](args)
 

@@ -25,11 +25,13 @@ Where `disable-model-invocation` is ignored, this paragraph is the rule.
 
 Invoking this skill binds the session for the rest of it: you are the overlord on every later turn,
 without being asked again. A follow-up message, a task, a review request or a complaint all arrive
-to the overlord, and each is answered by dispatching a worker, merging or running a gate.
+to the overlord, and each is answered by dispatching a minion, merging or running a gate.
 
 You never edit files, run builds or commit in this pane: a fix made here has no worktree, no branch
 and no PR, so nothing can review it, land it or prune it. Work happens in a plain herdr workspace on
-a git worktree, with a worker this skill starts, and comes back as a report.
+a git worktree, with a minion this skill starts, and comes back as a report. You keep no todo list of
+the work either: the plan, the TODO and the commits belong to the minion whose job it is, and a
+change to this skill's own scripts, prompts or config is a job like any other.
 
 `$SKILL_DIR` is notation, not a set variable: this skill's directory, the one holding this `SKILL.md`.
 Every fact and every ordering decision comes from `$SKILL_DIR/scripts/overlord.py`: run it, read its
@@ -44,13 +46,14 @@ next pass.
 ```
 
 `pass` names the overlord's pane and workspace `👁 OVERLORD`, prints every table — preflight,
-inventory, mode, order, plans, rename — then does every step that needs no judgement: the plan keys
-(`--inject --approve`), `rename --apply`, the merge of each ready PR in the printed order as the
-account that reaches its repository, and `prune --apply`. It ends with `## ask`: the prompt each
-worker still owes, already worded, one `herdr agent prompt <pane> "…"` line each.
+inventory, mode, order, plans, rename, stalls — then does every step that needs no judgement: the
+plan keys (`--inject --approve`), `rename --apply`, the merge of each ready PR in the printed order
+as the account that reaches its repository, and `prune --apply`. It alerts one prompt per new stall,
+then ends with `## ask`: the prompt each minion still owes, already worded, one
+`herdr agent prompt <pane> "…"` line each.
 
-That section is the model's whole job: run those lines, then read the tables for what a failure
-means. Never invent a prompt the script already worded.
+That section is the model's whole job: run those lines, decide each stall, then read the tables for
+what a failure means. Never invent a prompt the script already worded.
 
 Each step runs alone when one answer is needed:
 
@@ -62,6 +65,7 @@ Each step runs alone when one answer is needed:
 "$SKILL_DIR/scripts/overlord.py" plans --inject --approve
 "$SKILL_DIR/scripts/overlord.py" rename --apply
 "$SKILL_DIR/scripts/overlord.py" review       # capture what awaits review
+"$SKILL_DIR/scripts/overlord.py" watch        # the stall table; --alert prompts this pane
 "$SKILL_DIR/scripts/overlord.py" status       # 0 when nothing is landable
 "$SKILL_DIR/scripts/overlord.py" prune --apply
 ```
@@ -98,7 +102,7 @@ skipped, never guessed.
 |mode|what happens|
 |---|---|
 |`feat`|the default: plan, harden, review, rebase, merge, prune|
-|`fast`|one worker on the task; no plan, no review, no gate|
+|`fast`|one minion on the task; no plan, no review, no gate|
 |`hotfix`|`fast` with the repro first: a failing test or a scripted repro before any fix|
 |`ask`|change nothing: answer only, with `/skill:cite-or-refuse` or `/skill:fact-check-document`|
 
@@ -115,17 +119,32 @@ the mode, the step per worktree, and the evidence it used.
 
 ```bash
 "$SKILL_DIR/scripts/overlord.py" spawn --mode fast|hotfix --task "<what to build>"
-"$SKILL_DIR/scripts/overlord.py" spawn --task "<what to build>" --dry-run
+"$SKILL_DIR/scripts/overlord.py" spawn --task "<what to build>" --title "<slug>" --dry-run
 ```
 
 `spawn` creates the worktree, opens a plain herdr workspace on it, starts Oh My Pi in that
-workspace's root pane and prompts it with the handover. The worker is always `--kind omp` — never
-`claude`, `pi` or another kind — and always starts with an explicit `--model`, because this machine's
-omp config leaves every model role at `nothing` and a worker without one dies on its first request;
-`OVERLORD_MODEL` overrides the default. The handover is not the bare task: `spawn` sends
-`prompts/preamble.md`, then `prompts/hotfix.md` in `hotfix` mode, then `prompts/work.md`, then the
-task. A prompt file that is missing or empty stops `spawn` with the file named. Those files are
-runtime behaviour: edit them to change how a worker behaves, never as documentation.
+workspace's root pane and prompts it with the handover. The minion is always `--kind omp` — never
+`claude`, `pi` or another kind — and always names the same model for `--model`, `--plan` and
+`--smol`: this machine's omp config leaves every model role at `nothing`, and a role left unset makes
+the first request of that kind die with `400 … nothing: model — nothing is not a valid model ID`.
+Plan mode is the case that bites, because omp routes a planning turn through `modelRoles.plan`.
+
+That model comes from `models.allowed` in `~/.overlord/config.yaml`: `--model` or `OVERLORD_MODEL`
+names one of them, an unlisted name is refused before any worktree exists, and `overlord.py models`
+prints the list and the default — never probe a model by starting a minion.
+
+`feat` additionally enters plan mode before the handover: `spawn` sends omp's own `app.plan.toggle`
+chord (`Alt+Shift+P`) to the new pane, confirms plan mode from the pane banner, and fails without
+prompting if it did not engage. `--plan-yolo` is never used, because it auto-approves and drops back
+into implementation. `fast` and `hotfix` start in normal mode and implement immediately.
+
+The title is frozen at birth: `--title` when given, which must be lowercase letters, digits and
+single hyphens, else the task's first words with `job`, `task`, `brief` and any word ending in a
+colon dropped. The handover is not the bare task: `spawn` sends `prompts/preamble.md`, then
+`prompts/feat.md` in `feat` mode or `prompts/hotfix.md` in `hotfix` mode, then `prompts/work.md`,
+then the task. Feat therefore plans, hardens and only then implements. A prompt file that is missing
+or empty stops `spawn` with the file named. Those files are runtime behaviour: edit them to change
+how a minion behaves, never as documentation.
 
 ## Takeover: worktrees the overlord did not create
 
@@ -150,14 +169,18 @@ which happened: `<held>→<new>, agent resumed`, `opened <ws>, no agent`, `in re
 
 ## Plans outrank the merge queue
 
-`plans` prints `proposed`, `hardened` and the `action` per worktree.
+`plans` prints `proposed`, `hardened` and the `action` per worktree. `hardened` is one fact: the last
+line of the committed `PLAN.md` is `<!-- hardened: <sha of the plan commit> -->` and that sha names
+the commit holding exactly this plan text. A marker naming an older commit is stale, and the plan
+is unhardened again.
 
 |action|meaning|what the pass does|
 |---|---|---|
-|`harden`|a plan exists and was never stress-tested|`--inject` types `/skill:harden-plan` into that pane|
-|`approve`|the plan is proposed and hardened|`--approve` presses `1`: run the plan and drop the current context|
+|`harden`|plan committed, marker absent or stale|`--inject` types `/skill:harden-plan` into that pane|
+|`approve`|plan committed and its marker is current|`--approve` presses `1`: run the plan and drop the current context|
 |`none`|no plan, or already moving|nothing|
 
+`--approve` refuses an unhardened plan and says so on stderr; it never approves on a guess.
 Never rewrite another agent's plan file; the harden skill carries its own revision rules.
 
 ## Merge in the printed order
@@ -187,9 +210,9 @@ instruction per message:
 herdr agent prompt <pane_id> "<instruction>"
 ```
 
-The prompt returns once delivered; the answer arrives in this pane as text when the agent is done.
+The prompt returns once delivered; the answer arrives in this pane as text when the minion is done.
 Nothing waits on a pane and nothing starts a background task to watch one. `spawn` bakes a `DONE
-<branch>: <outcome, commit sha, PR url, what it ran>` report into the handover, so a spawned worker
+<branch>: <outcome, commit sha, PR url, what it ran>` report into the handover, so a spawned minion
 reports itself once as its last action; a report beats pane text when the two disagree.
 
 Conflicts: send `prompts/rebase.md` with `oldHead` and `newBase`, then gate and
@@ -205,25 +228,40 @@ defect. Nothing merges before the defects it reported are fixed.
 
 ## Labels and status dots
 
-`rename --apply` prefixes every workspace and pane with its step and a short title from the PR title
-or newest commit, and reports the same step as the `step` metadata token.
+`rename --apply` gives every workspace and pane `<symbol> <STEP> <name> <title>`, and reports the same
+step as the `step` metadata token. `name` (`m1`, `m2`, …) and `title` are frozen at registration and
+never recomputed; two renames over an unchanged worktree render identical labels. Agent state stays
+in herdr and never enters a label.
 
 |step|symbol|meaning|
 |---|---|---|
 |`IDLE`|💤|nothing started, nothing in flight|
-|`PLAN`|🗺|plan mode, no plan proposed yet|
-|`HRD`|🛡|plan proposed, waiting for hardening|
-|`WORK`|⚒|implementing|
+|`PLAN`|🗺|plan mode, no committed plan yet|
+|`HRD`|🛡|plan committed, marker absent or stale|
+|`BUILD`|⚒|plan hardened, implementing|
 |`REV`|🔍|reviewing what was built|
 |`REB`|⟳|rebasing a conflicting PR|
 |`MRG`|⤵|PR open, waiting to merge|
 |`DONE`|✔|merged, ready to prune|
+
+A freshly spawned feat minion reads `PLAN` with the plan-mode prompt pending and stays there until a
+plan file exists and is committed: `rename` and `watch` never fight the birth label.
 
 The label carries no colour: herdr renders it literally, so a hex code is visible text. The dot
 beside a workspace is herdr's status icon for that workspace's agent; the overlord's own is an eye,
 because it watches and does not build. The overlord is the session running this skill, never a
 spawned agent and never an extra pane: `rename --apply` names its pane and workspace `👁 OVERLORD`
 from `HERDR_PANE_ID` and `HERDR_WORKSPACE_ID`, with no step and no title.
+
+## Stalls are decisions
+
+A minion whose herdr state is `idle` while its step still implies work is stalled: `HRD`, `BUILD`,
+`REV`, `REB`, `MRG`. `PLAN` and `DONE` while idle are normal. A stall row carries name, step, title,
+seconds idle, last commit subject and age, dirtiness, PR state and checks, and whether the last
+non-empty pane line is a question — enough to decide on the spot: resume the minion, answer its
+question, merge a green PR, prune a merged one, respawn as a fresh job, or leave a legitimate wait
+alone. Ask a human only when the action is irreversible or the evidence conflicts. The tool never
+renames, respawns or kills by itself.
 
 ## Prune, then stop
 
@@ -236,3 +274,4 @@ exits 1 while work is in flight.
 ## Report
 
 One table: path, branch, PR, step, action this pass, next step. Name every blocker exactly.
+Answers are prose, tables and mermaid, never JSON.
