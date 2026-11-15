@@ -53,6 +53,19 @@ Agent Mail project needs the `ensure_project` call from the mail section below.
 `overlord.py spawn --mode fast|hotfix --task "<what to build>"` creates the worktree and starts the
 worker; without `--task` the script prints the command it would run.
 
+## Takeover: worktrees the overlord did not create
+
+```bash
+"$SKILL_DIR/scripts/overlord.py" adopt wRC /path/to/checkout   # workspace ids or paths
+"$SKILL_DIR/scripts/overlord.py" registry --rename-list        # what it now owns
+```
+
+`adopt` adds existing workspaces or checkouts to the ownership registry, so the pass renames,
+reviews and prunes them like its own. Ownership is never inferred from a label or a branch: the
+registry at `$XDG_STATE_HOME/call-overlord/worktrees.json` is the only source, `--remove` gives one
+back, and a corrupt registry is an error rather than an empty list. Adoption is a takeover, prune
+included: a merged, clean, idle adopted worktree is removed like any other.
+
 ## The feat pipeline, in six commands
 
 ```bash

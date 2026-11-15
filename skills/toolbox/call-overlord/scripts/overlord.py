@@ -69,6 +69,38 @@ def save_registry(entries: dict[str, dict[str, str]]) -> None:
     temporary.replace(REGISTRY)
 
 
+def cmd_adopt(args: argparse.Namespace) -> int:
+    """Take over worktrees this overlord did not create: an existing workspace or a path."""
+    by_path, _by_ws = herdr_facts()
+    workspaces = {}
+    if os.environ.get("HERDR_ENV") == "1":
+        for ws in json.loads(run(["herdr", "workspace", "list"]) or "{}").get("result", {}).get("workspaces", []):
+            workspaces[ws.get("workspace_id", "")] = (ws.get("worktree") or {}).get("checkout_path", "")
+
+    entries = registry()
+    print("#target\tpath\tbranch\tstate")
+    adopted = 0
+    for target in args.targets:
+        path_text = workspaces.get(target) or target
+        path = Path(path_text).expanduser()
+        if not path.is_dir():
+            print(f"{target}\t{path}\t-\tmissing")
+            continue
+        repo = Path(run(["git", "-C", str(path), "rev-parse", "--show-toplevel"]) or path)
+        branch = run(["git", "-C", str(path), "rev-parse", "--abbrev-ref", "HEAD"]) or "-"
+        resolved = str(path.resolve())
+        if resolved in entries:
+            print(f"{target}\t{path}\t{branch}\talready owned")
+            continue
+        entries[resolved] = {"repo": str(repo), "branch": branch, "mode": "adopted", "task": args.task}
+        adopted += 1
+        print(f"{target}\t{path}\t{branch}\tadopted")
+    if adopted:
+        save_registry(entries)
+    print(f"\nowned worktrees: {len(entries)}")
+    return 0 if adopted or entries else 1
+
+
 def cmd_registry(args: argparse.Namespace) -> int:
     entries = registry()
     if args.path:
@@ -696,7 +728,16 @@ def delegated(module: str):
     return handler
 
 
+BRIDGED = {"survey": "survey", "labels": "labels", "relabel": "apply", "verify": "verify"}
+
+
 def main(argv: list[str]) -> int:
+    # the rename helpers keep their own flags, so they are dispatched before argparse
+    # ever sees them: no REMAINDER quirks, no separator to remember
+    if argv and argv[0] in BRIDGED:
+        import importlib
+
+        return importlib.import_module(BRIDGED[argv[0]]).main(argv[1:])
     parser = argparse.ArgumentParser(description="Land worktree pull requests.")
     parser.add_argument("--repo", action="append", default=[], help="repository to inspect (repeatable)")
     parser.add_argument("--base", default="main", help="base branch for ahead counts")
@@ -707,14 +748,17 @@ def main(argv: list[str]) -> int:
     spawn.add_argument("--task", default="", help="what the worker should do")
     spawn.add_argument("--dry-run", action="store_true", help="print instead of creating")
 
-    for name, module, help_text in (
-        ("survey", "survey", "survey every worktree: branch, commits, panes"),
-        ("labels", "labels", "check labels against the naming rules"),
-        ("relabel", "apply", "rename workspaces and move their branches"),
-        ("verify", "verify", "verify labels after a pass"),
+    for name, help_text in (
+        ("survey", "survey every worktree: branch, commits, panes"),
+        ("labels", "check labels against the naming rules"),
+        ("relabel", "rename workspaces and move their branches"),
+        ("verify", "verify labels after a pass"),
     ):
-        sub = subs.add_parser(name, help=help_text)
-        sub.add_argument("rest", nargs=argparse.REMAINDER, help="arguments for the helper")
+        subs.add_parser(name, help=help_text, add_help=False)
+
+    adopt = subs.add_parser("adopt", help="take over existing worktrees or workspaces")
+    adopt.add_argument("targets", nargs="+", help="workspace id (w1) or checkout path")
+    adopt.add_argument("--task", default="", help="what the worktree is for")
 
     reg = subs.add_parser("registry", help="the worktrees this overlord owns")
     reg.add_argument("--path", action="store_true", help="one path per line")
@@ -753,10 +797,7 @@ def main(argv: list[str]) -> int:
     handlers = {
         "preflight": cmd_preflight,
         "registry": cmd_registry,
-        "survey": delegated("survey"),
-        "labels": delegated("labels"),
-        "relabel": delegated("apply"),
-        "verify": delegated("verify"),
+        "adopt": cmd_adopt,
         "spawn": cmd_spawn,
         "inventory": cmd_inventory,
         "order": cmd_order,
