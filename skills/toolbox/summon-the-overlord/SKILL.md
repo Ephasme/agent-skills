@@ -10,7 +10,7 @@ description: >-
   les PR des worktrees", "fais atterrir le travail des agents". Also starts a job in
   one of four modes: feat, fast, hotfix or ask.
 compatibility: >-
-  Requires git, gh, uv and python 3.11+; merging needs an authenticated gh. herdr is
+  Requires git, gh and the `overlord` binary on PATH; merging needs an authenticated gh. herdr is
   optional: it adds agent state, and it is the only way to press a key in a pane or to
   receive an agent's own report.
 disable-model-invocation: true
@@ -34,15 +34,15 @@ the work either: the plan, the TODO and the commits belong to the minion whose j
 change to this skill's own scripts, prompts or config is a job like any other.
 
 `$SKILL_DIR` is notation, not a set variable: this skill's directory, the one holding this `SKILL.md`.
-Every fact and every ordering decision comes from `$SKILL_DIR/scripts/overlord.py`: run it, read its
+Every fact and every ordering decision comes from the `overlord` binary: run it, read its
 output, act on it. Never re-derive what it computed, and never carry a list of handled items into the
 next pass.
 
 ## Run the pass
 
 ```bash
-"$SKILL_DIR/scripts/overlord.py" pass             # the whole pass, in one process
-"$SKILL_DIR/scripts/overlord.py" pass --dry-run   # the same report, changing nothing
+overlord pass             # the whole pass, in one process
+overlord pass --dry-run   # the same report, changing nothing
 ```
 
 `pass` names the overlord's pane and workspace `👁 OVERLORD`, prints every table — preflight,
@@ -58,20 +58,20 @@ what a failure means. Never invent a prompt the script already worded.
 Each step runs alone when one answer is needed:
 
 ```bash
-"$SKILL_DIR/scripts/overlord.py" bootstrap   # every read-only table
-"$SKILL_DIR/scripts/overlord.py" inventory   # one row per worktree
-"$SKILL_DIR/scripts/overlord.py" mode        # which mode each worktree is in
-"$SKILL_DIR/scripts/overlord.py" order       # merge plan for the open PRs
-"$SKILL_DIR/scripts/overlord.py" plans --inject --approve
-"$SKILL_DIR/scripts/overlord.py" rename --apply
-"$SKILL_DIR/scripts/overlord.py" review       # ocr over each PR diff; the artifact gates merges
-"$SKILL_DIR/scripts/overlord.py" watch        # the stall table; --alert prompts this pane
-"$SKILL_DIR/scripts/overlord.py" status       # 0 when nothing is landable
-"$SKILL_DIR/scripts/overlord.py" prune --apply
+overlord bootstrap   # every read-only table
+overlord inventory   # one row per worktree
+overlord mode        # which mode each worktree is in
+overlord order       # merge plan for the open PRs
+overlord plans --inject --approve
+overlord rename --apply
+overlord review      # ocr over each PR diff; the artifact gates merges
+overlord watch       # the stall table; --alert prompts this pane
+overlord status      # 0 when nothing is landable
+overlord prune --apply
 ```
 
 `--repo PATH` (repeatable) and `--base BRANCH` (default `main`) go before the subcommand:
-`overlord.py --repo PATH order`; `spawn` also takes them after. With no `--repo`, a pass covers the
+`overlord --repo PATH order`; `spawn` also takes them after. With no `--repo`, a pass covers the
 current directory when it is a checkout, every path in the ownership registry, and every repository
 open in herdr.
 
@@ -118,8 +118,8 @@ the mode, the step per worktree, and the evidence it used.
 |anything else already in motion|`fast`|`BUILD`|
 
 ```bash
-"$SKILL_DIR/scripts/overlord.py" spawn --mode fast|hotfix --task "<what to build>"
-"$SKILL_DIR/scripts/overlord.py" spawn --task "<what to build>" --title "<slug>" --dry-run
+overlord spawn --mode fast|hotfix --task "<what to build>"
+overlord spawn --task "<what to build>" --title "<slug>" --dry-run
 ```
 
 `spawn` creates the worktree, opens a plain herdr workspace on it, starts Oh My Pi in that
@@ -131,7 +131,7 @@ Plan mode is the case that bites, because omp routes a planning turn through `mo
 
 That model comes from `models.allowed` in `~/.overlord/config.yaml`, which ships as the classifier
 pair `deepseek/deepseek-v4.1-flash-1017` then `openai/gpt-5-mini`: `--model` or `OVERLORD_MODEL`
-names one of them, an unlisted name is refused before any worktree exists, and `overlord.py models`
+names one of them, an unlisted name is refused before any worktree exists, and `overlord models`
 prints the list and the default — never probe a model by starting a minion.
 
 `feat` additionally enters plan mode before the handover: `spawn` sends omp's own `app.plan.toggle`
@@ -150,8 +150,8 @@ how a minion behaves, never as documentation.
 ## Takeover: worktrees the overlord did not create
 
 ```bash
-"$SKILL_DIR/scripts/overlord.py" adopt wRC /path/to/checkout   # workspace ids or paths
-"$SKILL_DIR/scripts/overlord.py" registry --rename-list        # what it now owns
+overlord adopt wRC /path/to/checkout   # workspace ids or paths
+overlord registry --rename-list        # what it now owns
 ```
 
 `adopt` adds existing workspaces or checkouts to the ownership registry so the pass renames, reviews
