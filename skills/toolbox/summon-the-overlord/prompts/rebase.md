@@ -15,3 +15,5 @@ artifact.
 
 When both sides changed the same logic incompatibly and the task does not decide it, `git rebase
 --abort` and report the question. Never invent intent.
+
+Then `git push --force-with-lease` the rebased branch.

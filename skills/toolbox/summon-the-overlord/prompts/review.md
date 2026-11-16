@@ -8,7 +8,7 @@ concrete disclosure or unauthorized operation across a boundary that should stop
 Report a finding only with evidence of a sequence that occurs during the change's intended usage.
 Code shape, duplication and taste are not findings; a broader improvement is not a blocker.
 
-Severity: `error` must not merge, `warning` can wait, `info` is nice to have. Anchor every finding at
+Severity: `critical` and `high` block the merge; `medium` and `low` do not. Anchor every finding at
 `file:line`, one-indexed, in changed code; when one invariant breaks in several places, list each
 site in the same finding.
 

@@ -135,7 +135,7 @@ the mode, the step per worktree, and the evidence it used.
 |anything else already in motion|`fast`|`BUILD`|
 
 ```bash
-overlord spawn --mode fast|hotfix --task "<what to build>"
+overlord spawn --mode feat|fast|hotfix --task "<what to build>"
 overlord spawn --task "<what to build>" --title "<slug>" --dry-run
 ```
 
@@ -163,6 +163,9 @@ colon dropped. The handover is not the bare task: `spawn` sends `prompts/preambl
 then the task. Feat therefore plans, hardens and only then implements. A prompt file that is missing
 or empty stops `spawn` with the file named. Those files are runtime behaviour: edit them to change
 how a minion behaves, never as documentation.
+
+The handover ends with the reporting clause: `register_agent` once before the work, then
+`send_message` to `PinkAnchor` when the job is done or blocked.
 
 ## Takeover: worktrees the overlord did not create
 
@@ -245,10 +248,10 @@ report it, type nothing.
 `review` runs the `ocr` CLI against each PR diff — `--audience agent`, a per-PR `--background`,
 `--from origin/<base> --to <head> --repo <checkout>` — and writes the artifact to
 `$XDG_STATE_HOME/summon-the-overlord/review/<owner>-<repo>-<pr>.txt`. Its first line is
-`<!-- reviewed: <head sha> -->`, and that line is the gate: a PR is landable only while the artifact
-names its current head sha. A newer head reads `unreviewed: stale`, and no artifact reads
-`unreviewed: missing`, in `status` and `order` alike. Without `ocr`, preflight reports it missing and
-every open PR stays unlandable.
+`<!-- reviewed: <head sha> -->`, and that line is the gate: a PR is landable only when the artifact
+covers the current head and carries no critical or high finding. A newer head reads
+`unreviewed: stale`, and no artifact reads `unreviewed: missing`, in `status` and `order` alike.
+Without `ocr`, preflight reports it missing and every open PR stays unlandable.
 
 `review` prints one row per PR: repository, number, head, artifact, exit code, the four severity
 counts, and the sha the artifact actually covers. It ends with `## findings`, one prompt per defect
