@@ -55,6 +55,10 @@
     "type": "http",
     "url": "https://mcp.linear.app/mcp"
   },
+  "lsp": {
+    "type": "stdio",
+    "command": "lsp-mcp-server"
+  },
   "medicap": {
     "type": "http",
     "url": "https://medicap.site/api/mcp"
