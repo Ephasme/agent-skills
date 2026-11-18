@@ -6,6 +6,11 @@
       "Authorization": "Bearer ${AGENT_MAIL_BEARER_TOKEN}"
     }
   },
+  "agentation": {
+    "type": "stdio",
+    "command": "npx",
+    "args": ["-y", "agentation-mcp", "server"]
+  },
   "apify": {
     "type": "http",
     "url": "https://mcp.apify.com/"
