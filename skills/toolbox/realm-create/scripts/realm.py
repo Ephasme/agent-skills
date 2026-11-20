@@ -2,7 +2,7 @@
 """realm: wake subscribed herdr panes that have unread Agent Mail.
 
 launchd runs `realm tick` every 15 s; each subscriber is woken at most once per its own interval,
-only when its Agent Mail inbox has unread messages and herdr does not report its agent as working.
+only when its Agent Mail inbox has unread messages and herdr reports its agent neither working nor blocked.
 """
 
 import argparse
@@ -216,8 +216,9 @@ def cmd_tick(_a):
                 continue
             if status is None:
                 continue
-            if status == "working":
-                log(f"{pane} ({v['agent']}): busy, skip")
+            # `blocked` panes show a question form: typed text would answer it.
+            if status in ("working", "blocked"):
+                log(f"{pane} ({v['agent']}): {status}, skip")
                 continue
             try:
                 endpoint = endpoint or mail_endpoint()

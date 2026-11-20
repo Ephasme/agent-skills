@@ -32,7 +32,7 @@ returned inbox; carry any unread message into step 4.
 
 Below, `realm` is `python3 ~/.agents/skills/realm-create/scripts/realm.py`: every 15 s a launchd job
 (`com.loup.realm`) types `check your mail` + Enter into each subscribed pane whose agent has unread mail and is
-not `working`. Start it, then subscribe yourself:
+neither `working` nor `blocked`. Start it, then subscribe yourself:
 
 1. `launchctl print "gui/$(id -u)/com.loup.realm"` fails: `realm install`.
 2. `realm subscribe "$HERDR_PANE_ID" --agent <QUEEN> --project <key>`.
