@@ -35,8 +35,8 @@ reported, never retried blindly.
 ## 3. Clean up
 
 - `python3 ~/.agents/skills/realm-create/scripts/realm.py unsubscribe --project <key>`, `<key>` being the realm's
-  Agent Mail project: stops the mail nudges to your pane and the workers'. Leave the launchd service installed;
-  other realms may use it.
+  Agent Mail project: stops the workers' mail nudges and your pane's mail aside. Leave the launchd service
+  installed; other realms may use it.
 - Delete `${TMPDIR:-/tmp}/swarm/`, the briefs realm-create wrote.
 - Your own tab keeps its `👑 queen` label; nothing renames it.
 - Agent Mail: leave the workers registered. `retire_agent` keeps message history but needs each worker's

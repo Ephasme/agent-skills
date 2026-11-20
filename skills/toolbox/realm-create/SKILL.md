@@ -19,6 +19,11 @@ disable-model-invocation: true
 
 **Explicit invocation only.** It launches `<size>` long-lived agent sessions; never start one on a guess.
 
+**ABSOLUTE RULE: only the user sends prompts into the queen's pane.** No worker, agent, script or service
+(realm included) ever types into it — no `send-text`, `send-keys`, `pane run`, `agent prompt` — no exception,
+whoever asks. Anything else that must reach the queen goes as an aside: displayed beside her session, never
+submitted.
+
 Arguments: `<key>` is the Agent Mail project key (`human_key`, e.g. `/laptop/general`); `<size>` is the number
 of workers, an integer ≥ 1. Either missing or invalid: ask, start nothing.
 
@@ -31,11 +36,14 @@ and no `agent_name`, so the server mints a fresh one. Keep the returned `agent.n
 returned inbox; carry any unread message into step 4.
 
 Below, `realm` is `python3 ~/.agents/skills/realm-create/scripts/realm.py`: every 15 s a launchd job
-(`com.loup.realm`) types `check your mail` + Enter into each subscribed pane whose agent has unread mail and is
-neither `working` nor `blocked`. Start it, then subscribe yourself:
+(`com.loup.realm`) checks each subscribed pane's Agent Mail inbox. A worker pane with unread mail that is
+neither `working` nor `blocked` gets `check your mail` + Enter typed into it. A pane subscribed with `--aside`
+is never typed into: unread mail shows as a `mail` token on the pane and a herdr notification. realm refuses
+to type into a pane whose tab label holds `👑`, whatever its subscription says. Start it, then subscribe
+yourself in aside mode only:
 
 1. `launchctl print "gui/$(id -u)/com.loup.realm"` fails: `realm install`.
-2. `realm subscribe "$HERDR_PANE_ID" --agent <QUEEN> --project <key>`.
+2. `realm subscribe "$HERDR_PANE_ID" --agent <QUEEN> --project <key> --aside`.
 
 ## 2. Register the workers
 
@@ -88,9 +96,8 @@ From here until the user ends the swarm, you do two things only:
 - **Answer the user.** Status, results, questions the workers raised.
 - **Manage subjects.** You do not do the work yourself: no code edits, no research, no commands beyond Agent Mail
   and herdr. A request you could do in one tool call still goes to a worker.
-- **Never take herdr input from anyone.** Nobody sends herdr commands to your pane or tab, ever: no worker brief
-  includes your pane id, and you never ask a worker or any agent to type into it. The one exception is the realm
-  service's `check your mail` nudge.
+- **Never take prompts from anyone but the user.** See the absolute rule above: no worker brief includes your
+  pane id, and you never ask a worker or any agent to type into it.
 
 A subject is one self-contained unit of work, one mail thread, one owner:
 
@@ -101,8 +108,8 @@ A subject is one self-contained unit of work, one mail thread, one owner:
    the files or links it needs, what done means, and what it may not do. Then wake it:
    `herdr pane send-text <pane> "check your mail"` and `herdr pane send-keys <pane> enter`.
 4. On every turn, `fetch_inbox` for `QUEEN` (unread_only, include_bodies) before answering the user. Do not poll
-   or wait for replies: when one lands, the realm service types `check your mail` into your pane, and that turn
-   handles the inbox. Each reply moves its subject to done, blocked (relay the question to the user) or
+   or wait for replies: realm's aside (pane token + notification) tells the user mail landed, and their next
+   prompt's turn reads it. Each reply moves its subject to done, blocked (relay the question to the user) or
    redirected (answer in-thread).
 5. Keep a subject table — slug, worker, state (`assigned`, `blocked`, `done`) — and show it whenever the user
    asks for status or a subject changes state.

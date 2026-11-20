@@ -3,6 +3,8 @@
 
 launchd runs `realm tick` every 15 s; each subscriber is woken at most once per its own interval,
 only when its Agent Mail inbox has unread messages and herdr reports its agent neither working nor blocked.
+A `prompt` subscriber is woken by typing WAKE_TEXT + Enter into its pane. An `aside` subscriber is never
+typed into: it gets a herdr notification and a `mail` pane token, both display-only.
 """
 
 import argparse
@@ -25,6 +27,8 @@ LABEL = "com.loup.realm"
 TICK_SECONDS = 15
 DEFAULT_EVERY = 60
 WAKE_TEXT = "check your mail"
+QUEEN_TAB_MARK = "👑"
+TOKEN_SOURCE = "realm"
 MAIL_SERVER = "agent-mail-perso"
 
 HOME = Path.home()
@@ -88,8 +92,8 @@ def herdr(*args):
     return out
 
 
-def pane_status(pane_id):
-    """Return the pane's agent_status, "gone" if herdr says it no longer exists, None on other errors."""
+def pane_info(pane_id):
+    """Return the pane dict, "gone" if herdr says it no longer exists, None on other errors."""
     out = herdr("pane", "get", pane_id)
     err = out.get("error")
     if err:
@@ -97,14 +101,43 @@ def pane_status(pane_id):
             return "gone"
         log(f"herdr pane get {pane_id} failed: {err}")
         return None
-    return out["result"]["pane"].get("agent_status") or "unknown"
+    return out["result"]["pane"]
 
 
-def wake(pane_id):
+def is_queen_pane(pane):
+    """True when the pane's tab carries the queen label realm-create sets, or herdr cannot say.
+
+    Unknown counts as queen: a failed lookup must never let a prompt through.
+    """
+    out = herdr("tab", "get", pane.get("tab_id", ""))
+    try:
+        return QUEEN_TAB_MARK in out["result"]["tab"]["label"]
+    except (KeyError, TypeError):
+        return True
+
+
+def wake(pane_id, mode):
+    # Hard guard: the only call site of send-text/send-keys. An aside pane or a queen pane is never typed
+    # into, whatever the state file says.
+    pane = pane_info(pane_id)
+    if mode != "prompt" or not isinstance(pane, dict) or is_queen_pane(pane):
+        raise RuntimeError(f"refused to type into {pane_id}: aside or queen pane")
     for args in (("send-text", pane_id, WAKE_TEXT), ("send-keys", pane_id, "enter")):
         out = herdr("pane", *args)
         if out.get("error"):
             raise RuntimeError(f"herdr pane {args[0]} {pane_id}: {out['error']}")
+
+
+def aside(pane_id, agent, n, notify):
+    """Show unread mail beside the pane, never in it: a pane token, plus a herdr notification if notify."""
+    token = ["--token", f"mail=📬 {n}"] if n else ["--clear-token", "mail"]
+    out = herdr("pane", "report-metadata", pane_id, "--source", TOKEN_SOURCE, *token)
+    if out.get("error"):
+        raise RuntimeError(f"herdr pane report-metadata {pane_id}: {out['error']}")
+    if notify:
+        out = herdr("notification", "show", f"{agent}: {n} unread mail", "--body", f"pane {pane_id}", "--sound", "request")
+        if out.get("error"):
+            raise RuntimeError(f"herdr notification show: {out['error']}")
 
 
 # ---------- Agent Mail ----------
@@ -165,14 +198,22 @@ def unread_count(endpoint, agent, project):
 # ---------- commands ----------
 
 def cmd_subscribe(a):
+    mode = "aside" if a.aside else "prompt"
+    if mode == "prompt":
+        pane = pane_info(a.pane_id)
+        if not isinstance(pane, dict) or is_queen_pane(pane):
+            sys.exit(f"realm subscribe: {a.pane_id} is the queen's or unknown; only --aside may watch it")
     with locked_state() as s:
+        old = s["subscriptions"].get(a.pane_id, {})
         s["subscriptions"][a.pane_id] = {
             "agent": a.agent,
             "project": a.project,
             "every": a.every,
-            "last_wake": s["subscriptions"].get(a.pane_id, {}).get("last_wake", 0),
+            "mode": mode,
+            "last_wake": old.get("last_wake", 0),
+            "last_unread": old.get("last_unread", 0),
         }
-    log(f"subscribed {a.pane_id} agent={a.agent} project={a.project} every={a.every}s")
+    log(f"subscribed {a.pane_id} agent={a.agent} project={a.project} every={a.every}s mode={mode}")
 
 
 def cmd_unsubscribe(a):
@@ -196,7 +237,8 @@ def cmd_list(_a):
         print("no subscriptions")
     for pane, v in sorted(subs.items()):
         last = time.strftime("%H:%M:%S", time.localtime(v["last_wake"])) if v["last_wake"] else "never"
-        print(f"{pane}\t{v['agent']}\t{v['project']}\tevery {v['every']}s\tlast wake {last}")
+        mode = v.get("mode", "prompt")
+        print(f"{pane}\t{v['agent']}\t{v['project']}\t{mode}\tevery {v['every']}s\tlast wake {last}")
 
 
 def cmd_tick(_a):
@@ -209,15 +251,18 @@ def cmd_tick(_a):
         endpoint = None
         for pane in due:
             v = subs[pane]
-            status = pane_status(pane)
-            if status == "gone":
+            # Entries written before modes existed are prompt subscribers; wake() still guards them.
+            mode = v.get("mode", "prompt")
+            info = pane_info(pane)
+            if info == "gone":
                 del subs[pane]
                 log(f"{pane} ({v['agent']}): pane gone, unsubscribed")
                 continue
-            if status is None:
+            if info is None:
                 continue
-            # `blocked` panes show a question form: typed text would answer it.
-            if status in ("working", "blocked"):
+            status = info.get("agent_status") or "unknown"
+            # `blocked` panes show a question form: typed text would answer it. Asides type nothing.
+            if mode == "prompt" and status in ("working", "blocked"):
                 log(f"{pane} ({v['agent']}): {status}, skip")
                 continue
             try:
@@ -226,11 +271,25 @@ def cmd_tick(_a):
             except (OSError, urllib.error.URLError, RuntimeError, KeyError, ValueError) as e:
                 log(f"{pane} ({v['agent']}): mail check failed, skip: {e}")
                 continue
+            if mode == "aside":
+                last = v.get("last_unread", 0)
+                if n == last:
+                    continue
+                try:
+                    # The token tracks the count; the notification fires only when new mail arrives.
+                    aside(pane, v["agent"], n, notify=n > last)
+                except (RuntimeError, OSError, subprocess.SubprocessError) as e:
+                    log(f"{pane} ({v['agent']}): aside failed: {e}")
+                    continue
+                v["last_unread"] = n
+                v["last_wake"] = now
+                log(f"{pane} ({v['agent']}): {n} unread, aside shown")
+                continue
             if n == 0:
                 log(f"{pane} ({v['agent']}): no unread mail, skip")
                 continue
             try:
-                wake(pane)
+                wake(pane, mode)
             except (RuntimeError, OSError, subprocess.SubprocessError) as e:
                 log(f"{pane} ({v['agent']}): wake failed: {e}")
                 continue
@@ -288,6 +347,9 @@ def main():
     p.add_argument("--agent", required=True)
     p.add_argument("--project", required=True, help="Agent Mail human_key")
     p.add_argument("--every", type=int, default=DEFAULT_EVERY, help="min seconds between wakes (default 60)")
+    p.add_argument(
+        "--aside", action="store_true", help="never type into the pane: notification + pane token only (the queen)"
+    )
     p.set_defaults(fn=cmd_subscribe)
     p = sub.add_parser("unsubscribe", help="drop one pane, or every pane of --project")
     p.add_argument("pane_id", nargs="?")
