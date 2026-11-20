@@ -57,7 +57,7 @@ SOURCES = ("slack", "gmail-work", "gmail-perso", "whatsapp", "imessage")
 ACTIONS = ("task.add", "calendar.create", "calendar.update", "calendar.cancel")
 CONFIDENCE = ("low", "med", "high")
 # Why the user rejected a proposal; only `mistake` (the scout misjudged the message) is ratchet material.
-REASONS = ("mistake", "stale", "done", "unwanted")
+REASONS = ("mistake", "stale", "done", "unwanted", "cancelled")
 PRIORITIES = ("urgent", "normal")
 DECIDED = ("approved", "rejected")
 # Awaiting the user's verdict: `unclear` = the user must dig before deciding, never a rejection.
@@ -272,7 +272,8 @@ def render(proposals):
         when = " → ".join(x for x in (pl.get("start"), pl.get("end")) if x)
         extra = ", ".join(f"{k}: {pl[k]}" for k in ("calendar", "due", "attendees", "event_id") if pl.get(k))
         head = (f"**P{p['id']}** `{p['action']}` {pl.get('title', '')}" + (f" · {when}" if when else "")
-                + (" · **unclear**" if p["state"] == "unclear" else ""))
+                + (" · **unclear**" if p["state"] == "unclear" else "")
+                + (f" · rejected: {p['reason']}" if p["state"] == "rejected" and p["reason"] else ""))
         lines += [head,
                   f"- {p['source']} · {p['confidence']} · {p['why']}" + (f" · {extra}" if extra else ""),
                   f"- > {p['excerpt']}" + (f" ([link]({p['permalink']}))" if p["permalink"] else ""), ""]
@@ -997,7 +998,8 @@ def register(sub):
     p.add_argument("--reject", default="")
     p.add_argument("--unclear", default="", help="P1,P2: needs a deep-dive before deciding; stays open")
     p.add_argument("--reason", choices=REASONS,
-                   help="why rejected: mistake (scout misjudged), stale, done (already done), unwanted")
+                   help="why rejected: mistake (scout misjudged), stale (went old unanswered), done (already done), "
+                        "unwanted, cancelled (planned, then called off)")
     p.add_argument("--note", help="the user's own words on the verdict")
     p.set_defaults(fn=run(lambda c, a, now: decide(c, a.key, _ids(a.approve), _ids(a.reject), now,
                                                    a.reason, a.note, _ids(a.unclear))))

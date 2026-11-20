@@ -179,7 +179,8 @@ On a `scout-proposals` mail, or when the user asks:
    the item stays `proposed`. `realm proposal decide --project <key> --approve 3,5 --reject 4`. Each approved
    item is also kept as one short fact (title, why, date; never the excerpt) in the realm's Hindsight bank.
    A rejection carries why, from the user's words, never guessed: `--reason mistake` (the scout misjudged the
-   message), `stale`, `done` or `unwanted`, plus `--note "<their words>"`. Re-run `--reject N --reason …` to
+   message), `stale` (went old unanswered), `done`, `unwanted` or `cancelled` (planned, then called off), plus
+   `--note "<their words>"`. Re-run `--reject N --reason …` to
    add it to an item already rejected. `realm proposal list --reason mistake` exports the scout's mistakes.
    "Unclear" (they must dig before deciding) is not a rejection: `--unclear 6` keeps it open, flagged in the list.
 3. Approved `task.add`: `realm proposal apply --project <key> --ids 3`. It lands in `realm task list`.

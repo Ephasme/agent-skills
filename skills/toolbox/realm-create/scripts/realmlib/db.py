@@ -177,6 +177,14 @@ MIGRATIONS = [
     ALTER TABLE proposals RENAME COLUMN state_v8 TO state;
     CREATE INDEX proposals_by_state ON proposals(realm, state);
     """,
+    # 9: rejection reason `cancelled` (planned, then called off). Same column rebuild as 8.
+    """
+    ALTER TABLE proposals ADD COLUMN reason_v9 TEXT
+        CHECK (reason_v9 IN ('mistake','stale','done','unwanted','cancelled'));
+    UPDATE proposals SET reason_v9 = reason;
+    ALTER TABLE proposals DROP COLUMN reason;
+    ALTER TABLE proposals RENAME COLUMN reason_v9 TO reason;
+    """,
 ]
 
 

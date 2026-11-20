@@ -364,6 +364,10 @@ class Proposals(Base):
         # A rejection recorded before reasons existed gets its reason later; its decision time stays.
         scout.decide(self.conn, KEY, [], [a], T0 + 60, reason="mistake", note="misread the message")
         scout.decide(self.conn, KEY, [], [c], T0, reason="stale")
+        scout.decide(self.conn, KEY, [], [c], T0, reason="cancelled")  # re-reject: the reason changes
+        self.assertEqual([p["id"] for p in scout.list_proposals(self.conn, KEY, ["rejected"], reasons=["cancelled"])], [c])
+        self.assertIn(f"**P{c}** `task.add` Send deck · rejected: cancelled",
+                      scout.render(scout.list_proposals(self.conn, KEY, ids=[c])))
         mistakes = scout.list_proposals(self.conn, KEY, ["rejected"], reasons=["mistake"])
         self.assertEqual([(p["id"], p["note"], p["decided"]) for p in mistakes],
                          [(a, "misread the message", db.iso(T0))])
