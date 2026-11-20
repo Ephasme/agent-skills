@@ -297,8 +297,8 @@ def retire(conn, key, name):
 
 def move(conn, key, name):
     """Move a tab-era worker or scout pane into its own workspace with `herdr pane move`: the process keeps
-    running, so the agent keeps its conversation. Then rekey its subscription, record the pane and workspace,
-    and rewrite its brief for a later restart. Refused while a worker holds a subject.
+    running, mid-turn included, so the agent keeps its conversation and its current subject. Then rekey its
+    subscription, record the pane and workspace, and rewrite its brief for a later restart.
     """
     r = db.realm_row(conn, key)
     row = conn.execute("SELECT * FROM workers WHERE realm=? AND name=? AND retired_ts IS NULL",
@@ -306,10 +306,6 @@ def move(conn, key, name):
     scout = None if row else conn.execute("SELECT * FROM scouts WHERE realm=? AND agent=?", (key, name)).fetchone()
     if not (row or scout):
         raise Refused(f"no live worker or scout {name!r} in realm {key!r}")
-    if row:
-        w = db.worker_row(conn, key, name, now())
-        if not w["idle"]:
-            raise Refused(f"{name} holds {w['open_subjects']}: move it once its subjects end")
     old = (row or scout)["pane"]
     info = pane(old) if old else None
     if info is None:

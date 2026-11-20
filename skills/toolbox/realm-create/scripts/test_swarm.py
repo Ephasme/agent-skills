@@ -348,14 +348,16 @@ class SwarmTest(unittest.TestCase):
         with self.assertRaises(db.Refused):
             swarm.move(self.conn, KEY, "Old")  # already out of the queen's workspace
 
-    def test_move_refuses_a_busy_worker_and_the_queen(self):
+    def test_move_takes_a_busy_worker_but_never_the_queen(self):
         self.create(size=1)
         tab, p = self.h.add_tab("w", "🛠️ subject-busy")
+        self.h.panes[p].update(agent="omp", agent_status="working")
         db.add_worker(self.conn, KEY, "Busy", p, tab, None, self.t)
         db.add_subject(self.conn, KEY, "s1", "T", "Busy", None, None, None, self.t)
-        with self.assertRaises(db.Refused):
-            swarm.move(self.conn, KEY, "Busy")
-        self.assertIn(tab, self.h.tabs)
+        out = swarm.move(self.conn, KEY, "Busy")
+        self.assertNotIn(tab, self.h.tabs)
+        s = db.subject_row(self.conn, KEY, "s1")
+        self.assertEqual((s["state"], s["worker"], s["pane"]), ("assigned", "Busy", out["pane"]))
         db.add_worker(self.conn, KEY, "Fake", "w:p0", "w:t0", None, self.t)
         with self.assertRaises(db.Refused):
             swarm.move(self.conn, KEY, "Fake")
