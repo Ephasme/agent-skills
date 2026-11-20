@@ -19,6 +19,8 @@ disable-model-invocation: true
 
 **Explicit invocation only.** It launches `<size>` long-lived agent sessions; never start one on a guess.
 
+A realm already running whose queen session ended: `/realm-restart <key>` resumes it instead.
+
 **ABSOLUTE RULE: only the user sends prompts into the queen's pane.** No worker, agent, script or service
 (realm included) ever types into it — no `send-text`, `send-keys`, `pane run`, `agent prompt` — no exception,
 whoever asks. Anything else that must reach the queen goes as an aside: displayed beside her session, never
