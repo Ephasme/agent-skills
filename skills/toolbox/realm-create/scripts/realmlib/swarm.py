@@ -266,17 +266,18 @@ def create(conn, key, size, model, workspace, cwd, queen_pane, queen_tab, name=N
             **joined}
 
 
-def retire(conn, key, name, park=False):
+def retire(conn, key, name):
     """Scale in one worker: unsubscribe, close its workspace (its tab on older rows), retire it in Agent Mail,
     delete its brief.
 
-    Refused while it holds a subject, unless park: its open subjects are set paused and stay on it, for the record.
+    Only a worker whose subjects are all done: a paused one too keeps it, since retiring loses its conversation.
+    The queen closes or reassigns each subject first, explicitly; there is no override.
     """
     w = db.worker_row(conn, key, name, now())
     if w["retired"]:
         raise Refused(f"{name} is already retired")
-    if not w["idle"] and not park:
-        raise Refused(f"{name} still holds {w['open_subjects']}: reassign or close them first, or pass --park")
+    if not w["idle"]:
+        raise Refused(f"{name} still holds {w['open_subjects']}: close or reassign each one first")
     steps = {}
     unsubscribe([w["pane"]])
     steps["unsubscribe"] = "ok"
@@ -290,13 +291,8 @@ def retire(conn, key, name, park=False):
     if w["brief"]:
         Path(w["brief"]).unlink(missing_ok=True)
     steps["brief"] = "deleted"
-    parked = []
-    for s in db.list_subjects(conn, key):
-        if s["worker"] == name and s["state"] in ("queued", "assigned", "blocked"):
-            db.set_state(conn, key, s["slug"], "paused", None, None, now())
-            parked.append(s["slug"])
-    db.retire_worker(conn, key, name, now(), keep_subjects=park)
-    return {"name": name, "steps": steps, "parked": parked}
+    db.retire_worker(conn, key, name, now())
+    return {"name": name, "steps": steps}
 
 
 def move(conn, key, name):
@@ -569,10 +565,10 @@ def register(sub):
     p.add_argument("--timeout", type=int, default=JOIN_TIMEOUT)
     p.set_defaults(fn=db.run_verb(lambda c, a, t: wait_joined(c, a.key, a.names, a.timeout)))
 
-    p = db.keyed_parser(sub, "retire", "scale in: unsubscribe, close workspace, retire_agent, delete brief")
+    p = db.keyed_parser(sub, "retire", "scale in a worker whose subjects are all done: unsubscribe, close "
+                                       "workspace, retire_agent, delete brief")
     p.add_argument("--name", required=True)
-    p.add_argument("--park", action="store_true", help="retire anyway: its open subjects become paused")
-    p.set_defaults(fn=db.run_verb(lambda c, a, t: retire(c, a.key, a.name, a.park)))
+    p.set_defaults(fn=db.run_verb(lambda c, a, t: retire(c, a.key, a.name)))
 
     p = db.keyed_parser(sub, "move", "move a tab-era worker or scout into its own workspace, conversation kept")
     p.add_argument("--name", required=True, help="worker or scout agent name")

@@ -119,14 +119,15 @@ No upper bound on workers.
 - **Out:** `realm worker list --project <key> --idle` is empty. Queue instead when the subject must follow a
   current one, or is not urgent and a worker frees soon. Otherwise `realm spawn --project <key>`, then
   `realm wait-joined --project <key> <name>`.
-- **In:** for each worker `realm worker list --project <key> --scale-in` returns (it holds no `queued`,
-  `assigned`, `blocked` or `paused` subject, and nothing changed for it for 30 min):
-  `realm retire --project <key> --name <W>`. It unsubscribes the pane, closes its workspace, retires the agent in
-  Agent Mail and deletes the brief; each step's outcome is in `steps`. Its subjects stay in the db.
-- A worker holding a subject is never retired on your own initiative. On the user's word:
-  `realm retire --project <key> --name <W> --park`; its `queued`, `assigned` and `blocked` subjects become
-  `paused` (listed in `parked`; name them in your answer) and it retires anyway. Never close its workspace or call
-  `retire_agent` by hand.
+- **In:** for each worker `realm worker list --project <key> --scale-in` returns (every subject it held is
+  `done`, and nothing changed for it for 30 min): `realm retire --project <key> --name <W>`. It unsubscribes the
+  pane, closes its workspace, retires the agent in Agent Mail and deletes the brief; each step's outcome is in
+  `steps`. Its subjects stay in the db.
+- `realm retire` refuses a worker holding any subject that is not `done`, paused ones included. To retire one on
+  the user's word, first close or reassign each of its subjects explicitly (`realm subject set-state … --state
+  done`, or `realm subject assign` to another worker plus a mail to that worker in the subject's thread: `assign`
+  only records it) and name them in your answer, then retire. Never close its workspace or call `retire_agent` by
+  hand.
 
 ## The scout
 

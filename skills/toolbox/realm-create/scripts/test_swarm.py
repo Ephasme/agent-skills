@@ -395,19 +395,19 @@ class SwarmTest(unittest.TestCase):
             swarm.retire(self.conn, KEY, "WorkerAox")
         self.assertIn("x1", self.h.workspaces)
 
-    def test_retire_park_pauses_open_subjects_and_retires(self):
+    def test_retire_only_once_every_subject_is_done(self):
+        """Loup: retire done workers only. A paused subject keeps its worker alive; there is no override."""
         self.create(size=1)
         swarm.dispatch(self.conn, KEY, "WorkerAox", "s1", "t", "b")
-        db.set_state(self.conn, KEY, "s1", "blocked", "needs token", None, self.t)
-        swarm.dispatch(self.conn, KEY, "WorkerAox", "s2", "t", "b", after="s1")
-        res = swarm.retire(self.conn, KEY, "WorkerAox", park=True)
-        self.assertEqual(sorted(res["parked"]), ["s1", "s2"])
+        db.set_state(self.conn, KEY, "s1", "paused", "waits on the user", None, self.t)
+        self.assertFalse(db.worker_row(self.conn, KEY, "WorkerAox", self.t + 7200)["scale_in"])
+        with self.assertRaisesRegex(db.Refused, "s1:paused"):
+            swarm.retire(self.conn, KEY, "WorkerAox")
+        self.assertEqual((self.m.retired, "x1" in self.h.workspaces), ([], True))
+        db.set_state(self.conn, KEY, "s1", "done", None, None, self.t)
+        self.assertTrue(db.worker_row(self.conn, KEY, "WorkerAox", self.t + 30 * 60)["scale_in"])
+        swarm.retire(self.conn, KEY, "WorkerAox")
         self.assertEqual(self.m.retired, ["WorkerAox"])
-        self.assertNotIn("x1", self.h.workspaces)
-        subjects = {s["slug"]: s for s in db.list_subjects(self.conn, KEY)}
-        self.assertEqual({s["state"] for s in subjects.values()}, {"paused"})
-        self.assertEqual(subjects["s1"]["status"], "needs token")
-        self.assertEqual(db.list_workers(self.conn, KEY, self.t), [])
 
     def test_stop_is_scoped_to_the_key(self):
         self.create(size=1)
