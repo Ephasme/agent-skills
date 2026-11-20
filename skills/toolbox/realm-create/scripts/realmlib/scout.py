@@ -18,6 +18,8 @@ private contacts.
 import hashlib
 import json
 import os
+import re
+import shlex
 import subprocess
 import time
 import urllib.error
@@ -805,8 +807,51 @@ def write_brief(key, name, queen, label, workspace):
     return brief
 
 
-def spawn(conn, key, now):
-    """Register the scout, write its brief, open its workspace, start omp on it, subscribe it as a scout, record it."""
+# Every role and bundled-agent override the global config points at a model: the scout's overlay repoints them
+# all, so its subagents, judge and advisor spend the scout's model rather than the global one.
+OVERLAY_ROLES = ("default", "plan", "task", "advisor", "widget", "judge")
+OVERLAY_AGENTS = ("task", "scout", "reviewer", "security-reviewer", "sonic")
+
+
+def overlay_path(key):
+    slug = re.sub(r"[^A-Za-z0-9]+", "-", key).strip("-") or "root"
+    return STATE_DIR / "scout-config" / f"{slug}.yml"
+
+
+def write_overlay(key, model):
+    """An `omp --config` overlay scoped to the scout's process; JSON is valid YAML, so no YAML library."""
+    path = overlay_path(key)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps({"modelRoles": {r: model for r in OVERLAY_ROLES},
+                                "task": {"agentModelOverrides": {a: model for a in OVERLAY_AGENTS}}}, indent=2) + "\n")
+    return path
+
+
+def launch_command(key, model, brief=None, resume=None):
+    """`omp`, plus `--model` and the overlay when the scout has its own model, then `--resume <id>` (the session
+    already holds the brief) or `@brief`."""
+    from . import swarm
+
+    args = [swarm.PROGRAM]
+    if model:
+        args += ["--model", model, "--config", str(write_overlay(key, model))]
+    if resume:
+        return shlex.join(args + ["--resume", resume])
+    return shlex.join(args) + f" @{brief}"
+
+
+def set_model(conn, key, model, resume):
+    """Record the scout's model and return the command that relaunches it in place, resuming its session."""
+    s = _scout(conn, key)
+    with tx(conn):
+        conn.execute("UPDATE scouts SET model=? WHERE realm=?", (model, key))
+    return {"agent": s["agent"], "pane": s["pane"], "model": model, "command": launch_command(key, model, resume=resume)}
+
+
+def spawn(conn, key, now, model=None):
+    """Register the scout, write its brief, open its workspace, start omp on it, subscribe it as a scout, record it.
+
+    `model` runs the scout, and every subagent it starts, on that model instead of omp's configured one."""
     from . import swarm
 
     r = swarm._spawnable(conn, key)
@@ -814,30 +859,31 @@ def spawn(conn, key, now):
     if old and old["pane"] and swarm.pane(old["pane"]):
         raise Refused(f"realm {key} already has a live scout {old['agent']} in {old['pane']}")
     name = swarm.call("create_agent_identity", {
-        "project_key": key, "program": swarm.PROGRAM, "model": r["model"],
+        "project_key": key, "program": swarm.PROGRAM, "model": model or r["model"],
         "task_description": f"Swarm scout, queen {r['queen']}"})["name"]
     label = f"{SCOUT_MARK} {db.label(r)} · scout"
     pane_id, ws = swarm.open_workspace(label, r["cwd"])
     swarm.bind_pane(pane_id, name, key)  # before omp starts: its first poll already finds the file
     brief = write_brief(key, name, r["queen"], label, ws)
-    swarm._ok(swarm.herdr("pane", "run", pane_id, f"{swarm.PROGRAM} @{brief}"), "pane run")
+    swarm._ok(swarm.herdr("pane", "run", pane_id, launch_command(key, model, brief)), "pane run")
     with locked_state() as s:
         s["subscriptions"][pane_id] = {
             "agent": name, "project": key, "mode": "prompt", "cursor": None, "pending": [],
             "last_wake": 0, "last_unread": 0, "kind": "scout", "wake_text": SCAN_TEXT, "last_scan_wake": now}
     with tx(conn):
         conn.execute(
-            """INSERT INTO scouts (realm, agent, pane, tab, workspace, brief, created_ts) VALUES (?,?,?,NULL,?,?,?)
+            """INSERT INTO scouts (realm, agent, pane, tab, workspace, brief, model, created_ts)
+               VALUES (?,?,?,NULL,?,?,?,?)
                ON CONFLICT(realm) DO UPDATE SET agent=excluded.agent, pane=excluded.pane, tab=NULL,
-                 workspace=excluded.workspace, brief=excluded.brief""",
-            (key, name, pane_id, ws, str(brief), now))
-    log(f"spawned scout {name} in {pane_id} ({ws}) for {key}")
-    return {"name": name, "pane": pane_id, "workspace": ws, "brief": str(brief)}
+                 workspace=excluded.workspace, brief=excluded.brief, model=excluded.model""",
+            (key, name, pane_id, ws, str(brief), model, now))
+    log(f"spawned scout {name} in {pane_id} ({ws}) for {key}" + (f" on {model}" if model else ""))
+    return {"name": name, "pane": pane_id, "workspace": ws, "brief": str(brief), "model": model}
 
 
 def show(conn, key, now):
     s = _scout(conn, key)
-    return {"agent": s["agent"], "pane": s["pane"], "workspace": s["workspace"], "tab": s["tab"],
+    return {"agent": s["agent"], "pane": s["pane"], "workspace": s["workspace"], "tab": s["tab"], "model": s["model"],
             "last_scan_start": db.iso(s["scan_start_ts"]),
             "last_scan_end": db.iso(s["scan_end_ts"]), "scan_due": scan_due(conn, key, now),
             "interval_s": interval(now),
@@ -899,8 +945,13 @@ def register(sub):
     run, kp = db.run_verb, db.keyed_parser
 
     sc = sub.add_parser("scout", help="scout: channel tracker and proposals").add_subparsers(dest="sccmd", required=True)
-    p = kp(sc, "spawn", "start the realm's scout in its own tab")
-    p.set_defaults(fn=run(lambda c, a, now: spawn(c, a.key, now)))
+    p = kp(sc, "spawn", "start the realm's scout in its own workspace")
+    p.add_argument("--model", help="omp model for the scout and its subagents (default: omp's configured one)")
+    p.set_defaults(fn=run(lambda c, a, now: spawn(c, a.key, now, a.model)))
+    p = kp(sc, "set-model", "record the live scout's model; prints the command that relaunches it in place")
+    p.add_argument("--model", help="omp model; omit to go back to omp's configured one")
+    p.add_argument("--resume", required=True, help="the scout's omp session id (its exit line names it)")
+    p.set_defaults(fn=run(lambda c, a, now: set_model(c, a.key, a.model, a.resume)))
     p = kp(sc, "show", "the scout, its schedule and cursors")
     p.set_defaults(fn=run(lambda c, a, now: show(c, a.key, now)))
     p = kp(sc, "scan-start", "record a scan's start")

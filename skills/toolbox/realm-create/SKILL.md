@@ -154,6 +154,13 @@ scout: the launchd job types `scan` into it every hour from 08:00 to 22:00 and e
 another realm's (the user's word: it must not start from scratch): `realm scout adopt --from <old> --project
 <key>` moves cursors, judged ids, proposals, their tasks and scan times; refused once the new scout has acked.
 
+`--model <m>` on `scout spawn` runs the scout on its own omp model (stored on its row, shown by `scout show`);
+an overlay at `~/.local/state/realm/scout-config/<key>.yml`, passed with `omp --config`, repoints every model role and
+`task.agentModelOverrides` entry to it, so its subagents spend that model too, never the global config's. Switching a
+live scout, keeping its conversation: exit its omp (the exit line names the session id), run
+`realm scout set-model --project <key> --model <m> --resume <id>`, and run the command it prints in the same pane.
+Never respawn the scout for this.
+
 The scout reads Slack, both Gmail accounts, and the WhatsApp/iMessage chats allowlisted in
 `~/.config/realm/scout.json` (private: names contacts, never in a repository), all through `realm scout fetch`,
 which reads with read-only credentials: Slack and Gmail keys from `mcp/secrets.sops.yaml` (`SCOUT_SLACK_USER_TOKEN`,

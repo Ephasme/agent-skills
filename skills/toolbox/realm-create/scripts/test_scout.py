@@ -1,5 +1,6 @@
 """Tests for realmlib.scout: `python3 -m unittest test_scout` from this directory. No network, no sleeps."""
 
+import json
 import tempfile
 import unittest
 from datetime import datetime
@@ -411,6 +412,23 @@ class Adopt(Base):
             scout.adopt(self.conn, OTHER, KEY)
         with self.assertRaises(Refused):
             scout.adopt(self.conn, KEY, KEY)
+
+
+class Model(Base):
+    def test_relaunch_resumes_with_model_and_overlay(self):
+        with mock.patch.object(scout, "STATE_DIR", Path(self.dir.name)):
+            out = scout.set_model(self.conn, KEY, "omniroute/perso/cc/sonnet", "abc123")
+            overlay = scout.overlay_path(KEY)
+            cfg = json.loads(overlay.read_text())
+        self.assertEqual(out["command"],
+                         f"omp --model omniroute/perso/cc/sonnet --config {overlay} --resume abc123")
+        self.assertEqual(set(cfg["modelRoles"].values()), {"omniroute/perso/cc/sonnet"})
+        self.assertEqual(cfg["task"]["agentModelOverrides"]["task"], "omniroute/perso/cc/sonnet")
+        self.assertEqual(scout.show(self.conn, KEY, T0)["model"], "omniroute/perso/cc/sonnet")
+        self.assertIsNone(scout.show(self.conn, OTHER, T0)["model"])
+
+    def test_no_model_launches_plain_omp(self):
+        self.assertEqual(scout.launch_command(KEY, None, "/b/s.md"), "omp @/b/s.md")
 
 
 class Brief(unittest.TestCase):

@@ -158,6 +158,10 @@ MIGRATIONS = [
     ALTER TABLE proposals ADD COLUMN note TEXT;
     ALTER TABLE tasks ADD COLUMN priority TEXT NOT NULL DEFAULT 'normal' CHECK (priority IN ('urgent','normal'));
     """,
+    # 7: the scout's own model (`realm scout spawn --model`); NULL = omp's configured default.
+    """
+    ALTER TABLE scouts ADD COLUMN model TEXT;
+    """,
 ]
 
 
