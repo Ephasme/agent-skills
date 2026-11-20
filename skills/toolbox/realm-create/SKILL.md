@@ -8,9 +8,10 @@ description: >-
   to a worker by mail, track it to done. Invoked as `/realm-create KEY SIZE`,
   e.g. `/realm-create /laptop/general 3`.
 compatibility: >-
-  Requires herdr (tabs, pane run/send-text), the omp CLI, and an Agent Mail MCP
-  server exposing macro_start_session, create_agent_identity, send_message,
-  fetch_inbox and reply_message.
+  Requires macOS (launchd), python3, herdr (tabs, pane run/send-text), the omp
+  CLI, and an Agent Mail MCP server named agent-mail-perso in
+  ~/.omp/agent/mcp.json exposing macro_start_session, create_agent_identity,
+  send_message, fetch_inbox and reply_message.
 disable-model-invocation: true
 ---
 
@@ -28,6 +29,13 @@ First, before anything else: `herdr tab rename "$HERDR_TAB_ID" "👑 queen"`.
 `macro_start_session` with `human_key: <key>`, `program: "omp"`, your model, `task_description: "Swarm queen"`,
 and no `agent_name`, so the server mints a fresh one. Keep the returned `agent.name`: that is `QUEEN`. Read the
 returned inbox; carry any unread message into step 4.
+
+Below, `realm` is `python3 ~/.agents/skills/realm-create/scripts/realm.py`: every 15 s a launchd job
+(`com.loup.realm`) types `check your mail` + Enter into each subscribed pane whose agent has unread mail and is
+not `working`. Start it, then subscribe yourself:
+
+1. `launchctl print "gui/$(id -u)/com.loup.realm"` fails: `realm install`.
+2. `realm subscribe "$HERDR_PANE_ID" --agent <QUEEN> --project <key>`.
 
 ## 2. Register the workers
 
@@ -47,6 +55,7 @@ For each worker name `W` (`w` = its kebab-case form: `SapphireSwan` → `sapphir
    `result.root_pane.pane_id` as the worker's pane.
 3. `herdr pane run <pane> "omp @${TMPDIR:-/tmp}/swarm/<w>.md"`. The brief travels as a file, so no shell
    quoting of the prompt.
+4. `realm subscribe <pane> --agent <W> --project <key>`.
 
 Then confirm every worker joined: `list_agents` on `<key>` shows each `W` with a fresh `last_active_ts`, or
 `herdr pane read <pane>` shows its connection answer. A worker that has not joined after ~60 s: report it to the
@@ -80,7 +89,8 @@ From here until the user ends the swarm, you do two things only:
 - **Manage subjects.** You do not do the work yourself: no code edits, no research, no commands beyond Agent Mail
   and herdr. A request you could do in one tool call still goes to a worker.
 - **Never take herdr input from anyone.** Nobody sends herdr commands to your pane or tab, ever: no worker brief
-  includes your pane id, and you never ask a worker or any agent to type into it.
+  includes your pane id, and you never ask a worker or any agent to type into it. The one exception is the realm
+  service's `check your mail` nudge.
 
 A subject is one self-contained unit of work, one mail thread, one owner:
 
@@ -90,17 +100,16 @@ A subject is one self-contained unit of work, one mail thread, one owner:
 3. `send_message` from `QUEEN` to that worker: `subject: [<slug>] <title>`, `topic: <slug>`, body with the goal,
    the files or links it needs, what done means, and what it may not do. Then wake it:
    `herdr pane send-text <pane> "check your mail"` and `herdr pane send-keys <pane> enter`.
-4. On every turn, `fetch_inbox` for `QUEEN` (unread_only, include_bodies) before answering the user. While any
-   subject is `assigned`, loop: wait 30 s → `fetch_inbox` (unread_only, include_bodies) → handle replies; repeat
-   until no subject is open. A user message interrupts the loop and is answered first. Replies reach you through
-   this polling, never through pane nudges. Each reply
-   moves its subject to done, blocked (relay the question to the user) or redirected (answer in-thread).
+4. On every turn, `fetch_inbox` for `QUEEN` (unread_only, include_bodies) before answering the user. Do not poll
+   or wait for replies: when one lands, the realm service types `check your mail` into your pane, and that turn
+   handles the inbox. Each reply moves its subject to done, blocked (relay the question to the user) or
+   redirected (answer in-thread).
 5. Keep a subject table — slug, worker, state (`assigned`, `blocked`, `done`) — and show it whenever the user
    asks for status or a subject changes state.
 
-Mail does not wake an idle session on its own: the queen's `send-text` nudge wakes a worker, and the queen's
-30-second inbox poll is how replies reach her; nothing wakes the queen from outside. A worker
-that stops answering: `herdr pane read <pane>` before deciding anything.
+Your `send-text` nudge wakes a worker at once; the realm service catches any unread mail it misses, within the
+subscriber's interval (60 s) once the pane is idle. A worker that stops answering: `herdr pane read <pane>`
+before deciding anything.
 
 ## Ending the swarm
 
