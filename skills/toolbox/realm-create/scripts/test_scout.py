@@ -316,6 +316,38 @@ class Tasks(Base):
             scout.set_priority(self.conn, OTHER, a["id"], "normal")
 
 
+class Adopt(Base):
+    def test_history_moves_whole_and_scan_resumes(self):
+        scout.propose(self.conn, OTHER, [self.prop("m1"), self.prop("m2")], T0)
+        scout.ack(self.conn, OTHER, {"source": "slack", "cursors": {"all": "100"}, "ids": ["m1", "m2", "m3"],
+                                     "proposed": ["m1", "m2"]}, T0)
+        p1, p2 = sorted(p["id"] for p in scout.list_proposals(self.conn, OTHER))
+        scout.mailed(self.conn, OTHER, [p1, p2], 7)
+        scout.decide(self.conn, OTHER, [p1], [], T0)
+        scout.apply_tasks(self.conn, OTHER, [p1], T0)
+        scout.add_task(self.conn, OTHER, "by hand", None, None, T0)  # not the scout's: stays
+        scout.scan_end(self.conn, OTHER, T0, push=lambda *a: "off")
+        # KEY's fresh scout proposed m2 again (deleted) and m9 (kept)
+        scout.propose(self.conn, KEY, [self.prop("m2"), self.prop("m9")], T0)
+        out = scout.adopt(self.conn, OTHER, KEY)
+        self.assertEqual(out["moved"], {"tasks": 1, "scout_cursors": 1, "scout_seen": 3, "proposals": 2})
+        self.assertEqual(len(out["deleted_duplicates"]), 1)
+        self.assertEqual(sorted(p["ref"] for p in scout.list_proposals(self.conn, KEY)), ["m1", "m2", "m9"])
+        self.assertEqual(scout.cursors(self.conn, KEY, "slack", T0)["cursors"], {"all": "100"})
+        self.assertEqual(scout.unseen(self.conn, KEY, "slack", ["m1", "m3", "m4"]), ["m4"])
+        self.assertEqual([t["title"] for t in scout.list_tasks(self.conn, KEY, ["open"])], ["Send deck"])
+        self.assertEqual([t["title"] for t in scout.list_tasks(self.conn, OTHER, ["open"])], ["by hand"])
+        self.assertFalse(scout.scan_due(self.conn, KEY, T0 + 60))
+        self.assertTrue(scout.cursors(self.conn, OTHER, "slack", T0)["first"])
+
+    def test_refuses_onto_a_scout_with_its_own_history(self):
+        scout.ack(self.conn, KEY, {"source": "slack", "cursors": {"all": "5"}, "ids": ["x"], "proposed": []}, T0)
+        with self.assertRaises(Refused):
+            scout.adopt(self.conn, OTHER, KEY)
+        with self.assertRaises(Refused):
+            scout.adopt(self.conn, KEY, KEY)
+
+
 class Brief(unittest.TestCase):
     def test_fill_keeps_json_braces(self):
         text = scout.fill(scout.BRIEF_TEMPLATE.read_text(), S="Scout", KEY="/k", QUEEN="Q", LABEL="L")

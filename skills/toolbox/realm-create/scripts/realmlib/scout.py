@@ -791,6 +791,41 @@ def show(conn, key, now):
                 (key,))]}
 
 
+def adopt(conn, src, dst):
+    """Hand src's scout history to dst's scout: cursors, judged ids, proposals (ids kept, so seen rows and
+    tasks still point at them), the tasks made from them, and the scan timestamps, so dst's next scan
+    resumes where src's stopped. Refused if dst already judged a message or holds a cursor: two histories
+    never merge. A dst proposal matching a moved one on source, ref and action is deleted unless a task
+    uses it.
+    """
+    if src == dst:
+        raise Refused("adopt needs two different realms")
+    s, d = _scout(conn, src), _scout(conn, dst)
+    for t in ("scout_cursors", "scout_seen"):
+        n = conn.execute(f"SELECT COUNT(*) FROM {t} WHERE realm=?", (dst,)).fetchone()[0]
+        if n:
+            raise Refused(f"{dst} already has {n} {t} rows: its scout has a history of its own")
+    dups = [r["id"] for r in conn.execute(
+        """SELECT p.id FROM proposals p WHERE p.realm=? AND EXISTS (SELECT 1 FROM proposals q WHERE q.realm=?
+           AND q.source=p.source AND q.ref=p.ref AND q.action=p.action)
+           AND NOT EXISTS (SELECT 1 FROM tasks t WHERE t.proposal_id=p.id)""", (dst, src))]
+    with db.tx(conn):
+        conn.executemany("DELETE FROM proposals WHERE id=?", [(i,) for i in dups])
+        moved = {}
+        moved["tasks"] = conn.execute(
+            "UPDATE tasks SET realm=? WHERE realm=? AND proposal_id IN (SELECT id FROM proposals WHERE realm=?)",
+            (dst, src, src)).rowcount
+        for t in ("scout_cursors", "scout_seen", "proposals"):
+            moved[t] = conn.execute(f"UPDATE {t} SET realm=? WHERE realm=?", (dst, src)).rowcount
+        conn.execute("UPDATE scouts SET last_wake_ts=?, scan_start_ts=?, scan_end_ts=? WHERE realm=?",
+                     (s["last_wake_ts"], s["scan_start_ts"], s["scan_end_ts"], dst))
+        conn.execute("UPDATE scouts SET last_wake_ts=NULL, scan_start_ts=NULL, scan_end_ts=NULL WHERE realm=?",
+                     (src,))
+    log(f"scout history {src} -> {dst} ({d['agent']}): {moved}, deleted duplicates {dups}")
+    return {"from": src, "to": dst, "agent": d["agent"], "moved": moved, "deleted_duplicates": dups,
+            "scan_start": db.iso(s["scan_start_ts"]), "scan_end": db.iso(s["scan_end_ts"])}
+
+
 # ---------- CLI ----------
 
 def _stdin_json():
@@ -830,6 +865,9 @@ def register(sub):
     p.set_defaults(fn=run(lambda c, a, now: fetch(c, a.key, a.source, now, a.limit)))
     p = kp(sc, "propose", "stdin [proposal, …]: record them; duplicates come back flagged")
     p.set_defaults(fn=run(lambda c, a, now: propose(c, a.key, _stdin_json(), now)))
+    p = kp(sc, "adopt", "move another realm's scout history (cursors, seen, proposals, their tasks, scan times) here")
+    p.add_argument("--from", dest="src", required=True, help="realm key whose scout history moves")
+    p.set_defaults(fn=run(lambda c, a, now: adopt(c, db.resolve_key(a.src, conn=c), a.key)))
 
     pr = sub.add_parser("proposal", help="proposals awaiting the user").add_subparsers(dest="prcmd", required=True)
     p = kp(pr, "list", "proposals (default: proposed)")

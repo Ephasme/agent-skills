@@ -136,7 +136,9 @@ agent, writes its brief (`scripts/scout-brief.md`, filled), opens its own `🔭 
 subscribes the pane as a
 scout: the launchd job types `scan` into it every hour from 08:00 to 22:00 and every three hours otherwise
 (Europe/Paris), mail wakes first. It is not a worker: never dispatch a subject to it, it never shows in
-`worker list`. `realm scout show --project <key>` gives its last scan and cursors.
+`worker list`. `realm scout show --project <key>` gives its last scan and cursors. A new scout continuing
+another realm's (the user's word: it must not start from scratch): `realm scout adopt --from <old> --project
+<key>` moves cursors, judged ids, proposals, their tasks and scan times; refused once the new scout has acked.
 
 The scout reads Slack, both Gmail accounts, and the WhatsApp/iMessage chats allowlisted in
 `~/.config/realm/scout.json` (private: names contacts, never in a repository), all through `realm scout fetch`,
