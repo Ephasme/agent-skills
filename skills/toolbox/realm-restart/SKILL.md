@@ -41,7 +41,8 @@ version of everything this session must do as queen; a pointer to it is not enou
 
 `realm restart --project <realm> --model <your model>`, from this pane. It:
 
-- labels this tab `👑 queen · <name>` (realm's guard then refuses to type into it);
+- labels this tab `👑 queen · <name>` (realm's guard then refuses to type into it), and puts `👑` in front of this
+  workspace's label unless worker tabs still live in it (`queen_workspace` says which);
 - picks the queen: the one the db records, else the single `Swarm queen` agent in Agent Mail;
 - stops with `needs` (exit 2) when the old queen may still be running (another `👑` tab in this workspace, or
   Agent Mail activity in the last 5 min): two sessions reading one inbox lose replies. Show the user what it
@@ -49,8 +50,10 @@ version of everything this session must do as queen; a pointer to it is not enou
   ask, rerun with `--queen <name>`;
 - resumes the queen by name (same agent, threads and unread inbox), moves the aside subscription to this pane,
   and records this pane in the db;
-- adopts worker panes realm already wakes that the db does not know yet (a realm older than the db);
-- rewrites every worker's brief from the current template. omp workers get it delivered by realm's launchd job
+- adopts worker panes realm already wakes that the db does not know yet (a realm older than the db): a pane in a
+  `🛠️` workspace of its own is recorded with that workspace, any other with its tab;
+- rewrites every worker's brief from the current template (a worker recorded with a tab relabels that tab, never
+  the workspace it shares with you). omp workers get it delivered by realm's launchd job
   once their pane is idle (`brief_pending` until then); a pane with no agent gets `omp @<brief>` started now; a
   gone pane is listed in `pane_gone`;
 - syncs from mail and returns the table.

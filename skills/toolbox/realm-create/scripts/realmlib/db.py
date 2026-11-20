@@ -147,6 +147,11 @@ MIGRATIONS = [
     ALTER TABLE realms ADD COLUMN name TEXT;
     CREATE UNIQUE INDEX realms_by_name ON realms(name) WHERE name IS NOT NULL;
     """,
+    # 5: workers and the scout each get their own herdr workspace; `tab` stays set only on older rows.
+    """
+    ALTER TABLE workers ADD COLUMN workspace TEXT;
+    ALTER TABLE scouts ADD COLUMN workspace TEXT;
+    """,
 ]
 
 
@@ -294,14 +299,15 @@ def worker_by_pane(conn, pane):
     return (r["realm"], r) if r else None
 
 
-def add_worker(conn, key, name, pane, tab, brief, now):
+def add_worker(conn, key, name, pane, tab, brief, now, workspace=None):
     realm_row(conn, key)
     with tx(conn):
         conn.execute(
-            """INSERT INTO workers (realm, name, pane, tab, brief, created_ts) VALUES (?,?,?,?,?,?)
+            """INSERT INTO workers (realm, name, pane, tab, workspace, brief, created_ts) VALUES (?,?,?,?,?,?,?)
                ON CONFLICT(realm, name) DO UPDATE SET pane=COALESCE(excluded.pane, pane),
-                 tab=COALESCE(excluded.tab, tab), brief=COALESCE(excluded.brief, brief), retired_ts=NULL""",
-            (key, name, pane, tab, brief, now),
+                 tab=COALESCE(excluded.tab, tab), workspace=COALESCE(excluded.workspace, workspace),
+                 brief=COALESCE(excluded.brief, brief), retired_ts=NULL""",
+            (key, name, pane, tab, workspace, brief, now),
         )
     return worker_row(conn, key, name, now)
 
@@ -358,7 +364,7 @@ def list_workers(conn, key, now, include_retired=False):
     for w in rows:
         idle = w["held"] == 0 and w["retired_ts"] is None
         out.append({
-            "name": w["name"], "pane": w["pane"], "tab": w["tab"], "brief": w["brief"],
+            "name": w["name"], "pane": w["pane"], "workspace": w["workspace"], "tab": w["tab"], "brief": w["brief"],
             "brief_pending": bool(w["brief_pending"]),
             "joined": iso(w["joined_ts"]), "last_activity": iso(w["last_activity_ts"]),
             "retired": iso(w["retired_ts"]), "open_subjects": w["open_subjects"] or "",
@@ -446,10 +452,12 @@ def set_state(conn, key, slug, state, status, thread_id, now, source="queen"):
 
 def subject_row(conn, key, slug):
     s = _subject(conn, key, slug)
-    w = conn.execute("SELECT pane, tab FROM workers WHERE realm=? AND name=?", (key, s["worker"])).fetchone()
+    w = conn.execute("SELECT pane, workspace, tab FROM workers WHERE realm=? AND name=?",
+                     (key, s["worker"])).fetchone()
     return {
         "slug": s["slug"], "title": s["title"], "worker": s["worker"],
-        "pane": w["pane"] if w else None, "tab": w["tab"] if w else None,
+        "pane": w["pane"] if w else None, "workspace": w["workspace"] if w else None,
+        "tab": w["tab"] if w else None,
         "state": s["state"], "status": s["status"], "after": s["after_slug"], "thread_id": s["thread_id"],
         "unread_reply": s["last_reply_ts"] is not None and s["last_reply_ts"] > s["state_ts"],
         "last_reply_id": s["last_reply_id"], "last_reply": iso(s["last_reply_ts"]),
@@ -650,9 +658,11 @@ def register(sub):
     p = keyed_parser(w, "add", "record or update a worker (clears retired)")
     p.add_argument("--name", required=True)
     p.add_argument("--pane")
-    p.add_argument("--tab")
+    p.add_argument("--workspace")
+    p.add_argument("--tab", help="older rows: the worker's tab in the queen's workspace")
     p.add_argument("--brief")
-    p.set_defaults(fn=run_verb(lambda c, a, now: add_worker(c, a.key, a.name, a.pane, a.tab, a.brief, now)))
+    p.set_defaults(fn=run_verb(lambda c, a, now: add_worker(c, a.key, a.name, a.pane, a.tab, a.brief, now,
+                                                            a.workspace)))
     p = keyed_parser(w, "list", "workers with idle and scale_in flags")
     p.add_argument("--all", action="store_true", help="include retired")
     p.add_argument("--idle", action="store_true", help="idle workers only")

@@ -1,4 +1,4 @@
-"""herdr CLI adapter: JSON replies, pane lookup, the queen-tab check."""
+"""herdr CLI adapter: JSON replies, pane lookup, the queen check."""
 
 import json
 import os
@@ -39,12 +39,15 @@ def pane_info(pane_id):
 
 
 def is_queen_pane(pane):
-    """True when the pane's tab carries the queen label realm-create sets, or herdr cannot say.
+    """True when the pane's tab or workspace label holds the queen mark realm-create sets, or herdr cannot say.
 
     Unknown counts as queen: a failed lookup must never let a prompt through.
     """
-    out = herdr("tab", "get", pane.get("tab_id", ""))
-    try:
-        return QUEEN_TAB_MARK in out["result"]["tab"]["label"]
-    except (KeyError, TypeError):
-        return True
+    for kind, key in (("tab", "tab_id"), ("workspace", "workspace_id")):
+        out = herdr(kind, "get", pane.get(key, ""))
+        try:
+            if QUEEN_TAB_MARK in out["result"][kind]["label"]:
+                return True
+        except (KeyError, TypeError):
+            return True
+    return False

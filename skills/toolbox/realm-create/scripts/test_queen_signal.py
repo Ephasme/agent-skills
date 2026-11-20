@@ -51,9 +51,12 @@ class SignalTest(unittest.TestCase):
         if args[:2] == ("pane", "get"):
             if args[2] not in self.tabs:
                 return {"error": {"code": "pane_not_found"}}
-            return {"result": {"pane": {"pane_id": args[2], "tab_id": args[2], "agent_status": "idle"}}}
+            return {"result": {"pane": {"pane_id": args[2], "tab_id": args[2], "workspace_id": "ws",
+                                        "agent_status": "idle"}}}
         if args[:2] == ("tab", "get"):
             return {"result": {"tab": {"label": self.tabs[args[2]]}}}
+        if args[:2] == ("workspace", "get"):
+            return {"result": {"workspace": {"label": "home"}}}
         return {}
 
     def signal(self, sender="Ann", slug="s1", text=None, key=KEY):

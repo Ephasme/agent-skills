@@ -333,7 +333,7 @@
         ],
         [
           "realm(\\.py)?\\s+retire\\b.*--park",
-          "{\"name\": \"BlueOwl\", \"steps\": {\"unsubscribe\": \"ok\", \"tab_close\": \"ok\", \"retire_agent\": \"ok\", \"brief\": \"deleted\"}, \"parked\": [\"ci\"]}"
+          "{\"name\": \"BlueOwl\", \"steps\": {\"unsubscribe\": \"ok\", \"workspace_close\": \"ok\", \"retire_agent\": \"ok\", \"brief\": \"deleted\"}, \"parked\": [\"ci\"]}"
         ],
         [
           "realm(\\.py)?\\s+retire",

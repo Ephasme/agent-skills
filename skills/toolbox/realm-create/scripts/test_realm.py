@@ -40,6 +40,8 @@ class Harness(unittest.TestCase):
         self.mail = FakeMail()
         self.status = {"wC:p2": "idle", "wC:p1": "idle"}
         self.tabs = {"wC:p2": "🛠️ subject-w", "wC:p1": "👑 queen"}
+        # Each pane sits alone in a tab and a workspace named after it.
+        self.workspaces = {"wC:p2": "🛠️ realm · w", "wC:p1": "home"}
         self.typed = []
         self.texts = []
         self.due = False
@@ -68,9 +70,12 @@ class Harness(unittest.TestCase):
             pane = args[2]
             if pane not in self.status:
                 return {"error": {"code": "pane_not_found"}}
-            return {"result": {"pane": {"pane_id": pane, "tab_id": pane, "agent_status": self.status[pane]}}}
+            return {"result": {"pane": {"pane_id": pane, "tab_id": pane, "workspace_id": pane,
+                                        "agent_status": self.status[pane]}}}
         if args[:2] == ("tab", "get"):
             return {"result": {"tab": {"label": self.tabs[args[2]]}}}
+        if args[:2] == ("workspace", "get"):
+            return {"result": {"workspace": {"label": self.workspaces[args[2]]}}}
         if args[:2] == ("pane", "send-text"):
             self.typed.append(args[2])
             self.texts.append((args[2], args[3]))
@@ -161,6 +166,14 @@ class WakeTest(Harness):
         self.subscribe("wC:p2")
         with state.locked_state() as s:
             s["subscriptions"]["wC:p1"] = s["subscriptions"].pop("wC:p2")
+        self.tick()
+        self.mail.deliver(101)
+        self.tick()
+        self.assertEqual(self.typed, [])
+
+    def test_pane_in_a_queen_workspace_is_never_typed_into(self):
+        self.subscribe("wC:p2")
+        self.workspaces["wC:p2"] = "👑 other realm"
         self.tick()
         self.mail.deliver(101)
         self.tick()

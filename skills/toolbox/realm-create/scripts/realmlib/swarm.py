@@ -17,11 +17,11 @@ from pathlib import Path
 
 from . import db, hindsight
 from .db import NeedsHuman, Refused
-from .herdr import herdr as _herdr
+from .herdr import QUEEN_TAB_MARK, herdr as _herdr
 from .state import locked_state, log
 
 QUEEN_LABEL = "👑 queen"
-WORKER_LABEL = "🛠️ subject-"
+WORKER_MARK = "🛠️"
 BRIEF_TEMPLATE = Path(__file__).resolve().parent.parent / "brief.md"
 REREAD = "Re-read @{path}: it replaces your previous brief. Follow it from now on, keep your current subject."
 PROGRAM = "omp"
@@ -74,8 +74,19 @@ def brief_dir(key):
     return Path(os.environ.get("TMPDIR") or tempfile.gettempdir()) / "swarm" / slug
 
 
-def write_brief(key, name, queen, realm_label=None):
-    text = BRIEF_TEMPLATE.read_text().format(W=name, w=kebab(name), KEY=key, QUEEN=queen, REALM=realm_label or key)
+def label_step(realm_label, name, own_workspace):
+    """The brief's first step: label its own workspace, or its tab on rows older than workspaces.
+
+    Never `$HERDR_WORKSPACE_ID` for a tab worker: that is the queen's workspace."""
+    if own_workspace:
+        return f'`herdr workspace rename "$HERDR_WORKSPACE_ID" "{WORKER_MARK} {realm_label} · {kebab(name)}"`'
+    return f'`herdr tab rename "$HERDR_TAB_ID" "{WORKER_MARK} subject-{kebab(name)}"`'
+
+
+def write_brief(key, name, queen, realm_label=None, own_workspace=True):
+    realm_label = realm_label or key
+    text = BRIEF_TEMPLATE.read_text().format(W=name, w=kebab(name), KEY=key, QUEEN=queen, REALM=realm_label,
+                                             LABEL_STEP=label_step(realm_label, name, own_workspace))
     path = brief_dir(key) / f"{kebab(name)}.md"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(text)
@@ -99,6 +110,46 @@ def pane(pane_id):
 def tab_ids(workspace=None):
     args = ["tab", "list"] + (["--workspace", workspace] if workspace else [])
     return {t["tab_id"]: t for t in _ok(herdr(*args), "tab list")["tabs"]}
+
+
+def workspace_ids():
+    return {w["workspace_id"]: w for w in _ok(herdr("workspace", "list"), "workspace list")["workspaces"]}
+
+
+def closable_workspace(ws, queen_workspace, live):
+    """A workspace realm may close whole: not the realm's queen workspace, and not labelled 👑 by any realm."""
+    return bool(ws) and ws != queen_workspace and QUEEN_TAB_MARK not in (live.get(ws) or {}).get("label", "")
+
+
+def open_workspace(label, cwd):
+    """A top-level workspace (never nested under the queen's), unfocused: (pane id, workspace id)."""
+    res = _ok(herdr("workspace", "create", "--cwd", cwd, "--label", label, "--no-focus"), "workspace create")
+    return res["root_pane"]["pane_id"], res["workspace"]["workspace_id"]
+
+
+def close_home(workspace, tab, queen_workspace):
+    """Close a worker's own workspace, or its tab in the queen's workspace on rows older than workspaces.
+
+    Returns (what, id, outcome): outcome "ok", "already gone", "still open" or herdr's error. The queen's
+    workspace is never closed: a row naming it falls back to the tab.
+    """
+    if workspace and workspace != queen_workspace:
+        live = workspace_ids()
+        if workspace not in live:
+            return "workspace", workspace, "already gone"
+        if not closable_workspace(workspace, queen_workspace, live):
+            return "workspace", workspace, "refused: queen workspace"
+        kind, target, live = "workspace", workspace, workspace_ids
+    else:
+        kind, target, live = "tab", tab, tab_ids
+    if not target or target not in live():
+        return kind, target, "already gone"
+    err = (herdr(kind, "close", target).get("error") or {}).get("message")
+    return kind, target, err or ("still open" if target in live() else "ok")
+
+
+def worker_label(realm, name):
+    return f"{WORKER_MARK} {db.label(realm)} · {kebab(name)}"
 
 
 def subscribe(pane_id, agent, key, aside):
@@ -133,7 +184,7 @@ def _spawnable(conn, key):
 # ---------- verbs ----------
 
 def spawn(conn, key):
-    """Register one worker, write its brief, open its tab, start omp on the brief, subscribe it, record it."""
+    """Register one worker, write its brief, open its workspace, start omp on the brief, subscribe it, record it."""
     r = _spawnable(conn, key)
     ident = call("create_agent_identity", {
         "project_key": key, "program": PROGRAM, "model": r["model"],
@@ -141,14 +192,12 @@ def spawn(conn, key):
     })
     name = ident["name"]
     brief = write_brief(key, name, r["queen"], db.label(r))
-    res = _ok(herdr("tab", "create", "--workspace", r["workspace"], "--cwd", r["cwd"] or os.getcwd(),
-                    "--label", WORKER_LABEL + kebab(name), "--no-focus"), "tab create")
-    pane_id, tab_id = res["root_pane"]["pane_id"], res["tab"]["tab_id"]
+    pane_id, ws = open_workspace(worker_label(r, name), r["cwd"] or os.getcwd())
     _ok(herdr("pane", "run", pane_id, f"{PROGRAM} @{brief}"), "pane run")
     subscribe(pane_id, name, key, aside=False)
-    db.add_worker(conn, key, name, pane_id, tab_id, str(brief), now())
-    log(f"spawned {name} in {pane_id} for {key}")
-    return {"name": name, "pane": pane_id, "tab": tab_id, "brief": str(brief)}
+    db.add_worker(conn, key, name, pane_id, None, str(brief), now(), workspace=ws)
+    log(f"spawned {name} in {pane_id} ({ws}) for {key}")
+    return {"name": name, "pane": pane_id, "workspace": ws, "brief": str(brief)}
 
 
 def wait_joined(conn, key, names, timeout=JOIN_TIMEOUT, interval=5):
@@ -168,6 +217,21 @@ def queen_label(realm_name):
     return f"{QUEEN_LABEL} · {realm_name}" if realm_name else QUEEN_LABEL
 
 
+def label_queen_workspace(workspace):
+    """Prefix the queen's workspace label with 👑, keeping the rest, unless a subscribed prompt pane (a tab-era
+    worker or scout, any realm) lives in it: the guard would then refuse every wake there.
+    Returns "ok", "already marked" or why it was left alone."""
+    with locked_state() as s:
+        prompts = [p for p, v in s["subscriptions"].items() if v["mode"] == "prompt"]
+    if any((pane(p) or {}).get("workspace_id") == workspace for p in prompts):
+        return "left alone: worker tabs still in it"
+    label = _ok(herdr("workspace", "get", workspace), "workspace get")["workspace"]["label"]
+    if QUEEN_TAB_MARK in label:
+        return "already marked"
+    _ok(herdr("workspace", "rename", workspace, f"{QUEEN_TAB_MARK} {label}"), "workspace rename")
+    return "ok"
+
+
 def create(conn, key, size, model, workspace, cwd, queen_pane, queen_tab, name=None):
     """Bootstrap a realm from the queen's pane: label, identity, launchd, aside, db, size workers, joins."""
     if size < 1:
@@ -176,6 +240,7 @@ def create(conn, key, size, model, workspace, cwd, queen_pane, queen_tab, name=N
         raise Refused("run from the queen's herdr pane: HERDR_PANE_ID, HERDR_TAB_ID and HERDR_WORKSPACE_ID")
     db._check_name(conn, key, name)  # before any side effect
     _ok(herdr("tab", "rename", queen_tab, queen_label(name)), "tab rename")
+    ws_label = label_queen_workspace(workspace)
     session = call("macro_start_session", {"human_key": key, "program": PROGRAM, "model": model,
                                            "task_description": "Swarm queen"})
     queen = session["agent"]["name"]
@@ -186,11 +251,13 @@ def create(conn, key, size, model, workspace, cwd, queen_pane, queen_tab, name=N
     hindsight.on_create(key)
     workers = [spawn(conn, key) for _ in range(size)]
     joined = wait_joined(conn, key, [w["name"] for w in workers])
-    return {"queen": queen, "inbox": session.get("inbox", []), "workers": workers, **joined}
+    return {"queen": queen, "queen_workspace": ws_label, "inbox": session.get("inbox", []), "workers": workers,
+            **joined}
 
 
 def retire(conn, key, name, park=False):
-    """Scale in one worker: unsubscribe, close its tab, retire it in Agent Mail, delete its brief.
+    """Scale in one worker: unsubscribe, close its workspace (its tab on older rows), retire it in Agent Mail,
+    delete its brief.
 
     Refused while it holds a subject, unless park: its open subjects are set paused and stay on it, for the record.
     """
@@ -202,12 +269,8 @@ def retire(conn, key, name, park=False):
     steps = {}
     unsubscribe([w["pane"]])
     steps["unsubscribe"] = "ok"
-    if w["tab"] in tab_ids():
-        out = herdr("tab", "close", w["tab"])
-        err = (out.get("error") or {}).get("message")
-        steps["tab_close"] = err or ("still open" if w["tab"] in tab_ids() else "ok")
-    else:
-        steps["tab_close"] = "already gone"
+    kind, _, outcome = close_home(w["workspace"], w["tab"], db.realm_row(conn, key)["workspace"])
+    steps[f"{kind}_close"] = outcome
     agent = call("macro_start_session", {"human_key": key, "agent_name": name, "program": PROGRAM,
                                          "model": db.realm_row(conn, key)["model"] or "unknown"})["agent"]
     call("retire_agent", {"project_key": key, "agent_name": name,
@@ -231,7 +294,7 @@ def status(conn, key):
     out = []
     for w in db.list_workers(conn, key, now()):
         p = pane(w["pane"]) if w["pane"] else None
-        out.append({**{k: w[k] for k in ("name", "pane", "tab", "idle", "brief_pending", "joined")},
+        out.append({**{k: w[k] for k in ("name", "pane", "workspace", "tab", "idle", "brief_pending", "joined")},
                     "subscribed": subs.get(w["pane"], {}).get("mode"),
                     "agent": p and p.get("agent"), "agent_status": p and p.get("agent_status"),
                     "pane_gone": p is None})
@@ -294,16 +357,23 @@ def restart(conn, key, model, queen_pane, queen_tab, workspace, cwd, queen=None,
     unsubscribe([p for p, v in subscriptions(key).items() if v["mode"] == "aside" and p != queen_pane])
     subscribe(queen_pane, queen, key, aside=True)
     db.init_realm(conn, key, queen, queen_pane, now(), model=model, workspace=workspace, cwd=cwd)
-    # A realm older than the db: adopt the worker panes realm already wakes.
+    # A realm older than the db: adopt the worker panes realm already wakes. A pane is recorded as owning its
+    # workspace only when realm labelled that workspace a worker's.
+    live_ws = workspace_ids()
     for p, v in subscriptions(key).items():
         if v["mode"] != "prompt":
             continue
         if not conn.execute("SELECT 1 FROM workers WHERE realm=? AND name=?", (key, v["agent"])).fetchone():
-            info = pane(p)
-            db.add_worker(conn, key, v["agent"], p, info and info.get("tab_id"), None, now())
+            info = pane(p) or {}
+            ws = info.get("workspace_id")
+            own = ws != workspace and WORKER_MARK in (live_ws.get(ws) or {}).get("label", "")
+            db.add_worker(conn, key, v["agent"], p, None if own else info.get("tab_id"), None, now(),
+                          workspace=ws if own else None)
+    ws_label = label_queen_workspace(workspace)
     rebriefed = rebrief(conn, key)
     synced = db.sync(conn, key, now(), call)
-    return {"queen": queen, "inbox": session.get("inbox", []), **rebriefed, "sync": synced["changes"],
+    return {"queen": queen, "queen_workspace": ws_label, "inbox": session.get("inbox", []), **rebriefed,
+            "sync": synced["changes"],
             "table": db.render_table(conn, key, False, now())}
 
 
@@ -315,7 +385,7 @@ def rebrief(conn, key):
     r = db.realm_row(conn, key)
     pending, started, gone = [], [], []
     for w in db.list_workers(conn, key, now()):
-        path = write_brief(key, w["name"], r["queen"], db.label(r))
+        path = write_brief(key, w["name"], r["queen"], db.label(r), own_workspace=bool(w["workspace"]))
         db.add_worker(conn, key, w["name"], None, None, str(path), now())
         p = pane(w["pane"]) if w["pane"] else None
         if p is None:
@@ -349,24 +419,39 @@ def deliver_brief(pane_id, info, wake):
     return True
 
 
+def _homes(conn, key):
+    """pane → workspace the db records as that pane's own, for the key's live workers and its scout."""
+    rows = conn.execute("SELECT pane, workspace FROM workers WHERE realm=? AND retired_ts IS NULL "
+                        "UNION ALL SELECT pane, workspace FROM scouts WHERE realm=?", (key, key)).fetchall()
+    return {r["pane"]: r["workspace"] for r in rows if r["pane"] and r["workspace"]}
+
+
 def stop(conn, key, own_tab, close_working=False):
-    """Close the realm's worker tabs (its subscribed prompt panes only), unsubscribe the key, delete its briefs."""
+    """Close the realm's worker workspaces (its subscribed prompt panes only; a tab on rows older than
+    workspaces), unsubscribe the key, delete its briefs."""
     subs = subscriptions(key)
+    homes = _homes(conn, key)
+    queen_ws, live_ws = db.realm_row(conn, key)["workspace"], workspace_ids()
     targets = []
     for p, v in subs.items():
         info = pane(p) if v["mode"] == "prompt" else None
         if info is None or info.get("tab_id") == own_tab:
             continue
-        targets.append({"pane": p, "agent": v["agent"], "tab": info["tab_id"],
+        # A whole workspace is closed only when the db says it is this pane's own, and never a queen's.
+        ws = homes.get(p)
+        if ws != info.get("workspace_id") or not closable_workspace(ws, queen_ws, live_ws):
+            ws = None
+        targets.append({"pane": p, "agent": v["agent"], "workspace": ws, "tab": None if ws else info["tab_id"],
                         "agent_status": info.get("agent_status")})
     working = [t for t in targets if t["agent_status"] == "working"]
     if working and not close_working:
         raise NeedsHuman("workers mid-subject: confirm, then pass --close-working", working=working)
     for t in targets:
-        t["error"] = (herdr("tab", "close", t["tab"]).get("error") or {}).get("message")
-    still = tab_ids()
+        kind, target = ("workspace", t["workspace"]) if t["workspace"] else ("tab", t["tab"])
+        t["error"] = (herdr(kind, "close", target).get("error") or {}).get("message")
+    still_tabs, still_ws = tab_ids(), workspace_ids()
     for t in targets:
-        if not t["error"] and t["tab"] in still:
+        if not t["error"] and (t["workspace"] in still_ws if t["workspace"] else t["tab"] in still_tabs):
             t["error"] = "still open"
     unsubscribe(list(subs))
     shutil.rmtree(brief_dir(key), ignore_errors=True)
@@ -378,8 +463,12 @@ def stop(conn, key, own_tab, close_working=False):
     for w in db.list_workers(conn, key, now()):
         if w["name"] in names:
             db.retire_worker(conn, key, w["name"], now(), keep_subjects=True)
-    return {"closed": [{"agent": t["agent"], "tab": t["tab"]} for t in closed],
-            "failed": [{"agent": t["agent"], "tab": t["tab"], "error": t["error"]} for t in targets if t["error"]],
+
+    def where(t):
+        return {"workspace": t["workspace"]} if t["workspace"] else {"tab": t["tab"]}
+
+    return {"closed": [{"agent": t["agent"], **where(t)} for t in closed],
+            "failed": [{"agent": t["agent"], **where(t), "error": t["error"]} for t in targets if t["error"]],
             "unsubscribed": sorted(subs), "briefs_deleted": str(brief_dir(key))}
 
 
@@ -407,7 +496,7 @@ def register(sub):
     p.add_argument("--timeout", type=int, default=JOIN_TIMEOUT)
     p.set_defaults(fn=db.run_verb(lambda c, a, t: wait_joined(c, a.key, a.names, a.timeout)))
 
-    p = db.keyed_parser(sub, "retire", "scale in: unsubscribe, close tab, retire_agent, delete brief")
+    p = db.keyed_parser(sub, "retire", "scale in: unsubscribe, close workspace, retire_agent, delete brief")
     p.add_argument("--name", required=True)
     p.add_argument("--park", action="store_true", help="retire anyway: its open subjects become paused")
     p.set_defaults(fn=db.run_verb(lambda c, a, t: retire(c, a.key, a.name, a.park)))
@@ -435,6 +524,6 @@ def register(sub):
     p = db.keyed_parser(sub, "reinject", "rewrite every worker's brief; the tick delivers it once idle")
     p.set_defaults(fn=db.run_verb(lambda c, a, t: rebrief(c, a.key)))
 
-    p = db.keyed_parser(sub, "stop", "close the realm's worker tabs, unsubscribe, delete briefs")
+    p = db.keyed_parser(sub, "stop", "close the realm's worker workspaces, unsubscribe, delete briefs")
     p.add_argument("--close-working", action="store_true", help="also close workers mid-subject")
     p.set_defaults(fn=db.run_verb(lambda c, a, t: stop(c, a.key, env("HERDR_TAB_ID"), a.close_working)))

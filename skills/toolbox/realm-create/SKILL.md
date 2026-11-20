@@ -2,13 +2,13 @@
 name: realm-create
 description: >-
   Starts an agent swarm on Agent Mail: connects the current session as the
-  queen under a project key, registers N worker agents, opens one herdr tab per
-  worker running a fresh omp session that joins the same project, then runs the
+  queen under a project key, registers N worker agents, opens one herdr workspace
+  per worker running a fresh omp session that joins the same project, then runs the
   queen loop — answer the user, split work into subjects, dispatch each subject
   to a worker by mail, track it to done. Invoked as `/realm-create KEY SIZE
   [NAME]`, e.g. `/realm-create /laptop/general 3 "secret garden"`.
 compatibility: >-
-  Requires macOS (launchd), python3, herdr (tabs, pane run), the omp
+  Requires macOS (launchd), python3, herdr (workspaces, pane run), the omp
   CLI, and an Agent Mail MCP server named agent-mail-perso in
   ~/.omp/agent/mcp.json exposing macro_start_session, create_agent_identity,
   send_message, fetch_inbox and reply_message.
@@ -25,8 +25,8 @@ A realm already running whose queen session ended: `/realm-restart <key>` resume
 (realm included) ever types into it — no `send-text`, `send-keys`, `pane run`, `agent prompt` — no exception,
 whoever asks. Anything else that must reach the queen goes as an aside: displayed beside her session, never
 submitted. A worker reaches her only by mail, then rings with `realm signal-queen --slug <slug>`, run from its
-own pane after each reply: a `🔔` token beside her pane, nothing typed. No herdr command ever targets her pane or
-tab; the brief tells workers so.
+own pane after each reply: a `🔔` token beside her pane, nothing typed. No herdr command ever targets her pane,
+tab or workspace; the brief tells workers so.
 
 **ABSOLUTE RULE: workers never ask the user anything directly.** No question in their pane, no `ask` form, no
 message to the user on any channel. A worker's question reaches the queen by mail in its subject's thread; the
@@ -48,19 +48,22 @@ Every 15 s a launchd job (`com.loup.realm`) reads each subscribed agent's Agent 
 mail to a worker gets `check your mail` + Enter typed into its pane once, as soon as the pane is neither
 `working` nor `blocked`, unless the worker read it first. The same job types a pending brief's re-read prompt
 into an idle worker. A pane subscribed with `--aside` is never typed into: unread mail shows only as a `mail`
-token on the pane. realm refuses to type into a pane whose tab label holds `👑`, whatever its subscription says.
+token on the pane. realm refuses to type into a pane whose tab or workspace label holds `👑`, whatever its
+subscription says.
 
 ## 1. Start the realm
 
 `realm create --project <key> --size <size> --model <your model> --name "<name>"`, from this pane. It:
 
 - refuses a name another realm already has, before doing anything;
-- labels this tab `👑 queen · <name>`;
+- labels this tab `👑 queen · <name>`, and puts `👑` in front of this workspace's label unless worker tabs of an
+  older realm still live in it (`queen_workspace` says which);
 - registers a fresh queen identity (`task_description: "Swarm queen"`), installs the launchd job when missing,
   and subscribes this pane in aside mode;
 - records the realm in realm's db with your model, workspace and directory;
 - per worker: registers it, writes its brief (`scripts/brief.md`, filled) to a per-key directory under
-  `${TMPDIR:-/tmp}/swarm/`, opens a `🛠️ subject-<w>` tab, starts `omp @<brief>` in it, subscribes it, records it;
+  `${TMPDIR:-/tmp}/swarm/`, opens its own top-level workspace `🛠️ <name> · <w>` (unfocused, in your directory),
+  starts `omp @<brief>` in it, subscribes it, records it;
 - waits up to 60 s for each worker to join.
 
 Keep `queen`: that is `QUEEN`. Carry any message in `inbox` into step 2. Each `not_joined` worker: report it to
@@ -117,17 +120,18 @@ No upper bound on workers.
   `realm wait-joined --project <key> <name>`.
 - **In:** for each worker `realm worker list --project <key> --scale-in` returns (it holds no `queued`,
   `assigned`, `blocked` or `paused` subject, and nothing changed for it for 30 min):
-  `realm retire --project <key> --name <W>`. It unsubscribes the pane, closes the tab, retires the agent in
+  `realm retire --project <key> --name <W>`. It unsubscribes the pane, closes its workspace, retires the agent in
   Agent Mail and deletes the brief; each step's outcome is in `steps`. Its subjects stay in the db.
 - A worker holding a subject is never retired on your own initiative. On the user's word:
   `realm retire --project <key> --name <W> --park`; its `queued`, `assigned` and `blocked` subjects become
-  `paused` (listed in `parked`; name them in your answer) and it retires anyway. Never close its tab or call
+  `paused` (listed in `parked`; name them in your answer) and it retires anyway. Never close its workspace or call
   `retire_agent` by hand.
 
 ## The scout
 
 Optional, one per realm, only when the user asks for it: `realm scout spawn --project <key>`. It registers an
-agent, writes its brief (`scripts/scout-brief.md`, filled), opens a `🔭 scout` tab, and subscribes the pane as a
+agent, writes its brief (`scripts/scout-brief.md`, filled), opens its own `🔭 <name> · scout` workspace, and
+subscribes the pane as a
 scout: the launchd job types `scan` into it every hour from 08:00 to 22:00 and every three hours otherwise
 (Europe/Paris), mail wakes first. It is not a worker: never dispatch a subject to it, it never shows in
 `worker list`. `realm scout show --project <key>` gives its last scan and cursors.

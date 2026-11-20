@@ -34,7 +34,7 @@ CONFIG = Path(os.environ.get("REALM_SCOUT_CONFIG") or HOME / ".config/realm/scou
 SECRETS = Path(os.environ.get("REALM_SCOUT_SECRETS") or HOME / "code/perso/agent-skills/mcp/secrets.sops.yaml")
 MCP_CONFIG = HOME / ".omp/agent/mcp.json"
 SCAN_TEXT = "scan"
-SCOUT_LABEL = "🔭 scout"
+SCOUT_MARK = "🔭"
 BRIEF_TEMPLATE = Path(__file__).resolve().parent.parent / "scout-brief.md"
 TZ = ZoneInfo("Europe/Paris")
 DAY_HOURS = (8, 22)  # [08:00, 22:00) local: scan every DAY_INTERVAL, otherwise every NIGHT_INTERVAL
@@ -692,7 +692,7 @@ def fill(template, **values):
 
 
 def spawn(conn, key, now):
-    """Register the scout, write its brief, open its tab, start omp on it, subscribe it as a scout, record it."""
+    """Register the scout, write its brief, open its workspace, start omp on it, subscribe it as a scout, record it."""
     from . import swarm
 
     r = swarm._spawnable(conn, key)
@@ -704,10 +704,9 @@ def spawn(conn, key, now):
         "task_description": f"Swarm scout, queen {r['queen']}"})["name"]
     brief = swarm.brief_dir(key) / f"{swarm.kebab(name)}.md"
     brief.parent.mkdir(parents=True, exist_ok=True)
-    brief.write_text(fill(BRIEF_TEMPLATE.read_text(), S=name, KEY=key, QUEEN=r["queen"], LABEL=SCOUT_LABEL))
-    res = swarm._ok(swarm.herdr("tab", "create", "--workspace", r["workspace"], "--cwd", r["cwd"] or os.getcwd(),
-                                "--label", SCOUT_LABEL, "--no-focus"), "tab create")
-    pane_id, tab_id = res["root_pane"]["pane_id"], res["tab"]["tab_id"]
+    label = f"{SCOUT_MARK} {db.label(r)} · scout"
+    brief.write_text(fill(BRIEF_TEMPLATE.read_text(), S=name, KEY=key, QUEEN=r["queen"], LABEL=label))
+    pane_id, ws = swarm.open_workspace(label, r["cwd"] or os.getcwd())
     swarm._ok(swarm.herdr("pane", "run", pane_id, f"{swarm.PROGRAM} @{brief}"), "pane run")
     with locked_state() as s:
         s["subscriptions"][pane_id] = {
@@ -715,17 +714,18 @@ def spawn(conn, key, now):
             "last_wake": 0, "last_unread": 0, "kind": "scout", "wake_text": SCAN_TEXT, "last_scan_wake": now}
     with tx(conn):
         conn.execute(
-            """INSERT INTO scouts (realm, agent, pane, tab, brief, created_ts) VALUES (?,?,?,?,?,?)
-               ON CONFLICT(realm) DO UPDATE SET agent=excluded.agent, pane=excluded.pane, tab=excluded.tab,
-                 brief=excluded.brief""",
-            (key, name, pane_id, tab_id, str(brief), now))
-    log(f"spawned scout {name} in {pane_id} for {key}")
-    return {"name": name, "pane": pane_id, "tab": tab_id, "brief": str(brief)}
+            """INSERT INTO scouts (realm, agent, pane, tab, workspace, brief, created_ts) VALUES (?,?,?,NULL,?,?,?)
+               ON CONFLICT(realm) DO UPDATE SET agent=excluded.agent, pane=excluded.pane, tab=NULL,
+                 workspace=excluded.workspace, brief=excluded.brief""",
+            (key, name, pane_id, ws, str(brief), now))
+    log(f"spawned scout {name} in {pane_id} ({ws}) for {key}")
+    return {"name": name, "pane": pane_id, "workspace": ws, "brief": str(brief)}
 
 
 def show(conn, key, now):
     s = _scout(conn, key)
-    return {"agent": s["agent"], "pane": s["pane"], "tab": s["tab"], "last_scan_start": db.iso(s["scan_start_ts"]),
+    return {"agent": s["agent"], "pane": s["pane"], "workspace": s["workspace"], "tab": s["tab"],
+            "last_scan_start": db.iso(s["scan_start_ts"]),
             "last_scan_end": db.iso(s["scan_end_ts"]), "scan_due": scan_due(conn, key, now),
             "interval_s": interval(now),
             "proposed": conn.execute("SELECT COUNT(*) FROM proposals WHERE realm=? AND state='proposed'",

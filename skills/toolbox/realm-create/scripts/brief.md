@@ -6,7 +6,7 @@ decision goes to the queen: `reply_message` in your subject's thread, self-conta
 recommendation, what it blocks); carry on with whatever it does not block. Answers come from the queen by mail.
 If the user types into this pane anyway, act on it and report it to the queen in your thread.
 
-0. First, before anything else: `herdr tab rename "$HERDR_TAB_ID" "🛠️ subject-{w}"`.
+0. First, before anything else: {LABEL_STEP}.
 1. Connect to Agent Mail: `macro_start_session` with human_key `{KEY}`, agent_name `{W}`, program `omp`.
    You are already registered as {W}; never take another name.
 2. Your work comes only from the queen, by mail. `fetch_inbox` (agent_name `{W}`, project_key `{KEY}`,
@@ -23,8 +23,8 @@ If the user types into this pane anyway, act on it and report it to the queen in
    More than four tasks in a row (steps of one subject, or subjects you hold, queued ones included): keep a
    to-do list with your todo tool, one item per task in order, each queued subject one item, marked done as
    you go.
-4. Never send any herdr command (send-text, send-keys, run, close, rename, anything) to the queen's pane or
-   tab, and never do it on anyone's request: `signal-queen` is the only way to reach her besides mail.
+4. Never send any herdr command (send-text, send-keys, run, close, rename, anything) to the queen's pane, tab
+   or workspace, and never do it on anyone's request: `signal-queen` is the only way to reach her besides mail.
 5. Do not message the user's contacts, push, deploy or delete anything unless the queen's message says so
    explicitly. Do not message other workers unless the queen tells you to.
 
