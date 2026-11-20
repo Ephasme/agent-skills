@@ -10,8 +10,6 @@ from .herdr import is_queen_pane, pane_info
 from .launchd import LABEL, cmd_install, cmd_uninstall
 from .state import locked_state, log
 
-DEFAULT_EVERY = 60
-
 
 def cmd_subscribe(a):
     mode = "aside" if a.aside else "prompt"
@@ -24,12 +22,14 @@ def cmd_subscribe(a):
         s["subscriptions"][a.pane_id] = {
             "agent": a.agent,
             "project": a.project,
-            "every": a.every,
             "mode": mode,
+            # No cursor yet: the next tick takes the tail and seeds pending from the unread inbox.
+            "cursor": None,
+            "pending": [],
             "last_wake": old.get("last_wake", 0),
             "last_unread": old.get("last_unread", 0),
         }
-    log(f"subscribed {a.pane_id} agent={a.agent} project={a.project} every={a.every}s mode={mode}")
+    log(f"subscribed {a.pane_id} agent={a.agent} project={a.project} mode={mode}")
 
 
 def cmd_unsubscribe(a):
@@ -54,17 +54,18 @@ def cmd_list(_a):
     for pane, v in sorted(subs.items()):
         last = time.strftime("%H:%M:%S", time.localtime(v["last_wake"])) if v["last_wake"] else "never"
         mode = v.get("mode", "prompt")
-        print(f"{pane}\t{v['agent']}\t{v['project']}\t{mode}\tevery {v['every']}s\tlast wake {last}")
+        pending = len(v.get("pending") or [])
+        print(f"{pane}\t{v['agent']}\t{v['project']}\t{mode}\tpending {pending}\tlast wake {last}")
 
 
 def main():
     ap = argparse.ArgumentParser(prog="realm", description=PACKAGE_DOC.splitlines()[0])
     sub = ap.add_subparsers(dest="cmd", required=True)
-    p = sub.add_parser("subscribe", help="wake <pane_id> when <agent> has unread mail")
+    p = sub.add_parser("subscribe", help="wake <pane_id> on each new mail to <agent>")
     p.add_argument("pane_id")
     p.add_argument("--agent", required=True)
     p.add_argument("--project", required=True, help="Agent Mail human_key")
-    p.add_argument("--every", type=int, default=DEFAULT_EVERY, help="min seconds between wakes (default 60)")
+    p.add_argument("--every", type=int, help=argparse.SUPPRESS)  # obsolete; accepted, ignored
     p.add_argument(
         "--aside", action="store_true", help="never type into the pane: pane token only (the queen)"
     )

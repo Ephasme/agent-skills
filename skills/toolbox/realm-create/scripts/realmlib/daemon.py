@@ -1,11 +1,12 @@
-"""The wake pass launchd runs every TICK_SECONDS: type into idle worker panes, show the queen an aside."""
+"""The wake pass launchd runs every TICK_SECONDS: wake idle worker panes on new mail, show the queen an aside."""
 
 import subprocess
 import time
 import urllib.error
 
 from .herdr import herdr, is_queen_pane, pane_info
-from .mail import mail_endpoint, unread_count
+from . import mail
+from .mail import MailToolError
 from .state import locked_state, log
 
 TICK_SECONDS = 15
@@ -34,17 +35,11 @@ def aside(pane_id, n):
 
 
 def cmd_tick(_a):
-    now = time.time()
     with locked_state() as s:
         subs = s["subscriptions"]
-        due = [p for p, v in subs.items() if now - v["last_wake"] >= v["every"]]
-        if not due:
-            return
         endpoint = None
-        for pane in due:
+        for pane in list(subs):
             v = subs[pane]
-            # Entries written before modes existed are prompt subscribers; wake() still guards them.
-            mode = v.get("mode", "prompt")
             info = pane_info(pane)
             if info == "gone":
                 del subs[pane]
@@ -52,37 +47,67 @@ def cmd_tick(_a):
                 continue
             if info is None:
                 continue
-            status = info.get("agent_status") or "unknown"
-            # `blocked` panes show a question form: typed text would answer it. Asides type nothing.
-            if mode == "prompt" and status in ("working", "blocked"):
-                log(f"{pane} ({v['agent']}): {status}, skip")
-                continue
             try:
-                endpoint = endpoint or mail_endpoint()
-                n = unread_count(endpoint, v["agent"], v["project"])
+                endpoint = endpoint or mail.mail_endpoint()
+                tick_one(endpoint, pane, v, info.get("agent_status") or "unknown")
             except (OSError, urllib.error.URLError, RuntimeError, KeyError, ValueError) as e:
                 log(f"{pane} ({v['agent']}): mail check failed, skip: {e}")
-                continue
-            if mode == "aside":
-                last = v.get("last_unread", 0)
-                if n == last:
-                    continue
-                try:
-                    aside(pane, n)
-                except (RuntimeError, OSError, subprocess.SubprocessError) as e:
-                    log(f"{pane} ({v['agent']}): aside failed: {e}")
-                    continue
-                v["last_unread"] = n
-                v["last_wake"] = now
-                log(f"{pane} ({v['agent']}): {n} unread, aside shown")
-                continue
-            if n == 0:
-                log(f"{pane} ({v['agent']}): no unread mail, skip")
-                continue
-            try:
-                wake(pane, mode)
-            except (RuntimeError, OSError, subprocess.SubprocessError) as e:
-                log(f"{pane} ({v['agent']}): wake failed: {e}")
-                continue
-            v["last_wake"] = now
-            log(f"{pane} ({v['agent']}): {n} unread, woken")
+
+
+def tick_one(endpoint, pane, v, status):
+    """Advance one subscription. v changes only after the mail reads succeed, so a failure retries next tick."""
+    agent, project = v["agent"], v["project"]
+    # Entries written before modes existed are prompt subscribers; wake() still guards them.
+    mode = v.get("mode", "prompt")
+    cursor = v.get("cursor")
+    try:
+        new, cursor = mail.fetch_events(endpoint, agent, project, cursor)
+    except MailToolError as e:
+        if e.kind not in ("CURSOR_EXPIRED", "CURSOR_AHEAD"):
+            raise
+        log(f"{pane} ({agent}): {e.kind}, cursor reset to tail")
+        new, cursor = mail.fetch_events(endpoint, agent, project, None)
+        v["cursor"] = None
+    unread = None
+    if v.get("cursor") is None:
+        # First sight (new or legacy row, lost cursor): what is unread now stands in for the missed events.
+        unread = mail.unread_ids(endpoint, agent, project)
+        new = sorted(unread)
+
+    if mode == "aside":
+        # Recount while the token shows mail, so it clears once the agent reads it.
+        if unread is None and (new or v.get("last_unread", 0)):
+            unread = mail.unread_ids(endpoint, agent, project)
+        if unread is not None and len(unread) != v.get("last_unread", 0):
+            aside(pane, len(unread))
+            v["last_unread"] = len(unread)
+            v["last_wake"] = time.time()
+            log(f"{pane} ({agent}): {len(unread)} unread, aside shown")
+        v["cursor"], v["pending"] = cursor, []
+        return
+
+    # The cursor advances now: pending carries the new ids until a wake delivers them.
+    pending = sorted(set(v.get("pending") or []) | set(new))
+    v["cursor"], v["pending"] = cursor, pending
+    if not pending:
+        return
+    # `blocked` panes show a question form: typed text would answer it. Mid-turn text would interrupt.
+    if status in ("working", "blocked"):
+        if new:
+            log(f"{pane} ({agent}): {status}, {len(pending)} pending until it is idle")
+        return
+    if unread is None:
+        unread = mail.unread_ids(endpoint, agent, project)
+    still = [m for m in pending if m in unread]
+    if not still:
+        v["pending"] = []
+        log(f"{pane} ({agent}): pending mail already read, no wake")
+        return
+    try:
+        wake(pane, mode)
+    except (RuntimeError, OSError, subprocess.SubprocessError) as e:
+        log(f"{pane} ({agent}): wake failed: {e}")
+        return
+    v["pending"] = []
+    v["last_wake"] = time.time()
+    log(f"{pane} ({agent}): {len(still)} new unread, woken")

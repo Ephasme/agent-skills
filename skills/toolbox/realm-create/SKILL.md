@@ -8,7 +8,7 @@ description: >-
   to a worker by mail, track it to done. Invoked as `/realm-create KEY SIZE`,
   e.g. `/realm-create /laptop/general 3`.
 compatibility: >-
-  Requires macOS (launchd), python3, herdr (tabs, pane run/send-text), the omp
+  Requires macOS (launchd), python3, herdr (tabs, pane run), the omp
   CLI, and an Agent Mail MCP server named agent-mail-perso in
   ~/.omp/agent/mcp.json exposing macro_start_session, create_agent_identity,
   send_message, fetch_inbox and reply_message.
@@ -38,11 +38,11 @@ and no `agent_name`, so the server mints a fresh one. Keep the returned `agent.n
 returned inbox; carry any unread message into step 4.
 
 Below, `realm` is `python3 ~/.agents/skills/realm-create/scripts/realm.py`: every 15 s a launchd job
-(`com.loup.realm`) checks each subscribed pane's Agent Mail inbox. A worker pane with unread mail that is
-neither `working` nor `blocked` gets `check your mail` + Enter typed into it. A pane subscribed with `--aside`
-is never typed into: unread mail shows only as a `mail` token on the pane. realm refuses
-to type into a pane whose tab label holds `👑`, whatever its subscription says. Start it, then subscribe
-yourself in aside mode only:
+(`com.loup.realm`) reads each subscribed agent's Agent Mail delivery events. Each new mail to a worker gets
+`check your mail` + Enter typed into its pane once, as soon as the pane is neither `working` nor `blocked`, unless
+the worker read it first. A pane subscribed with `--aside` is never typed into: unread mail shows only as a
+`mail` token on the pane. realm refuses to type into a pane whose tab label holds `👑`, whatever its
+subscription says. Start it, then subscribe yourself in aside mode only:
 
 1. `launchctl print "gui/$(id -u)/com.loup.realm"` fails: `realm install`.
 2. `realm subscribe "$HERDR_PANE_ID" --agent <QUEEN> --project <key> --aside`.
