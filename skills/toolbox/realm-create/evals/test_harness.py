@@ -43,8 +43,8 @@ class Stub(unittest.TestCase):
         case = {**CASES[5]}
         init_subtask_store(Store())
         store().set("case", case)
-        first = asyncio.run(harness._bash("python3 realm.py dispatch --to AmberFox --slug e2e --after login-page"))
-        again = asyncio.run(harness._bash("python3 realm.py dispatch --to AmberFox --slug e2e"))
+        first = asyncio.run(harness._bash("python3 realm.py dispatch --to AmberFox --slug e2e --title E2E --after login-page"))
+        again = asyncio.run(harness._bash("python3 realm.py dispatch --to AmberFox --slug e2e --title E2E"))
         self.assertEqual(json.loads(first)["subject"]["state"], "queued")
         self.assertIn("error", json.loads(again))
 
