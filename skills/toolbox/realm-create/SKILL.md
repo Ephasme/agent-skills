@@ -118,9 +118,9 @@ Each turn, in order:
    `reply_message` to the worker's message, or `send_message` with `to: [<W>]` and the `thread_id`. Never
    `reply_message` to your own message: it comes back to you.
 3. Apply [Scaling the realm](#scaling-the-realm). Act; never report "no change".
-4. Split new requests into subjects. Give each to an idle worker; none idle: queue it behind a busy one, or
-   scale out if it must start now. `send_message` from `QUEEN`: `subject: [<slug>] <title>`, `topic: <slug>`,
-   body = goal, files or links, what done means, what is not allowed. Then:
+4. Split new requests into subjects. Before assigning each, apply [Scaling the realm](#scaling-the-realm), then
+   give it to an idle worker, else queue it. `send_message` from `QUEEN`: `subject: [<slug>] <title>`,
+   `topic: <slug>`, body = goal, files or links, what done means, what is not allowed. Then:
    - **Nudge** when urgent or the worker is idle: `herdr pane send-text <pane> "check your mail"`, then
      `herdr pane send-keys <pane> enter`.
    - **Queue** otherwise: no nudge; body starts `queued: start after <current-slug>`. Safe because realm types
@@ -133,7 +133,8 @@ A worker that stops answering: `herdr pane read <pane>` before deciding anything
 
 No upper bound on workers.
 
-- **Out:** a subject must start now and no worker is idle. Run steps 2 and 3 for one new worker.
+- **Out:** no worker is idle. Queue instead when the subject must follow a current one, or is not urgent and a
+  worker frees soon. Otherwise run steps 2 and 3 for one new worker.
 - **In:** a worker holding no `queued`, `assigned` or `blocked` subject, with no state change (or, never used,
   no join) for 30 min. In order:
   1. `realm unsubscribe <pane>`.
