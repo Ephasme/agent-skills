@@ -34,13 +34,17 @@ class FakeMail:
         return {m for _, m in self.events} - self.read
 
 
-class WakeTest(unittest.TestCase):
+class Harness(unittest.TestCase):
     def setUp(self):
         tmp = Path(tempfile.mkdtemp())
         self.mail = FakeMail()
         self.status = {"wC:p2": "idle", "wC:p1": "idle"}
         self.tabs = {"wC:p2": "🛠️ subject-w", "wC:p1": "👑 queen"}
         self.typed = []
+        self.texts = []
+        self.due = False
+        self.now = 1_800_000_000.0
+        self.scan_checks = []
         self.tokens = []
         for module, target, value in (
             (state, "STATE_DIR", tmp),
@@ -51,6 +55,8 @@ class WakeTest(unittest.TestCase):
             (mail, "fetch_events", self.mail.fetch_events),
             (mail, "unread_ids", self.mail.unread_ids),
             (herdr, "herdr", self.herdr),
+            (daemon, "clock", lambda: self.now),
+            (daemon, "scan_due", self.scan_due),
             (daemon, "herdr", self.herdr),
         ):
             patcher = mock.patch.object(module, target, value)
@@ -67,16 +73,27 @@ class WakeTest(unittest.TestCase):
             return {"result": {"tab": {"label": self.tabs[args[2]]}}}
         if args[:2] == ("pane", "send-text"):
             self.typed.append(args[2])
+            self.texts.append((args[2], args[3]))
         if args[:2] == ("pane", "report-metadata"):
             self.tokens.append((args[2], args[-1]))
         return {}
 
-    def subscribe(self, pane, aside=False):
-        cli.cmd_subscribe(mock.Mock(pane_id=pane, agent="W", project="/p", aside=aside))
+    def subscribe(self, pane, aside=False, scout=False, wake_text=daemon.WAKE_TEXT):
+        cli.cmd_subscribe(
+            mock.Mock(pane_id=pane, agent="W", project="/p", aside=aside, scout=scout, wake_text=wake_text)
+        )
+
+    def scan_due(self, key, now):
+        self.scan_checks.append((key, now))
+        if self.due == "raise":
+            raise RuntimeError("scout broken")
+        return self.due
 
     def tick(self):
         daemon.cmd_tick(None)
 
+
+class WakeTest(Harness):
     def test_new_mail_to_idle_pane_wakes_once(self):
         self.subscribe("wC:p2")
         self.tick()
@@ -160,6 +177,103 @@ class WakeTest(unittest.TestCase):
         self.status["wC:p2"] = "idle"
         self.tick()
         self.assertEqual(self.typed, ["wC:p2"])
+
+
+class ScoutWakeTest(Harness):
+    """A scout pane is also woken with its wake_text when scout.scan_due says a scan is due."""
+
+    def subscribe_scout(self):
+        self.subscribe("wC:p2", scout=True, wake_text="scan")
+        self.tick()  # seeds the mail cursor: an empty inbox, nothing typed while nothing is due
+        self.texts.clear()
+        self.scan_checks.clear()
+
+    def test_due_and_idle_types_wake_text_once(self):
+        self.subscribe_scout()
+        self.due = True
+        self.tick()
+        self.assertEqual(self.texts, [("wC:p2", "scan")])
+        self.assertEqual(self.scan_checks, [("/p", self.now)])
+
+    def test_not_due_types_nothing(self):
+        self.subscribe_scout()
+        self.tick()
+        self.assertEqual(self.texts, [])
+
+    def test_busy_scout_is_not_scanned_nor_asked(self):
+        self.subscribe_scout()
+        self.due = True
+        for status in ("working", "blocked"):
+            self.status["wC:p2"] = status
+            self.tick()
+        self.assertEqual(self.texts, [])
+        self.assertEqual(self.scan_checks, [])
+
+    def test_mail_wins_one_line_per_tick(self):
+        self.subscribe_scout()
+        self.due = True
+        self.mail.deliver(101)
+        self.tick()
+        self.assertEqual(self.texts, [("wC:p2", daemon.WAKE_TEXT)])
+        self.tick()
+        self.assertEqual(self.texts, [("wC:p2", daemon.WAKE_TEXT), ("wC:p2", "scan")])
+
+    def test_mail_held_while_busy_still_goes_first_once_idle(self):
+        self.subscribe_scout()
+        self.due = True
+        self.status["wC:p2"] = "working"
+        self.mail.deliver(101)
+        self.tick()
+        self.status["wC:p2"] = "idle"
+        self.tick()
+        self.assertEqual(self.texts, [("wC:p2", daemon.WAKE_TEXT)])
+
+    def test_unrecorded_scan_is_retyped_only_after_retry_window(self):
+        self.subscribe_scout()
+        self.due = True
+        self.tick()
+        self.now += daemon.SCAN_RETRY_SECONDS - 1
+        self.tick()
+        self.assertEqual(len(self.texts), 1)
+        self.now += 1
+        self.tick()
+        self.assertEqual(self.texts, [("wC:p2", "scan")] * 2)
+
+    def test_broken_scout_never_blocks_mail(self):
+        self.subscribe_scout()
+        self.due = "raise"
+        self.tick()
+        self.mail.deliver(101)
+        self.tick()
+        self.assertEqual(self.texts, [("wC:p2", daemon.WAKE_TEXT)])
+
+    def test_worker_subscription_is_never_scanned(self):
+        self.subscribe("wC:p2")
+        self.due = True
+        self.tick()
+        self.tick()
+        self.assertEqual(self.texts, [])
+        self.assertEqual(self.scan_checks, [])
+
+    def test_queen_tab_refuses_scan_wake(self):
+        self.subscribe_scout()
+        with state.locked_state() as s:
+            s["subscriptions"]["wC:p1"] = s["subscriptions"].pop("wC:p2")
+        self.due = True
+        self.tick()
+        self.assertEqual(self.texts, [])
+
+    def test_scout_and_aside_exclude_each_other(self):
+        with self.assertRaises(SystemExit):
+            self.subscribe("wC:p2", aside=True, scout=True)
+
+    def test_resubscribe_keeps_last_scan_wake(self):
+        self.subscribe_scout()
+        self.due = True
+        self.tick()
+        self.subscribe("wC:p2", scout=True, wake_text="scan")
+        self.tick()
+        self.assertEqual(len(self.texts), 1)
 
 
 if __name__ == "__main__":

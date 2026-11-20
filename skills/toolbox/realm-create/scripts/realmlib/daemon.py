@@ -1,10 +1,12 @@
-"""The wake pass launchd runs every TICK_SECONDS: wake idle worker panes on new mail, show the queen an aside."""
+"""The wake pass launchd runs every TICK_SECONDS: wake idle worker panes on new mail, show the queen an aside,
+and type a scout's scan prompt when its schedule says a scan is due."""
 
 import subprocess
 import time
 import urllib.error
 
 from .herdr import herdr, is_queen_pane, pane_info
+from . import queen_signal
 from . import mail
 from .mail import MailToolError
 from .state import locked_state, log
@@ -12,6 +14,12 @@ from .state import locked_state, log
 TICK_SECONDS = 15
 WAKE_TEXT = "check your mail"
 TOKEN_SOURCE = "realm"
+# A scan wake not yet recorded by the scout (still running, or failed) is not re-typed before this.
+SCAN_RETRY_SECONDS = 600
+
+
+def clock():
+    return time.time()
 
 
 def wake(pane_id, mode, text=WAKE_TEXT):
@@ -38,6 +46,8 @@ def cmd_tick(_a):
     with locked_state() as s:
         subs = s["subscriptions"]
         endpoint = None
+        # Signals rung after this moment may belong to mail this tick has not counted yet: keep them.
+        started = clock()
         for pane in list(subs):
             v = subs[pane]
             info = pane_info(pane)
@@ -57,11 +67,60 @@ def cmd_tick(_a):
                         status = "working"
                 except Exception as e:  # noqa: BLE001 - a db problem must never stop the mail wake
                     log(f"{pane} ({v['agent']}): brief delivery failed: {e}")
+            typed = False
             try:
                 endpoint = endpoint or mail.mail_endpoint()
                 typed = tick_one(endpoint, pane, v, status)
             except (OSError, urllib.error.URLError, RuntimeError, KeyError, ValueError) as e:
                 log(f"{pane} ({v['agent']}): mail check failed, skip: {e}")
+            # Mail wins: one typed line per pane per tick, and held mail goes before any scan.
+            if v.get("kind") == "scout" and not typed and not v.get("pending"):
+                scan_wake(pane, v, status)
+            # The queen read everything: the doorbells rung by workers' signal-queen are answered. Counted live,
+            # since last_unread only moves on new events.
+            if v.get("mode") == "aside" and s.get("signals", {}).get(v["project"]):
+                try:
+                    endpoint = endpoint or mail.mail_endpoint()
+                    if not mail.unread_ids(endpoint, v["agent"], v["project"]):
+                        if queen_signal.clear(s, v["project"], pane, before=started):
+                            log(f"{pane} ({v['agent']}): inbox read, signals cleared")
+                except (OSError, urllib.error.URLError, RuntimeError, KeyError, ValueError) as e:
+                    log(f"{pane} ({v['agent']}): signal clear failed: {e}")
+
+
+def scan_due(key, now):
+    """scout.scan_due on the realm db; imported here so a missing or broken scout never stops mail wakes."""
+    from . import db, scout
+
+    conn = db.connect()
+    try:
+        return scout.scan_due(conn, key, now)
+    finally:
+        conn.close()
+
+
+def scan_wake(pane, v, status):
+    """Type the scout's wake_text when it is idle and scout.scan_due says the schedule calls for a scan."""
+    if status in ("working", "blocked"):
+        return
+    now = clock()
+    if now - v.get("last_scan_wake", 0) < SCAN_RETRY_SECONDS:
+        return
+    try:
+        due = scan_due(v["project"], now)
+    except Exception as e:  # noqa: BLE001 - a scout problem must never stop the mail wake
+        log(f"{pane} ({v['agent']}): scan check failed, skip: {e}")
+        return
+    if not due:
+        return
+    text = v.get("wake_text") or WAKE_TEXT
+    try:
+        wake(pane, v.get("mode", "prompt"), text)
+    except (RuntimeError, OSError, subprocess.SubprocessError) as e:
+        log(f"{pane} ({v['agent']}): scan wake failed: {e}")
+        return
+    v["last_scan_wake"] = now
+    log(f"{pane} ({v['agent']}): scan due, typed {text!r}")
 
 
 def tick_one(endpoint, pane, v, status):
@@ -100,24 +159,25 @@ def tick_one(endpoint, pane, v, status):
     pending = sorted(set(v.get("pending") or []) | set(new))
     v["cursor"], v["pending"] = cursor, pending
     if not pending:
-        return
+        return False
     # `blocked` panes show a question form: typed text would answer it. Mid-turn text would interrupt.
     if status in ("working", "blocked"):
         if new:
             log(f"{pane} ({agent}): {status}, {len(pending)} pending until it is idle")
-        return
+        return False
     if unread is None:
         unread = mail.unread_ids(endpoint, agent, project)
     still = [m for m in pending if m in unread]
     if not still:
         v["pending"] = []
         log(f"{pane} ({agent}): pending mail already read, no wake")
-        return
+        return False
     try:
         wake(pane, mode)
     except (RuntimeError, OSError, subprocess.SubprocessError) as e:
         log(f"{pane} ({agent}): wake failed: {e}")
-        return
+        return False
     v["pending"] = []
     v["last_wake"] = time.time()
     log(f"{pane} ({agent}): {len(still)} new unread, woken")
+    return True

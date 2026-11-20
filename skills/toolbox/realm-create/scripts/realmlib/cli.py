@@ -5,8 +5,8 @@ import sys
 import time
 
 from . import __doc__ as PACKAGE_DOC
-from . import db, swarm
-from .daemon import cmd_tick
+from . import db, queen_signal, swarm
+from .daemon import WAKE_TEXT, cmd_tick
 from .herdr import is_queen_pane, pane_info
 from .launchd import LABEL, cmd_install, cmd_uninstall
 from .state import locked_state, log
@@ -14,6 +14,9 @@ from .state import locked_state, log
 
 def cmd_subscribe(a):
     mode = "aside" if a.aside else "prompt"
+    kind = "scout" if a.scout else "worker"
+    if a.scout and a.aside:
+        sys.exit("realm subscribe: a scout is woken by typing; --scout and --aside exclude each other")
     if mode == "prompt":
         pane = pane_info(a.pane_id)
         if not isinstance(pane, dict) or is_queen_pane(pane):
@@ -29,8 +32,13 @@ def cmd_subscribe(a):
             "pending": [],
             "last_wake": old.get("last_wake", 0),
             "last_unread": old.get("last_unread", 0),
+            "kind": kind,
+            "wake_text": a.wake_text,
+            "last_scan_wake": old.get("last_scan_wake", 0),
         }
-    log(f"subscribed {a.pane_id} agent={a.agent} project={a.project} mode={mode}")
+    if a.wake_text != WAKE_TEXT:
+        kind += f" wake_text={a.wake_text!r}"
+    log(f"subscribed {a.pane_id} agent={a.agent} project={a.project} mode={mode} kind={kind}")
 
 
 def cmd_unsubscribe(a):
@@ -56,7 +64,8 @@ def cmd_list(_a):
         last = time.strftime("%H:%M:%S", time.localtime(v["last_wake"])) if v["last_wake"] else "never"
         mode = v.get("mode", "prompt")
         pending = len(v.get("pending") or [])
-        print(f"{pane}\t{v['agent']}\t{v['project']}\t{mode}\tpending {pending}\tlast wake {last}")
+        kind = f"\t{v['kind']}" if v.get("kind") == "scout" else ""
+        print(f"{pane}\t{v['agent']}\t{v['project']}\t{mode}\tpending {pending}\tlast wake {last}{kind}")
 
 
 def main():
@@ -70,6 +79,8 @@ def main():
     p.add_argument(
         "--aside", action="store_true", help="never type into the pane: pane token only (the queen)"
     )
+    p.add_argument("--scout", action="store_true", help="also type --wake-text when scout.scan_due says so")
+    p.add_argument("--wake-text", default=WAKE_TEXT, help=f"text typed to wake the pane (default {WAKE_TEXT!r})")
     p.set_defaults(fn=cmd_subscribe)
     p = sub.add_parser("unsubscribe", help="drop one pane, or every pane of --project")
     p.add_argument("pane_id", nargs="?")
@@ -84,5 +95,6 @@ def main():
         sub.add_parser(name, help=h).set_defaults(fn=fn)
     db.register(sub)
     swarm.register(sub)
+    queen_signal.register(sub)
     a = ap.parse_args()
     a.fn(a)
