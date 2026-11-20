@@ -7,7 +7,7 @@ description: >-
   rewrites each worker's brief for delivery once it is idle, and reloads the
   subject table from realm's SQLite db; then runs the queen loop. Use after the
   queen's omp session died or when continuing a live realm from a new session.
-  Invoked as `/realm-restart KEY`, e.g. `/realm-restart /laptop/general`.
+  Invoked as `/realm-restart KEY|NAME`, e.g. `/realm-restart "secret garden"`.
 compatibility: >-
   Requires a realm started by realm-create (its realm.py and launchd service),
   herdr, and an Agent Mail MCP server named agent-mail-perso exposing
@@ -28,8 +28,9 @@ restart rewrites carry it.
 Below, `realm` is `python3 ~/.agents/skills/realm-create/scripts/realm.py`, and "realm-create" is
 `~/.agents/skills/realm-create/SKILL.md`.
 
-Argument: `<key>`, the realm's Agent Mail project key. Missing: `realm realms` lists the keys the db knows and
-`realm list` the subscribed panes per project; show them, ask which one, start nothing.
+Argument: `<realm>`, the realm's Agent Mail project key (starts with `/`) or its name. Missing: `realm realms`
+lists each realm's key and name, `realm list` the subscribed panes per project; show them, ask which one, start
+nothing.
 
 ## 1. Load the queen's instructions
 
@@ -38,9 +39,9 @@ version of everything this session must do as queen; a pointer to it is not enou
 
 ## 2. Take over
 
-`realm restart --project <key> --model <your model>`, from this pane. It:
+`realm restart --project <realm> --model <your model>`, from this pane. It:
 
-- labels this tab `👑 queen` (realm's guard then refuses to type into it);
+- labels this tab `👑 queen · <name>` (realm's guard then refuses to type into it);
 - picks the queen: the one the db records, else the single `Swarm queen` agent in Agent Mail;
 - stops with `needs` (exit 2) when the old queen may still be running (another `👑` tab in this workspace, or
   Agent Mail activity in the last 5 min): two sessions reading one inbox lose replies. Show the user what it
@@ -58,10 +59,10 @@ Keep `queen`: that is `QUEEN`. Show `table`, with `brief_pending` names beside i
 it. Each `pane_gone` worker: report it; relaunch (`realm spawn`) or retire it (`realm retire`) only on the
 user's word.
 
-When `realm worker list --project <key> --all` is empty after the restart (no subscribed worker panes, no db
+When `realm worker list --project <realm> --all` is empty after the restart (no subscribed worker panes, no db
 rows), the realm has no workers left: say so; `realm spawn` adds them on the user's word.
 
 ## 3. Be the queen
 
 Act as realm-create "Be the queen" and every section after it, which you read in step 1, with this `QUEEN`, this
-pane and the db. `realm status --project <key>` shows which briefs are still pending delivery.
+pane and the db. `realm status --project <realm>` shows which briefs are still pending delivery.

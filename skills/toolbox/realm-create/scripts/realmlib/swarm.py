@@ -74,8 +74,8 @@ def brief_dir(key):
     return Path(os.environ.get("TMPDIR") or tempfile.gettempdir()) / "swarm" / slug
 
 
-def write_brief(key, name, queen):
-    text = BRIEF_TEMPLATE.read_text().format(W=name, w=kebab(name), KEY=key, QUEEN=queen)
+def write_brief(key, name, queen, realm_label=None):
+    text = BRIEF_TEMPLATE.read_text().format(W=name, w=kebab(name), KEY=key, QUEEN=queen, REALM=realm_label or key)
     path = brief_dir(key) / f"{kebab(name)}.md"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(text)
@@ -140,7 +140,7 @@ def spawn(conn, key):
         "task_description": f"Swarm worker, queen {r['queen']}",
     })
     name = ident["name"]
-    brief = write_brief(key, name, r["queen"])
+    brief = write_brief(key, name, r["queen"], db.label(r))
     res = _ok(herdr("tab", "create", "--workspace", r["workspace"], "--cwd", r["cwd"] or os.getcwd(),
                     "--label", WORKER_LABEL + kebab(name), "--no-focus"), "tab create")
     pane_id, tab_id = res["root_pane"]["pane_id"], res["tab"]["tab_id"]
@@ -164,20 +164,25 @@ def wait_joined(conn, key, names, timeout=JOIN_TIMEOUT, interval=5):
         sleep(interval)
 
 
-def create(conn, key, size, model, workspace, cwd, queen_pane, queen_tab):
+def queen_label(realm_name):
+    return f"{QUEEN_LABEL} · {realm_name}" if realm_name else QUEEN_LABEL
+
+
+def create(conn, key, size, model, workspace, cwd, queen_pane, queen_tab, name=None):
     """Bootstrap a realm from the queen's pane: label, identity, launchd, aside, db, size workers, joins."""
     if size < 1:
         raise Refused("size must be an integer ≥ 1")
     if not (queen_pane and queen_tab and workspace):
         raise Refused("run from the queen's herdr pane: HERDR_PANE_ID, HERDR_TAB_ID and HERDR_WORKSPACE_ID")
-    _ok(herdr("tab", "rename", queen_tab, QUEEN_LABEL), "tab rename")
+    db._check_name(conn, key, name)  # before any side effect
+    _ok(herdr("tab", "rename", queen_tab, queen_label(name)), "tab rename")
     session = call("macro_start_session", {"human_key": key, "program": PROGRAM, "model": model,
                                            "task_description": "Swarm queen"})
     queen = session["agent"]["name"]
     if not launchd_loaded():
         launchd_install()
     subscribe(queen_pane, queen, key, aside=True)
-    db.init_realm(conn, key, queen, queen_pane, now(), model=model, workspace=workspace, cwd=cwd)
+    db.init_realm(conn, key, queen, queen_pane, now(), model=model, workspace=workspace, cwd=cwd, name=name)
     workers = [spawn(conn, key) for _ in range(size)]
     joined = wait_joined(conn, key, [w["name"] for w in workers])
     return {"queen": queen, "inbox": session.get("inbox", []), "workers": workers, **joined}
@@ -222,7 +227,7 @@ def status(conn, key):
                     "agent": p and p.get("agent"), "agent_status": p and p.get("agent_status"),
                     "pane_gone": p is None})
     r = db.realm_row(conn, key)
-    return {"queen": r["queen"], "queen_pane": r["queen_pane"], "workers": out}
+    return {"realm": db.label(r), "queen": r["queen"], "queen_pane": r["queen_pane"], "workers": out}
 
 
 def dispatch(conn, key, to, slug, title, body, after=None):
@@ -261,7 +266,8 @@ def restart(conn, key, model, queen_pane, queen_tab, workspace, cwd, queen=None,
     """Take over a live realm from this pane: find and resume the queen, move the aside, re-brief workers."""
     if not (queen_pane and queen_tab and workspace):
         raise Refused("run from the new queen's herdr pane: HERDR_PANE_ID, HERDR_TAB_ID and HERDR_WORKSPACE_ID")
-    _ok(herdr("tab", "rename", queen_tab, QUEEN_LABEL), "tab rename")
+    known = conn.execute("SELECT name FROM realms WHERE key=?", (key,)).fetchone()
+    _ok(herdr("tab", "rename", queen_tab, queen_label(known and known["name"])), "tab rename")
     agents = call("list_agents", {"project_key": key})
     queen = _pick_queen(conn, key, agents, queen)
     if not force:
@@ -299,7 +305,7 @@ def rebrief(conn, key):
     r = db.realm_row(conn, key)
     pending, started, gone = [], [], []
     for w in db.list_workers(conn, key, now()):
-        path = write_brief(key, w["name"], r["queen"])
+        path = write_brief(key, w["name"], r["queen"], db.label(r))
         db.add_worker(conn, key, w["name"], None, None, str(path), now())
         p = pane(w["pane"]) if w["pane"] else None
         if p is None:
@@ -378,9 +384,10 @@ def register(sub):
     p = db.keyed_parser(sub, "create", "bootstrap a realm from the queen's pane with SIZE workers")
     p.add_argument("--size", type=int, required=True)
     p.add_argument("--model", required=True)
+    p.add_argument("--name", help="human name of the new realm, unique; --project stays its key")
     p.set_defaults(fn=db.run_verb(lambda c, a, t: create(
         c, a.key, a.size, a.model, env("HERDR_WORKSPACE_ID"), os.getcwd(), env("HERDR_PANE_ID"),
-        env("HERDR_TAB_ID"))))
+        env("HERDR_TAB_ID"), a.name)))
 
     p = db.keyed_parser(sub, "spawn", "add one worker to the realm")
     p.set_defaults(fn=db.run_verb(lambda c, a, t: spawn(c, a.key)))

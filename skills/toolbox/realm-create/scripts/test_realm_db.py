@@ -90,7 +90,7 @@ class Isolation(Base):
         self.assertEqual(db.subject_row(self.conn, self.OTHER, "s")["pane"], "p9")
         self.assertNotIn("p9", db.render_table(self.conn, KEY, True, T0))
         self.assertEqual([w["name"] for w in db.list_workers(self.conn, self.OTHER, T0)], ["Ann"])
-        self.assertEqual(db.list_realms(self.conn), [self.OTHER, KEY])
+        self.assertEqual([r["key"] for r in db.list_realms(self.conn)], [self.OTHER, KEY])
 
     def test_unknown_key_refused(self):
         with self.assertRaises(db.Refused):
@@ -112,6 +112,27 @@ class ResolveKey(unittest.TestCase):
                     finally:
                         if env is not None:
                             os.environ["HERDR_PANE_ID"] = env
+
+
+class Names(Base):
+    def test_name_is_unique_and_resolves_to_key(self):
+        db.init_realm(self.conn, "/other", "Q2", None, T0, name="secret garden")
+        self.assertEqual(db.resolve_key("secret garden", conn=self.conn), "/other")
+        self.assertEqual(db.resolve_key(KEY, conn=self.conn), KEY)
+        with self.assertRaises(db.Refused):
+            db.rename_realm(self.conn, KEY, "secret garden", T0)
+        with self.assertRaises(db.Refused):
+            db.resolve_key("no such realm", conn=self.conn)
+        for bad in ("", " ", "/looks-like-a-key"):
+            with self.assertRaises(db.Refused):
+                db.rename_realm(self.conn, KEY, bad, T0)
+
+    def test_rename_and_init_keep_name(self):
+        db.rename_realm(self.conn, KEY, "garden", T0)
+        db.init_realm(self.conn, KEY, "Queen", "p9", T0 + 1)  # restart: no name given
+        self.assertEqual(db.realm_row(self.conn, KEY)["name"], "garden")
+        self.assertIn("Realm `garden` (/test/realm), queen Queen", db.render_table(self.conn, KEY, False, T0))
+        self.assertEqual(db.list_realms(self.conn), [{"key": KEY, "name": "garden"}])
 
 
 class Subjects(Base):

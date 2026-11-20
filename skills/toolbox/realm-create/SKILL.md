@@ -5,8 +5,8 @@ description: >-
   queen under a project key, registers N worker agents, opens one herdr tab per
   worker running a fresh omp session that joins the same project, then runs the
   queen loop — answer the user, split work into subjects, dispatch each subject
-  to a worker by mail, track it to done. Invoked as `/realm-create KEY SIZE`,
-  e.g. `/realm-create /laptop/general 3`.
+  to a worker by mail, track it to done. Invoked as `/realm-create KEY SIZE
+  [NAME]`, e.g. `/realm-create /laptop/general 3 "secret garden"`.
 compatibility: >-
   Requires macOS (launchd), python3, herdr (tabs, pane run), the omp
   CLI, and an Agent Mail MCP server named agent-mail-perso in
@@ -33,13 +33,16 @@ message to the user on any channel. A worker's question reaches the queen by mai
 queen asks the user and mails the answer back. The worker brief carries this rule, and the rule that a worker
 holding more than four tasks in a row keeps a to-do list and reports open items in its reply.
 
-Arguments: `<key>` is the Agent Mail project key (`human_key`, e.g. `/laptop/general`); `<size>` is the initial number
-of workers, an integer ≥ 1. Either missing or invalid: ask, start nothing.
+Arguments: `<key>` is the Agent Mail project key (`human_key`, e.g. `/laptop/general`), the realm's identity;
+`<size>` is the initial number of workers, an integer ≥ 1; `<name>` is the realm's human name, unique across
+realms (e.g. `secret garden`). Key or size missing or invalid: ask, start nothing. Name missing: ask for it with
+them; create without one only if the user says so.
 
 Below, `realm` is `python3 ~/.agents/skills/realm-create/scripts/realm.py`. Its verbs answer JSON. `{"error": …}`
 with exit 1: nothing changed past that point. `{"needs": …}` with exit 2: a person must decide; ask the user,
-then rerun with the flag it names. Every verb acts on one realm: always pass `--project <key>`; the db is shared
-by every realm on the machine and a verb never reads or writes another key's rows.
+then rerun with the flag it names. Every verb acts on one realm: always pass `--project <key>` (the name works
+too once the realm exists); the db is shared by every realm on the machine and a verb never reads or writes
+another key's rows.
 
 Every 15 s a launchd job (`com.loup.realm`) reads each subscribed agent's Agent Mail delivery events. Each new
 mail to a worker gets `check your mail` + Enter typed into its pane once, as soon as the pane is neither
@@ -49,9 +52,10 @@ token on the pane. realm refuses to type into a pane whose tab label holds `👑
 
 ## 1. Start the realm
 
-`realm create --project <key> --size <size> --model <your model>`, from this pane. It:
+`realm create --project <key> --size <size> --model <your model> --name "<name>"`, from this pane. It:
 
-- labels this tab `👑 queen`;
+- refuses a name another realm already has, before doing anything;
+- labels this tab `👑 queen · <name>`;
 - registers a fresh queen identity (`task_description: "Swarm queen"`), installs the launchd job when missing,
   and subscribes this pane in aside mode;
 - records the realm in realm's db with your model, workspace and directory;

@@ -132,6 +132,20 @@ class SwarmTest(unittest.TestCase):
     def create(self, size=2, key=KEY):
         return swarm.create(self.conn, key, size, "m1", "w", "/cwd", "w:p0", "w:t0")
 
+    def test_create_with_name_labels_tab_brief_and_table(self):
+        out = swarm.create(self.conn, KEY, 1, "m1", "w", "/cwd", "w:p0", "w:t0", name="secret garden")
+        self.assertEqual(self.h.tabs["w:t0"]["label"], "👑 queen · secret garden")
+        self.assertIn("worker of realm `secret garden`", Path(out["workers"][0]["brief"]).read_text())
+        self.assertEqual(swarm.status(self.conn, KEY)["realm"], "secret garden")
+        self.assertIn("Realm `secret garden`", db.render_table(self.conn, KEY, False, self.t))
+
+    def test_create_refuses_taken_name_before_any_side_effect(self):
+        db.init_realm(self.conn, OTHER, "Q", None, self.t, name="garden")
+        with self.assertRaises(db.Refused):
+            swarm.create(self.conn, KEY, 1, "m1", "w", "/cwd", "w:p0", "w:t0", name="garden")
+        self.assertEqual(self.h.tabs["w:t0"]["label"], "shell")
+        self.assertEqual(self.m.agents, {})
+
     def test_create_bootstraps_queen_and_workers(self):
         out = self.create()
         self.assertEqual(out["queen"], "QueenBee")

@@ -6,7 +6,7 @@ description: >-
   unsubscribes every pane of the realm's key, deletes that key's brief
   directory, pauses open subjects and retires the closed workers in realm's
   db, then reports what closed and what failed. Run by the queen. Invoked as
-  `/realm-stop`.
+  `/realm-stop [KEY|NAME]`.
 compatibility: >-
   Requires herdr (tab list/close) and a realm launched by realm-create.
 disable-model-invocation: true
@@ -16,18 +16,18 @@ disable-model-invocation: true
 
 **Explicit invocation only.** It kills every worker session of the realm; never run it on a guess.
 
-Below, `realm` is `python3 ~/.agents/skills/realm-create/scripts/realm.py` and `<key>` the realm's Agent Mail
-project key.
+Below, `realm` is `python3 ~/.agents/skills/realm-create/scripts/realm.py` and `<realm>` this realm's Agent Mail
+project key or its name (`realm realms` lists both).
 
 ## 1. Stop
 
-`realm stop --project <key>`, from the queen's pane. It acts only on panes subscribed under `<key>`, never on
-another realm sharing the workspace, and never on your own tab.
+`realm stop --project <realm>`, from the queen's pane. It acts only on panes subscribed under that realm's key,
+never on another realm sharing the workspace, and never on your own tab.
 
 - Workers mid-subject (`agent_status` `working`): it stops with `needs` (exit 2) and lists them, closing nothing.
   Name them to the user; rerun with `--close-working` only once they confirm.
 - Otherwise it closes each worker tab, checks with `herdr tab list` that each one is gone, unsubscribes every
-  pane of `<key>` (worker wakes and your mail aside), deletes `<key>`'s brief directory, sets open subjects to
+  pane of the key (worker wakes and your mail aside), deletes its brief directory, sets open subjects to
   `paused` and retires the closed workers in the db. A close that failed or a tab still open is in `failed`,
   never retried blindly.
 

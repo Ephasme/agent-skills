@@ -142,6 +142,11 @@ MIGRATIONS = [
     );
     CREATE INDEX tasks_by_state ON tasks(realm, state);
     """,
+    # 4: a human name per realm, unique; the Agent Mail key stays the identity and the partition.
+    """
+    ALTER TABLE realms ADD COLUMN name TEXT;
+    CREATE UNIQUE INDEX realms_by_name ON realms(name) WHERE name IS NOT NULL;
+    """,
 ]
 
 
@@ -229,18 +234,37 @@ def parse_ts(s):
 
 # ---------- operations (pure: conn + now in, dicts out) ----------
 
-def init_realm(conn, key, queen, pane, now, model=None, workspace=None, cwd=None):
+def _check_name(conn, key, name):
+    if name is None:
+        return
+    if not name.strip() or name.startswith("/"):
+        raise Refused("a realm name is non-empty and does not start with '/' (that is a key)")
+    other = conn.execute("SELECT key FROM realms WHERE name=? AND key!=?", (name, key)).fetchone()
+    if other:
+        raise Refused(f"realm name {name!r} is taken by {other['key']}")
+
+
+def init_realm(conn, key, queen, pane, now, model=None, workspace=None, cwd=None, name=None):
     """Record a realm (idempotent). Omitted fields keep their stored value."""
+    _check_name(conn, key, name)
     with tx(conn):
         conn.execute(
-            """INSERT INTO realms (key, queen, queen_pane, model, workspace, cwd, created_ts, updated_ts)
-                 VALUES (?,?,?,?,?,?,?,?)
+            """INSERT INTO realms (key, queen, queen_pane, model, workspace, cwd, name, created_ts, updated_ts)
+                 VALUES (?,?,?,?,?,?,?,?,?)
                ON CONFLICT(key) DO UPDATE SET queen=excluded.queen,
                  queen_pane=COALESCE(excluded.queen_pane, queen_pane), model=COALESCE(excluded.model, model),
                  workspace=COALESCE(excluded.workspace, workspace), cwd=COALESCE(excluded.cwd, cwd),
-                 updated_ts=excluded.updated_ts""",
-            (key, queen, pane, model, workspace, cwd, now, now),
+                 name=COALESCE(excluded.name, name), updated_ts=excluded.updated_ts""",
+            (key, queen, pane, model, workspace, cwd, name, now, now),
         )
+    return realm_row(conn, key)
+
+
+def rename_realm(conn, key, name, now):
+    realm_row(conn, key)
+    _check_name(conn, key, name)
+    with tx(conn):
+        conn.execute("UPDATE realms SET name=?, updated_ts=? WHERE key=?", (name, now, key))
     return realm_row(conn, key)
 
 
@@ -248,9 +272,14 @@ def realm_row(conn, key):
     r = conn.execute("SELECT * FROM realms WHERE key=?", (key,)).fetchone()
     if not r:
         raise Refused(f"no realm {key!r} in the db: run `realm init` first")
-    return {"key": r["key"], "queen": r["queen"], "queen_pane": r["queen_pane"], "model": r["model"],
-            "workspace": r["workspace"], "cwd": r["cwd"],
+    return {"key": r["key"], "name": r["name"], "queen": r["queen"], "queen_pane": r["queen_pane"],
+            "model": r["model"], "workspace": r["workspace"], "cwd": r["cwd"],
             "created": iso(r["created_ts"]), "updated": iso(r["updated_ts"])}
+
+
+def label(realm):
+    """How a realm is shown to people: its name, else its key."""
+    return realm["name"] or realm["key"]
 
 
 def set_brief_pending(conn, key, name, pending):
@@ -450,7 +479,8 @@ def render_table(conn, key, include_done, now):
     """The table the queen shows the user: markdown, one row per subject, then idle workers."""
     realm = realm_row(conn, key)
     subjects = [s for s in list_subjects(conn, key) if include_done or s["state"] != "done"]
-    lines = [f"Realm `{key}`, queen {realm['queen']}", ""]
+    title = f"Realm `{realm['name']}` ({key})" if realm["name"] else f"Realm `{key}`"
+    lines = [f"{title}, queen {realm['queen']}", ""]
     if subjects:
         lines += ["| slug | worker | pane | state | since | status |", "|---|---|---|---|---|---|"]
         for s in subjects:
@@ -535,13 +565,19 @@ def _emit(obj):
     print(json.dumps(obj, indent=2, ensure_ascii=False))
 
 
-def resolve_key(project, pane=None, state_file=None):
-    """The realm key a verb acts on: --project, else the project of the caller's pane subscription.
+def resolve_key(project, pane=None, state_file=None, conn=None):
+    """The realm key a verb acts on: --project (a key, or a realm name looked up in the db), else the
+    project of the caller's pane subscription.
 
-    No default and no guessing: neither given → Refused. A realm never reads another key's rows.
+    No default and no guessing: neither given, or an unknown name → Refused. A realm never reads another key's rows.
     """
     if project:
-        return project
+        if project.startswith("/"):
+            return project
+        r = conn.execute("SELECT key FROM realms WHERE name=?", (project,)).fetchone() if conn else None
+        if not r:
+            raise Refused(f"no realm named {project!r}: keys start with '/'; `realm realms` lists both")
+        return r["key"]
     pane = pane or os.environ.get("HERDR_PANE_ID")
     if pane:
         try:
@@ -550,12 +586,13 @@ def resolve_key(project, pane=None, state_file=None):
             subs = {}
         if pane in subs:
             return subs[pane]["project"]
-    raise Refused("no realm key: pass --project <key>, or run from a pane subscribed to realm")
+    raise Refused("no realm key: pass --project <key or name>, or run from a pane subscribed to realm")
 
 
 def list_realms(conn):
-    """Admin listing: the keys only, never their rows."""
-    return [r["key"] for r in conn.execute("SELECT key FROM realms ORDER BY key")]
+    """Admin listing: each realm's key and name, never its rows."""
+    return [{"key": r["key"], "name": r["name"]}
+            for r in conn.execute("SELECT key, name FROM realms ORDER BY key")]
 
 
 def run_verb(fn, keyed=True):
@@ -565,9 +602,9 @@ def run_verb(fn, keyed=True):
     """
     def handler(a):
         try:
-            if keyed:
-                a.key = resolve_key(a.project)
             with closing(connect()) as conn:
+                if keyed:
+                    a.key = resolve_key(a.project, conn=conn)
                 out = fn(conn, a, time.time())
         except Refused as e:
             if isinstance(e, NeedsHuman):
@@ -584,20 +621,25 @@ def run_verb(fn, keyed=True):
 
 def keyed_parser(sub, name, help):
     p = sub.add_parser(name, help=help)
-    p.add_argument("--project", help="Agent Mail project key; default: the project of $HERDR_PANE_ID's subscription")
+    p.add_argument("--project", help="realm key (/…) or name; default: the project of $HERDR_PANE_ID's subscription")
     return p
 
 
 def register(sub):
     """Add the db verbs to realm's argparse subparsers. Each one acts on exactly one realm key."""
 
-    p = sub.add_parser("realms", help="db: list realm keys (admin; keys only)")
+    p = sub.add_parser("realms", help="db: list realms, key and name (admin; no rows)")
     p.set_defaults(fn=run_verb(lambda c, a, now: list_realms(c), keyed=False))
 
     p = keyed_parser(sub, "init", "db: record a realm and its queen (idempotent)")
     p.add_argument("--queen", required=True)
     p.add_argument("--pane", help="queen pane id")
-    p.set_defaults(fn=run_verb(lambda c, a, now: init_realm(c, a.key, a.queen, a.pane, now)))
+    p.add_argument("--name", help="human name, unique across realms")
+    p.set_defaults(fn=run_verb(lambda c, a, now: init_realm(c, a.key, a.queen, a.pane, now, name=a.name)))
+
+    p = keyed_parser(sub, "rename", "db: set the realm's human name")
+    p.add_argument("--name", required=True)
+    p.set_defaults(fn=run_verb(lambda c, a, now: rename_realm(c, a.key, a.name, now)))
 
     w = sub.add_parser("worker", help="db: workers").add_subparsers(dest="wcmd", required=True)
     p = keyed_parser(w, "add", "record or update a worker (clears retired)")
