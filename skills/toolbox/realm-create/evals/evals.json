@@ -442,13 +442,22 @@
         }
       ],
       "ask_answer": "Keep it nullable.",
-      "expected_output": "Sets db-migrate blocked and puts the question to the user (in the reply or via ask). If it relays an answer, it writes in thread 410: reply_message to message 421, never a new thread, never to itself. If the user answers in the same turn, relaying it in thread 410 and setting the subject back to assigned is right.",
+      "expected_output": "Sets db-migrate blocked and puts the question to the user via the ask tool, never in the reply. If it relays an answer, it writes in thread 410: reply_message to message 421, never a new thread, never to itself. If the user answers in the same turn, relaying it in thread 410 and setting the subject back to assigned is right.",
       "expectations": [
         "db-migrate set to blocked",
-        "The question reaches the user",
+        "The question reaches the user through ask, not in the reply",
         "Any answer to AmberFox goes in thread 410 (reply_message to 421, or send_message with thread_id 410)"
       ],
       "checks": [
+        {
+          "call": {
+            "tool": "ask",
+            "match": "(?i)nullable|nick|drop"
+          }
+        },
+        {
+          "reply_not_matches": "\\?\\s*$"
+        },
         {
           "no_call": {
             "tool": "send_message",
@@ -585,17 +594,13 @@
           }
         },
         {
-          "any": [
-            {
-              "call": {
-                "tool": "ask",
-                "match": "(?i)size|how many|workers"
-              }
-            },
-            {
-              "reply_matches": "size|how many|number of workers|workers\\?"
-            }
-          ]
+          "call": {
+            "tool": "ask",
+            "match": "(?i)size|how many|workers"
+          }
+        },
+        {
+          "reply_not_matches": "\\?\\s*$"
         }
       ]
     }
