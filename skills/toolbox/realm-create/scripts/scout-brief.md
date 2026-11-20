@@ -32,7 +32,9 @@ answers JSON.
    in `ack`'s shape: WhatsApp and iMessage only for the allowlisted contacts, Slack for everything the user can
    read, Gmail without Promotions and Social.
    - `more: true`: judge, propose and ack this batch, then fetch again, until `more` is false.
-   - `skipped: <reason>` (a missing key, refused auth): leave that source for this scan and report it in step 6.
+   - `skipped: <reason>` (a missing key, refused auth, Slack's rate limit or this scan's Slack call budget):
+     leave that source for this scan and report it in step 6.
+   - `capped: <reason>`: judge, propose and ack this batch, then leave the source; the rest comes next scan.
 3. Judge each message: does it ask or imply something for the user's calendar (an event to create, move or
    cancel, a deadline, a reminder) or to-do list (something the user must do)? Most messages: nothing. Read a
    thread or the earlier messages only when one message is not enough. Messages the user sent count too

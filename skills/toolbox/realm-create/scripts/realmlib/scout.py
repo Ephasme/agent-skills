@@ -15,6 +15,7 @@ The allowlists, the ntfy endpoint and its token command live in CONFIG, outside 
 private contacts.
 """
 
+import hashlib
 import json
 import os
 import subprocess
@@ -28,7 +29,7 @@ from zoneinfo import ZoneInfo
 
 from . import db
 from .db import Refused, tx
-from .state import HOME, locked_state, log
+from .state import HOME, STATE_DIR, locked_state, log
 
 CONFIG = Path(os.environ.get("REALM_SCOUT_CONFIG") or HOME / ".config/realm/scout.json")
 SECRETS = Path(os.environ.get("REALM_SCOUT_SECRETS") or HOME / "code/perso/agent-skills/mcp/secrets.sops.yaml")
@@ -44,6 +45,12 @@ BACKFILL_SECONDS = 30 * 86400
 EXCERPT_MAX = 200
 TEXT_MAX = 2000
 FETCH_LIMIT = 300
+# Slack: search.messages is Tier 2 (20+ calls/min). Every call, across `realm scout fetch` processes, waits
+# SLACK_INTERVAL after the previous one; one scan makes at most SLACK_MAX_CALLS, the rest waits for the next scan.
+SLACK_INTERVAL = 3.0
+SLACK_MAX_CALLS = 60
+SLACK_MAX_429 = 3
+SLACK_PACE = STATE_DIR / "slack-pace.json"
 SOURCES = ("slack", "gmail-work", "gmail-perso", "whatsapp", "imessage")
 ACTIONS = ("task.add", "calendar.create", "calendar.update", "calendar.cancel")
 CONFIDENCE = ("low", "med", "high")
@@ -507,25 +514,60 @@ def _http_json(url, headers=None, data=None):
         return json.loads(r.read())
 
 
+class SlackCapped(Skipped):
+    """This scan's Slack call budget is spent."""
+
+
 class SlackApi:
-    """Slack Web API with a read-only user token: search.messages, and auth.test for the user's own id."""
+    """Slack Web API with a read-only user token: search.messages, and auth.test (cached) for the user's id.
 
-    RETRIES = 5  # search.messages is rate-limited; a 429 carries the wait in Retry-After
+    Pacing and the per-scan budget live in SLACK_PACE, shared by every fetch of the scan `scan`. A 429 waits
+    exactly Slack's Retry-After; after SLACK_MAX_429 of them, or one without Retry-After, the source is skipped.
+    """
 
-    def __init__(self, token=None):
+    def __init__(self, token=None, scan=None, pace=None, clock=time.time, sleep=time.sleep):
         self.token = token or secret("SCOUT_SLACK_USER_TOKEN")
-        self._me = None
+        self.scan, self.pace, self.clock, self.sleep = scan, Path(pace or SLACK_PACE), clock, sleep
+        self.token_id = hashlib.sha256(self.token.encode()).hexdigest()[:16]
+
+    def _state(self):
+        try:
+            s = json.loads(self.pace.read_text())
+        except (FileNotFoundError, ValueError):
+            s = {}
+        scan = self.scan if self.scan is not None else f"hour {int(self.clock() // 3600)}"  # fetch outside a scan
+        if s.get("scan") != scan:
+            s.update(scan=scan, calls=0, limited=0)
+        return s
+
+    def _save(self, s):
+        self.pace.parent.mkdir(parents=True, exist_ok=True)
+        self.pace.write_text(json.dumps(s))
 
     def get(self, method, **params):
         url = f"https://slack.com/api/{method}?{urllib.parse.urlencode(params)}"
-        for attempt in range(self.RETRIES + 1):
+        while True:
+            s = self._state()
+            if s["calls"] >= SLACK_MAX_CALLS:
+                raise SlackCapped(f"slack: {SLACK_MAX_CALLS} calls this scan, the rest waits for the next scan")
+            wait = s.get("last", 0) + SLACK_INTERVAL - self.clock()
+            if wait > 0:
+                self.sleep(wait)
+            s.update(last=self.clock(), calls=s["calls"] + 1)
+            self._save(s)
             try:
                 d = _http_json(url, {"Authorization": f"Bearer {self.token}"})
                 break
             except urllib.error.HTTPError as e:
-                if e.code != 429 or attempt == self.RETRIES:
+                if e.code != 429:
                     raise
-                time.sleep(int(e.headers.get("Retry-After") or 30))
+                s["limited"] += 1
+                self._save(s)
+                after = e.headers.get("Retry-After")
+                log(f"scout: slack {method} 429 #{s['limited']}, Retry-After {after}")
+                if after is None or s["limited"] >= SLACK_MAX_429:
+                    raise Skipped(f"slack: rate limited ({s['limited']} × 429 this scan)") from e
+                self.sleep(int(after))
         if not d.get("ok"):
             err = d.get("error", "unknown")
             if err in ("invalid_auth", "not_authed", "token_revoked", "missing_scope", "account_inactive"):
@@ -534,9 +576,14 @@ class SlackApi:
         return d
 
     def me(self):
-        if self._me is None:
-            self._me = self.get("auth.test")["user_id"]
-        return self._me
+        """The user's id: one auth.test per token, then read from SLACK_PACE."""
+        s = self._state()
+        if (s.get("me") or {}).get("token") != self.token_id:
+            uid = self.get("auth.test")["user_id"]
+            s = self._state()
+            s["me"] = {"token": self.token_id, "id": uid}
+            self._save(s)
+        return s["me"]["id"]
 
 
 def fetch_slack(conn, key, now, limit=None, api=None):
@@ -547,11 +594,19 @@ def fetch_slack(conn, key, now, limit=None, api=None):
     """
     state = cursors(conn, key, "slack", now)
     after = float(state["cursors"].get("all", state["default"]))
-    api = api or SlackApi()
+    api = api or SlackApi(scan=_scout(conn, key)["scan_start_ts"])
+    me = api.me()
     day = datetime.fromtimestamp(after - 86400, timezone.utc).strftime("%Y-%m-%d")
-    msgs, page, top = [], 1, after
+    msgs, page, top, capped = [], 1, after, None
     while True:
-        d = api.get("search.messages", query=f"after:{day}", sort="timestamp", sort_dir="asc", count=100, page=page)
+        try:
+            d = api.get("search.messages", query=f"after:{day}", sort="timestamp", sort_dir="asc", count=100,
+                        page=page)
+        except SlackCapped as e:
+            if not msgs:
+                raise
+            capped, more_pages = str(e), False
+            break
         res = d.get("messages") or {}
         for m in res.get("matches") or []:
             ts = float(m["ts"])
@@ -560,7 +615,7 @@ def fetch_slack(conn, key, now, limit=None, api=None):
             ch = m.get("channel") or {}
             top = max(top, ts)
             msgs.append({"id": f"{ch.get('id')}:{m['ts']}", "scope": "all", "epoch": ts, "chat": ch.get("name"),
-                         "ts": db.iso(ts), "from_me": m.get("user") == api.me(),
+                         "ts": db.iso(ts), "from_me": m.get("user") == me,
                          "sender": m.get("username") or m.get("user"),
                          "kind": "text", "text": _clip(m.get("text")), "permalink": m.get("permalink")})
         pages = (res.get("paging") or {}).get("pages", 1)
@@ -570,6 +625,8 @@ def fetch_slack(conn, key, now, limit=None, api=None):
         page += 1
     out = _batch(conn, key, "slack", msgs, {"all": str(top)}, state["first"], limit)
     out["more"] = out["more"] or more_pages
+    if capped:
+        out["capped"] = capped
     return out
 
 

@@ -163,18 +163,83 @@ class Fetch(Base):
         self.assertEqual((b["ids"], b["cursors"], b["more"]), (["C1:1001.0", "C2:1003.0"], {"all": "1003.0"}, False))
         self.assertEqual([m["from_me"] for m in b["messages"]], [False, True])
 
-    def test_slack_waits_out_rate_limit(self):
+    def slack(self, responses, t0=1000.0):
+        """A SlackApi on a fake clock; responses are returned (or raised) in order. Returns (api, sleeps, calls)."""
+        clock, sleeps, calls = [t0], [], []
+
+        def http(url, headers):
+            calls.append((clock[0], url.split("/api/")[1].split("?")[0]))
+            r = responses.pop(0)
+            if isinstance(r, Exception):
+                raise r
+            return r
+
+        def sleep(s):
+            sleeps.append(s)
+            clock[0] += s
+
+        api = scout.SlackApi(token="t", scan=1.0, pace=Path(self.dir.name) / "pace.json", clock=lambda: clock[0],
+                             sleep=sleep)
+        patch = mock.patch.object(scout, "_http_json", side_effect=http)
+        patch.start()
+        self.addCleanup(patch.stop)
+        return api, sleeps, calls
+
+    def limited(self, after="7"):
         import io
         import urllib.error
 
-        limited = urllib.error.HTTPError("u", 429, "Too Many Requests", {"Retry-After": "7"}, io.BytesIO())
-        with mock.patch.object(scout, "_http_json", side_effect=[limited, {"ok": True, "x": 1}]), \
-                mock.patch.object(scout.time, "sleep") as sleep:
-            self.assertEqual(scout.SlackApi(token="t").get("search.messages")["x"], 1)
-        sleep.assert_called_once_with(7)
-        with mock.patch.object(scout, "_http_json", side_effect=limited), mock.patch.object(scout.time, "sleep"):
-            with self.assertRaises(urllib.error.HTTPError):
-                scout.SlackApi(token="t").get("search.messages")
+        return urllib.error.HTTPError("u", 429, "Too Many Requests", {"Retry-After": after} if after else {},
+                                      io.BytesIO())
+
+    def test_slack_paces_calls_and_waits_exactly_retry_after(self):
+        api, sleeps, calls = self.slack([{"ok": True}, self.limited("7"), {"ok": True}])
+        api.get("search.messages")
+        api.get("search.messages")
+        self.assertEqual(sleeps[0], scout.SLACK_INTERVAL)  # spaced from the previous call
+        self.assertEqual(sleeps[1], 7)  # then Slack's own wait, nothing guessed
+        gaps = [b[0] - a[0] for a, b in zip(calls, calls[1:])]
+        self.assertTrue(all(g >= scout.SLACK_INTERVAL for g in gaps), gaps)
+
+    def test_slack_gives_up_after_bounded_429s_or_no_retry_after(self):
+        api, _, calls = self.slack([self.limited()] * scout.SLACK_MAX_429)
+        with self.assertRaisesRegex(scout.Skipped, "rate limited"):
+            api.get("search.messages")
+        self.assertEqual(len(calls), scout.SLACK_MAX_429)
+        (Path(self.dir.name) / "pace.json").unlink()
+        api, _, calls = self.slack([self.limited(after=None)])
+        with self.assertRaises(scout.Skipped):
+            api.get("search.messages")
+        self.assertEqual(len(calls), 1)
+
+    def test_slack_budget_per_scan_shared_across_processes_and_user_id_cached(self):
+        api, _, calls = self.slack([{"ok": True, "user_id": "U1"}] + [{"ok": True}] * scout.SLACK_MAX_CALLS)
+        self.assertEqual(api.me(), "U1")
+        again = scout.SlackApi(token="t", scan=1.0, pace=api.pace, clock=api.clock, sleep=api.sleep)  # next fetch
+        self.assertEqual(again.me(), "U1")
+        for _ in range(scout.SLACK_MAX_CALLS - 1):
+            again.get("search.messages")
+        with self.assertRaises(scout.SlackCapped):
+            again.get("search.messages")
+        self.assertEqual([c[1] for c in calls].count("auth.test"), 1)
+        self.assertEqual(len(calls), scout.SLACK_MAX_CALLS)
+        scout.SlackApi(token="t", scan=2.0, pace=api.pace, clock=api.clock, sleep=api.sleep).get("x")  # next scan
+
+    def test_slack_cap_mid_fetch_keeps_what_was_read(self):
+        scout.ack(self.conn, KEY, {"source": "slack", "cursors": {"all": "1000"}, "ids": [], "proposed": []}, T0)
+
+        class Api:
+            def me(self):
+                return "U"
+
+            def get(self, method, **p):
+                if p["page"] > 1:
+                    raise scout.SlackCapped("slack: budget")
+                return {"messages": {"matches": [{"ts": "1001.0", "channel": {"id": "C1"}}], "paging": {"pages": 5}}}
+
+        b = scout.fetch_slack(self.conn, KEY, T0, api=Api())
+        self.assertEqual((b["ids"], b["cursors"], b["more"], b["capped"]),
+                         (["C1:1001.0"], {"all": "1001.0"}, False, "slack: budget"))
 
     def test_gmail_oldest_first_limit_and_cursor(self):
         import base64
