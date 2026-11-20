@@ -218,7 +218,9 @@ def read_at(ref, rel):
 
 def system_prompt(skill, case, ref=None):
     if case.get("system", "skill") == "brief":
-        text = read_at(ref, "realm-create/scripts/brief.md").format(**{"REALM": case["brief"]["KEY"], **case["brief"]})
+        b = {"REALM": case["brief"]["KEY"], **case["brief"]}
+        b.setdefault("LABEL_STEP", f'`herdr workspace rename "$HERDR_WORKSPACE_ID" "🛠️ {b["REALM"]} · {b["w"]}"`')
+        text = read_at(ref, "realm-create/scripts/brief.md").format(**b)
     else:
         text = read_at(ref, f"{skill}/SKILL.md")
         for extra in case.get("also_read", []):

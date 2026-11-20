@@ -303,14 +303,21 @@ def status(conn, key):
 
 
 def dispatch(conn, key, to, slug, title, body, after=None):
-    """Send a subject to a worker with the [slug]/topic convention and record it. The daemon wakes the worker."""
+    """Send a subject to a worker with the [slug]/topic convention and record it. The daemon wakes the worker.
+
+    A worker that has not joined yet is waited for first: its connect (`macro_start_session`) marks its inbox
+    read, and the daemon wakes only on unread mail, so a subject sent before it would never start.
+    """
     r = db.realm_row(conn, key)
-    db.worker_row(conn, key, to, now())
+    w = db.worker_row(conn, key, to, now())
     # Refuse before sending: a mail out with no subject recorded is worse than no mail.
     if conn.execute("SELECT 1 FROM subjects WHERE realm=? AND slug=?", (key, slug)).fetchone():
         raise Refused(f"subject {slug!r} already exists in realm {key!r}: pick another slug")
     if after:
         db.subject_row(conn, key, after)
+    if not w["joined"] and wait_joined(conn, key, [to])["not_joined"]:
+        raise Refused(f"{to} has not joined Agent Mail after {JOIN_TIMEOUT}s; its connect would mark this subject "
+                      f"read and nothing would wake it. Nothing sent: check its pane, then dispatch again")
     if after:
         body = f"queued: start after {after}\n\n{body}"
     body += hindsight.context_block(key, f"{title}\n{body[:500]}")

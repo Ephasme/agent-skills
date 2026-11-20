@@ -8,7 +8,8 @@ If the user types into this pane anyway, act on it and report it to the queen in
 
 0. First, before anything else: {LABEL_STEP}.
 1. Connect to Agent Mail: `macro_start_session` with human_key `{KEY}`, agent_name `{W}`, program `omp`.
-   You are already registered as {W}; never take another name.
+   You are already registered as {W}; never take another name. It marks your inbox read, so nothing will wake
+   you for what it returns: a subject from the queen in it that you have not replied to yet is yours now.
 2. Your work comes only from the queen, by mail. `fetch_inbox` (agent_name `{W}`, project_key `{KEY}`,
    unread_only, include_bodies) when told to check mail or after replying, never mid-subject: it marks queued
    mail read. Act on what the queen sent.
@@ -28,4 +29,5 @@ If the user types into this pane anyway, act on it and report it to the queen in
 5. Do not message the user's contacts, push, deploy or delete anything unless the queen's message says so
    explicitly. Do not message other workers unless the queen tells you to.
 
-Now connect, then reply to me here in one line: your agent name and project. Then wait.
+Now connect, then reply to me here in one line: your agent name and project. Then start the first such subject;
+none: wait.

@@ -88,6 +88,7 @@ class FakeMail:
         self.agents = {}
         self.sent = []
         self.retired = []
+        self.unread = {}  # agent → ids of mail it has not read
         self.n = 0
         self.clock = None
 
@@ -113,12 +114,17 @@ class FakeMail:
             self.n += 1
             mid = 1000 + self.n
             self.sent.append({**args, "id": mid})
+            for to in args["to"]:
+                self.unread.setdefault(to, set()).add(mid)
             return {"deliveries": [{"payload": {"id": mid, "thread_id": None}}]}
         if tool == "fetch_topic":
             return []
         raise AssertionError(tool)
 
     def join(self, name, at):
+        """The worker's first `macro_start_session`: it returns the inbox and marks it read."""
+        if self.agents[name]["last_active_ts"] == self.agents[name]["inception_ts"]:
+            self.unread.pop(name, None)
         self.agents[name]["last_active_ts"] = db.iso(at)
 
 
@@ -229,6 +235,25 @@ class SwarmTest(unittest.TestCase):
             with self.assertRaises(db.Refused):
                 swarm.dispatch(self.conn, KEY, "WorkerAox", slug, "Again", "body", after=after)
         self.assertEqual(len(self.m.sent), 2)  # refused before any mail went out
+
+    def test_dispatch_to_a_fresh_worker_waits_for_its_connect(self):
+        """The race: a subject sent before the worker connects is marked read by that connect, and the daemon,
+        which wakes only on unread mail, never wakes it."""
+        self.create(size=1)
+        name = swarm.spawn(self.conn, KEY)["name"]  # not joined: spawn does not wait
+        self.assertIsNone(db.worker_row(self.conn, KEY, name, self.t)["joined"])
+        out = swarm.dispatch(self.conn, KEY, name, "s1", "First", "body")
+        self.m.join(name, self.t + 1)  # its connect, if it had not happened yet
+        self.assertEqual(self.m.unread.get(name), {out["message_id"]})
+
+    def test_dispatch_to_a_worker_that_never_joins_sends_nothing(self):
+        self.create(size=1)
+        self.never_join = {"WorkerBox"}
+        swarm.spawn(self.conn, KEY)
+        with self.assertRaises(db.Refused):
+            swarm.dispatch(self.conn, KEY, "WorkerBox", "s1", "First", "body")
+        self.assertEqual(self.m.sent, [])
+        self.assertEqual(db.list_subjects(self.conn, KEY), [])
 
     def test_retire_scales_in(self):
         out = self.create(size=1)

@@ -104,8 +104,9 @@ Each turn, in order:
    current subject. Write the body (goal, files or links, what done means, what is not allowed) to a file, then
    `realm dispatch --project <key> --to <W> --slug <slug> --title "<title>" --body-file <file>`, plus
    `--after <current-slug>` when queued. It sends the `[<slug>]` mail with topic `<slug>`, prefixes a queued body
-   with `queued: start after <current-slug>`, and records the subject. Never wake the worker yourself: realm does
-   it once its pane is idle.
+   with `queued: start after <current-slug>`, and records the subject. A worker not joined yet is waited for (up
+   to 60 s) before anything is sent; still absent: `error`, nothing sent. Never wake the worker yourself: realm
+   does it once its pane is idle.
 5. Answer the user.
 
 A worker that stops answering: `realm status --project <key>`, then `herdr pane read <pane>`, before deciding
