@@ -141,7 +141,8 @@ On a `scout-proposals` mail, or when the user asks:
 
 1. `realm proposal list --project <key> --md`: show the user the open proposals, as is.
 2. The user answers per item (`ok P3 P5, no P4`). Only their explicit words count: no answer is no decision, and
-   the item stays `proposed`. `realm proposal decide --project <key> --approve 3,5 --reject 4`.
+   the item stays `proposed`. `realm proposal decide --project <key> --approve 3,5 --reject 4`. Each approved
+   item is also kept as one short fact (title, why, date; never the excerpt) in the realm's Hindsight bank.
 3. Approved `task.add`: `realm proposal apply --project <key> --ids 3`. It lands in `realm task list`.
 4. Approved `calendar.*`: a subject to a worker, body = the proposal's exact payload (calendar `work` = the
    `google_workspace` account, `perso` = `google_perso`), done = the event made, then

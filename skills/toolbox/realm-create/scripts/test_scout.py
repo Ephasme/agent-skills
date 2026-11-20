@@ -69,24 +69,40 @@ class Tracker(Base):
         c = scout.cursors(self.conn, KEY, "slack", T0)
         self.assertTrue(c["first"])
         self.assertEqual(c["default"], T0 - scout.BACKFILL_SECONDS)
-        scout.ack(self.conn, KEY, {"source": "slack", "cursors": {"all": "100"}, "ids": ["a", "b"]}, T0)
+        scout.ack(self.conn, KEY, {"source": "slack", "cursors": {"all": "100"}, "ids": ["a", "b"], "proposed": []}, T0)
         c = scout.cursors(self.conn, KEY, "slack", T0)
         self.assertEqual((c["first"], c["cursors"]), (False, {"all": "100"}))
         self.assertEqual(scout.unseen(self.conn, KEY, "slack", ["a", "c", "b"]), ["c"])
 
     def test_cursor_never_moves_back(self):
-        scout.ack(self.conn, KEY, {"source": "slack", "cursors": {"all": "100"}, "ids": []}, T0)
-        scout.ack(self.conn, KEY, {"source": "slack", "cursors": {"all": "90"}, "ids": []}, T0)
+        scout.ack(self.conn, KEY, {"source": "slack", "cursors": {"all": "100"}, "ids": [], "proposed": []}, T0)
+        scout.ack(self.conn, KEY, {"source": "slack", "cursors": {"all": "90"}, "ids": [], "proposed": []}, T0)
         self.assertEqual(scout.cursors(self.conn, KEY, "slack", T0)["cursors"], {"all": "100"})
 
     def test_realms_isolated(self):
-        scout.ack(self.conn, KEY, {"source": "slack", "cursors": {"all": "100"}, "ids": ["a"]}, T0)
+        scout.ack(self.conn, KEY, {"source": "slack", "cursors": {"all": "100"}, "ids": ["a"], "proposed": []}, T0)
         self.assertTrue(scout.cursors(self.conn, OTHER, "slack", T0)["first"])
         self.assertEqual(scout.unseen(self.conn, OTHER, "slack", ["a"]), ["a"])
 
     def test_unknown_source(self):
         with self.assertRaises(Refused):
-            scout.ack(self.conn, KEY, {"source": "fax", "ids": []}, T0)
+            scout.ack(self.conn, KEY, {"source": "fax", "ids": [], "proposed": []}, T0)
+
+    def test_ack_refuses_until_proposals_recorded(self):
+        batch = {"source": "slack", "cursors": {"all": "100"}, "ids": ["m1", "m2"], "proposed": ["m1"]}
+        with self.assertRaises(Refused):
+            scout.ack(self.conn, KEY, batch, T0)
+        with self.assertRaises(Refused):
+            scout.ack(self.conn, KEY, {**batch, "proposed": None}, T0)
+        self.assertTrue(scout.cursors(self.conn, KEY, "slack", T0)["first"])  # nothing moved
+        pid = scout.propose(self.conn, OTHER, [self.prop(ref="m1")], T0)[0]["id"]
+        with self.assertRaises(Refused):
+            scout.ack(self.conn, KEY, batch, T0)  # another realm's proposal doesn't count
+        pid = scout.propose(self.conn, KEY, [self.prop(ref="m1")], T0)[0]["id"]
+        scout.ack(self.conn, KEY, batch, T0)
+        self.assertEqual(scout.unseen(self.conn, KEY, "slack", ["m1", "m2", "m3"]), ["m3"])
+        self.assertEqual(self.conn.execute("SELECT proposal_id FROM scout_seen WHERE realm=? AND msg_id='m1'",
+                                           (KEY,)).fetchone()[0], pid)
 
 
 class Fetch(Base):
@@ -111,7 +127,7 @@ class Fetch(Base):
             self.assertTrue(b["more"])
             self.assertEqual(b["ids"], ["a0", "b0", "a1", "b1"])
             self.assertEqual(b["cursors"], {"c1@s": "1002.0", "c2@s": "1003.0"})
-            scout.ack(self.conn, KEY, b, 2000)
+            scout.ack(self.conn, KEY, {**b, "proposed": []}, 2000)
             b = scout.fetch_whatsapp(self.conn, KEY, 2000, limit=4, client=self.client(items))
             self.assertFalse(b["more"])
             self.assertEqual(b["ids"], ["a2", "b2"])
@@ -131,7 +147,7 @@ class Fetch(Base):
             self.assertIn("not available", scout.fetch(self.conn, KEY, "slack", T0, 10)["skipped"])
 
     def test_slack_drops_bots_and_pre_cursor_and_pages(self):
-        scout.ack(self.conn, KEY, {"source": "slack", "cursors": {"all": "1000"}, "ids": []}, T0)
+        scout.ack(self.conn, KEY, {"source": "slack", "cursors": {"all": "1000"}, "ids": [], "proposed": []}, T0)
         pages = {1: [{"ts": "999.0", "channel": {"id": "C1"}}, {"ts": "1001.0", "channel": {"id": "C1"}, "text": "hi"},
                      {"ts": "1002.0", "channel": {"id": "C1"}, "bot_id": "B1"}],
                  2: [{"ts": "1003.0", "channel": {"id": "C2"}, "text": "yo"}]}
@@ -222,6 +238,26 @@ class Proposals(Base):
         pid = scout.propose(self.conn, KEY, [self.prop()], T0)[0]["id"]
         with self.assertRaises(Refused):
             scout.decide(self.conn, OTHER, [pid], [], T0)
+
+    def test_decide_remembers_approved_only_and_never_fails_on_memory(self):
+        from realmlib import hindsight
+        a, b = (scout.propose(self.conn, KEY, [self.prop(ref=r)], T0)[0]["id"] for r in "ab")
+        calls = []
+        with mock.patch.object(hindsight, "hooks_enabled", return_value=True), \
+                mock.patch.object(hindsight, "retain", side_effect=lambda k, items: calls.append((k, items))):
+            scout.decide(self.conn, KEY, [a], [b], T0)
+        self.assertEqual(len(calls), 1)
+        (key, items), = calls
+        self.assertEqual((key, [i["document_id"] for i in items]), (KEY, [f"proposal/P{a}"]))
+        self.assertEqual(items[0]["tags"], ["source:slack", "kind:channel-fact"])
+        self.assertIn("Send deck", items[0]["content"])
+        self.assertIn("2026-11-27", items[0]["content"])
+        self.assertNotIn("send the deck by Friday", items[0]["content"])  # never the excerpt
+        c = scout.propose(self.conn, KEY, [self.prop(ref="c")], T0)[0]["id"]
+        with mock.patch.object(hindsight, "hooks_enabled", return_value=True), \
+                mock.patch.object(hindsight, "retain", side_effect=OSError("down")):
+            scout.decide(self.conn, KEY, [c], [], T0)
+        self.assertEqual(scout.list_proposals(self.conn, KEY, ids=[c])[0]["state"], "approved")
 
     def test_render(self):
         scout.propose(self.conn, KEY, [self.prop()], T0)

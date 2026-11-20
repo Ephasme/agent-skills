@@ -47,8 +47,9 @@ answers JSON.
    Calendar: `work` for Slack and gmail-work, `perso` for WhatsApp, iMessage and gmail-perso. Times you
    cannot pin down → lower confidence and say so in `why`, or make it a `task.add`. One action per need; don't
    propose what the user plainly already did.
-5. `realm scout ack` for each source, stdin = the batch `{source, cursors, ids}` (all judged ids, proposals or
-   not). Ack only after the batch's proposals are recorded.
+5. `realm scout ack` for each batch, stdin = `{source, cursors, ids, proposed}`: `ids` all judged ids,
+   `proposed` the ids you made proposals from (`[]` when none). It refuses until those proposals are recorded:
+   propose first, ack second.
 6. Mail the queen after each source that recorded new (non-duplicate) proposals, one mail per source:
    `send_message` from `{S}` to `{QUEEN}`, topic `scout-proposals`, subject
    `[scout-proposals] <source>: N new`, body = the output of `realm proposal list --ids P1,P2,… --md`. Then

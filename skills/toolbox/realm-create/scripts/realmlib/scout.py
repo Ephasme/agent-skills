@@ -107,16 +107,35 @@ def unseen(conn, key, source, ids):
 def ack(conn, key, batch, now):
     """Record a judged batch: its ids as seen, then its cursors. One transaction: both or neither.
 
-    batch: {"source", "cursors": {scope: cursor}, "ids": [msg_id, ...]}; extra keys (the messages) are ignored.
+    batch: {"source", "cursors": {scope: cursor}, "ids": [msg_id, ...], "proposed": [msg_id, ...]}; extra keys
+    (the messages) are ignored. `proposed` names the ids the scout made proposals from: ack refuses until each
+    has its proposal recorded, so a scan that stops between ack and propose cannot lose them.
     A cursor never moves backwards when it is numeric.
     """
     source = _source(batch.get("source"))
     ids = [str(i) for i in batch.get("ids") or []]
     curs = {str(k): str(v) for k, v in (batch.get("cursors") or {}).items()}
+    if not isinstance(batch.get("proposed"), list):
+        raise Refused("batch needs `proposed`: the ids you made proposals from ([] when none)")
+    proposed = [str(i) for i in batch["proposed"]]
+    stray = [i for i in proposed if i not in ids]
+    if stray:
+        raise Refused(f"proposed ids not in this batch's ids: {stray}")
+    recorded = {r["ref"] for r in conn.execute(
+        f"SELECT ref FROM proposals WHERE realm=? AND source=? AND ref IN ({','.join('?' * len(proposed))})",
+        (key, source, *proposed))} if proposed else set()
+    pending = [i for i in proposed if i not in recorded]
+    if pending:
+        raise Refused(f"proposals not recorded yet for {pending}: `realm scout propose` first, then ack")
     with tx(conn):
         conn.executemany(
             "INSERT OR IGNORE INTO scout_seen (realm, source, msg_id, seen_ts) VALUES (?,?,?,?)",
             [(key, source, i, now) for i in ids])
+        conn.executemany(
+            """UPDATE scout_seen SET proposal_id=(SELECT MIN(id) FROM proposals p WHERE p.realm=scout_seen.realm
+                 AND p.source=scout_seen.source AND p.ref=scout_seen.msg_id)
+               WHERE realm=? AND source=? AND msg_id=? AND proposal_id IS NULL""",
+            [(key, source, i) for i in proposed])
         for scope, cur in curs.items():
             old = conn.execute("SELECT cursor FROM scout_cursors WHERE realm=? AND source=? AND scope=?",
                                (key, source, scope)).fetchone()
@@ -261,7 +280,33 @@ def decide(conn, key, approve, reject, now):
     with tx(conn):
         for i, state in todo:
             conn.execute("UPDATE proposals SET state=?, decided_ts=? WHERE id=?", (state, now, i))
-    return list_proposals(conn, key, ids=[i for i, _ in todo])
+    out = list_proposals(conn, key, ids=[i for i, _ in todo])
+    remember_approved(key, [p for p in out if p["state"] == "approved"])
+    return out
+
+
+def remember_approved(key, proposals):
+    """Retain one short fact per approved proposal in the realm's Hindsight bank: title, why, date, never the
+    excerpt. Best-effort: a memory failure never undoes or blocks the user's verdict."""
+    if not proposals:
+        return None
+    from . import hindsight  # local: memory is optional and must not load with every scout verb
+    if not hindsight.hooks_enabled(key):
+        return None
+    items = []
+    for p in proposals:
+        pl = p["payload"]
+        when = pl.get("start") or pl.get("due")
+        items.append({
+            "content": f"Loup approved: {title(p['action'], pl)}." + (f" When: {when}." if when else "")
+                       + (f" Why: {p['why']}" if p["why"] else ""),
+            "context": "approved scout proposal", "document_id": f"proposal/P{p['id']}",
+            "tags": [f"source:{p['source']}", "kind:channel-fact"]})
+    try:
+        return hindsight.retain(key, items)
+    except Exception as e:  # noqa: BLE001 - see docstring
+        log(f"hindsight: skipped retain of approved proposals: {e}")
+        return None
 
 
 def apply_tasks(conn, key, ids, now):
@@ -721,7 +766,7 @@ def register(sub):
     p.add_argument("--source", required=True, choices=SOURCES)
     p.add_argument("--ids", required=True, help="comma-separated message ids")
     p.set_defaults(fn=run(lambda c, a, now: unseen(c, a.key, a.source, [x for x in a.ids.split(",") if x])))
-    p = kp(sc, "ack", "stdin {source, cursors, ids}: mark judged, advance cursors")
+    p = kp(sc, "ack", "stdin {source, cursors, ids, proposed}: mark judged, advance cursors (after propose)")
     p.set_defaults(fn=run(lambda c, a, now: ack(c, a.key, _stdin_json(), now)))
     p = kp(sc, "fetch", "a source's next unjudged messages, in ack's shape; marks nothing read")
     p.add_argument("source", choices=SOURCES)
