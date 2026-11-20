@@ -18,8 +18,8 @@ from .state import HOME, log
 
 MCP_CONFIG = HOME / ".omp/agent/mcp.json"
 SERVER = "hindsight"
-TIMEOUT = 10  # hooks: a dispatch must not stall on a cold server
-VERB_TIMEOUT = 120  # `realm memory`: a cold recall (reranker load) measured 45 s
+TIMEOUT = 10  # hooks: a dispatch must not stall on a slow recall
+VERB_TIMEOUT = 120  # `realm memory`: a recall waits on the server's embedding call, whose tail reached 40 s
 REPLY_MAX = 4000
 CONTEXT_FACTS = 8
 
