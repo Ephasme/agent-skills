@@ -119,6 +119,9 @@ class FakeMail:
             return {"deliveries": [{"payload": {"id": mid, "thread_id": None}}]}
         if tool == "fetch_topic":
             return []
+        if tool == "fetch_inbox_events":
+            assert args.get("position_now")
+            return {"tail_cursor": 500 + len(self.sent)}
         raise AssertionError(tool)
 
     def join(self, name, at):
@@ -412,6 +415,18 @@ class SwarmTest(unittest.TestCase):
         with self.assertRaises(RuntimeError):
             swarm.deliver_brief("w:p0", {"pane_id": "w:p0", **self.h.panes["w:p0"]}, daemon.wake)
         self.assertEqual(len(self.h.typed), 1)
+
+    def test_every_woken_pane_is_bound_from_its_tail_and_unbound_when_dropped(self):
+        """realm-wake reads these files: a worker bound before omp starts, from the tail taken then."""
+        self.create(size=2)
+        queen, a = swarm.bind.read("w:p0"), swarm.bind.read("x1:p1")
+        self.assertEqual((queen["agent"], queen["project"]), ("QueenBee", KEY))
+        self.assertEqual((a["agent"], a["cursor"]), ("WorkerAox", 500))
+        self.assertNotEqual(a["id"], swarm.bind.read("x2:p2")["id"])
+        swarm.retire(self.conn, KEY, "WorkerAox")
+        self.assertIsNone(swarm.bind.read("x1:p1"))
+        swarm.stop(self.conn, KEY, "w:t0")
+        self.assertEqual(list(swarm.bind.bind_dir().glob("*.json")), [])
 
 
 if __name__ == "__main__":

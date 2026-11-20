@@ -15,7 +15,7 @@ import time
 from contextlib import closing
 from pathlib import Path
 
-from . import db, hindsight
+from . import bind, db, hindsight
 from .db import NeedsHuman, Refused
 from .herdr import QUEEN_TAB_MARK, herdr as _herdr
 from .state import locked_state, log
@@ -153,7 +153,10 @@ def worker_label(realm, name):
 
 
 def subscribe(pane_id, agent, key, aside):
-    """The same row `realm subscribe` writes; cursor None lets the next tick start from the tail."""
+    """The same row `realm subscribe` writes; cursor None lets the next tick start from the tail.
+
+    Also binds the pane for the `realm-wake` extension, at the agent's delivery tail taken now: mail sent after
+    this call is a delivery the extension wakes on, whatever the agent's connect marks read."""
     with locked_state() as s:
         old = s["subscriptions"].get(pane_id, {})
         s["subscriptions"][pane_id] = {
@@ -161,12 +164,19 @@ def subscribe(pane_id, agent, key, aside):
             "cursor": None, "pending": [],
             "last_wake": old.get("last_wake", 0), "last_unread": old.get("last_unread", 0),
         }
+    bind_pane(pane_id, agent, key)
+
+
+def bind_pane(pane_id, agent, key):
+    tail = call("fetch_inbox_events", {"project_key": key, "agent_name": agent, "position_now": True})
+    bind.write(pane_id, agent, key, tail["tail_cursor"])
 
 
 def unsubscribe(pane_ids):
     with locked_state() as s:
         for p in pane_ids:
             s["subscriptions"].pop(p, None)
+    bind.remove(pane_ids)
 
 
 def subscriptions(key):
@@ -193,8 +203,8 @@ def spawn(conn, key):
     name = ident["name"]
     brief = write_brief(key, name, r["queen"], db.label(r))
     pane_id, ws = open_workspace(worker_label(r, name), r["cwd"] or os.getcwd())
+    subscribe(pane_id, name, key, aside=False)  # bound before omp starts: its first poll already finds the file
     _ok(herdr("pane", "run", pane_id, f"{PROGRAM} @{brief}"), "pane run")
-    subscribe(pane_id, name, key, aside=False)
     db.add_worker(conn, key, name, pane_id, None, str(brief), now(), workspace=ws)
     log(f"spawned {name} in {pane_id} ({ws}) for {key}")
     return {"name": name, "pane": pane_id, "workspace": ws, "brief": str(brief)}
@@ -370,6 +380,8 @@ def restart(conn, key, model, queen_pane, queen_tab, workspace, cwd, queen=None,
     for p, v in subscriptions(key).items():
         if v["mode"] != "prompt":
             continue
+        if not bind.read(p):  # a pane subscribed before bind files existed
+            bind_pane(p, v["agent"], key)
         if not conn.execute("SELECT 1 FROM workers WHERE realm=? AND name=?", (key, v["agent"])).fetchone():
             info = pane(p) or {}
             ws = info.get("workspace_id")
