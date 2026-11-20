@@ -60,9 +60,11 @@ subscription says.
   older realm still live in it (`queen_workspace` says which);
 - registers a fresh queen identity (`task_description: "Swarm queen"`), installs the launchd job when missing,
   and subscribes this pane in aside mode;
-- records the realm in realm's db with your model, workspace and directory;
+- records the realm in realm's db with your model, workspace and the realm repository (`spare-cycles/realm` at
+  `~/code/perso/realm` or `$REALM_REPO`; refused before anything else when it is missing or another repo): every
+  worker and the scout start there, whatever directory you run this from;
 - per worker: registers it, writes its brief (`scripts/brief.md`, filled) to a per-key directory under
-  `${TMPDIR:-/tmp}/swarm/`, opens its own top-level workspace `🛠️ <name> · <w>` (unfocused, in your directory),
+  `${TMPDIR:-/tmp}/swarm/`, opens its own top-level workspace `🛠️ <name> · <w>` (unfocused, in the realm repository),
   starts `omp @<brief>` in it, subscribes it, records it;
 - waits up to 60 s for each worker to join.
 
@@ -128,6 +130,11 @@ No upper bound on workers.
   done`, or `realm subject assign` to another worker plus a mail to that worker in the subject's thread: `assign`
   only records it) and name them in your answer, then retire. Never close its workspace or call `retire_agent` by
   hand.
+- Workers never open a herdr workspace or tab (`hwt`, `herdr workspace/tab create`, `herdr worktree`) unless
+  the user expressly grants it and you relay that grant naming the exact workspace. A subject on another repo is
+  worked in a plain `git worktree` from the worker's own pane. A worker whose subject needs parallel hands or
+  several separable steps asks you to open new subjects (slug, goal, files, done, dependency); you create and
+  assign them like any other, and its workers coordinate in `realm-coordination`.
 
 ## The scout
 
