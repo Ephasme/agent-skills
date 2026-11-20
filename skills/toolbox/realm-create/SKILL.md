@@ -81,7 +81,8 @@ Each turn, in order:
 1. `fetch_inbox` for `QUEEN` (unread_only, include_bodies), then `realm sync --project <key>`. Never poll or wait:
    realm's aside tells the user mail landed, and their next prompt runs this turn. `sync` records joins, each
    subject's thread and latest worker reply (`· reply` in the table), and turns a `queued` subject `assigned`
-   once the subject it waits for is replied to. It never decides done or blocked.
+   once the subject it waits for is replied to. It never decides done or blocked. Mail from the scout (topic
+   `scout-proposals`): see [The scout](#the-scout).
 2. Each reply: `realm subject set-state --project <key> --slug <slug> --state done|blocked --status "<a few
    words>"`; a `blocked` question goes to the user. To answer or redirect a worker, write in its thread:
    `reply_message` to the worker's message, or `send_message` with `to: [<W>]` and the `thread_id`, then
@@ -110,6 +111,36 @@ No upper bound on workers.
   `assigned`, `blocked` or `paused` subject, and nothing changed for it for 30 min):
   `realm retire --project <key> --name <W>`. It unsubscribes the pane, closes the tab, retires the agent in
   Agent Mail and deletes the brief; each step's outcome is in `steps`. Its subjects stay in the db.
+
+## The scout
+
+Optional, one per realm, only when the user asks for it: `realm scout spawn --project <key>`. It registers an
+agent, writes its brief (`scripts/scout-brief.md`, filled), opens a `🔭 scout` tab, and subscribes the pane as a
+scout: the launchd job types `scan` into it every hour from 08:00 to 22:00 and every three hours otherwise
+(Europe/Paris), mail wakes first. It is not a worker: never dispatch a subject to it, it never shows in
+`worker list`. `realm scout show --project <key>` gives its last scan and cursors.
+
+The scout reads Slack, both Gmail accounts, and the WhatsApp/iMessage chats allowlisted in
+`~/.config/realm/scout.json` (private: names contacts, never in a repository). It writes nothing anywhere;
+each calendar or to-do action it finds is a proposal, mailed to you (`[scout-proposals] N new`) and pushed as
+titles to the user's phone (ntfy, same file).
+
+**Nothing the scout proposes happens without the user's yes on that exact item.** The user's time is theirs:
+never accept, decline or answer a meeting or a slot for them, approved or not.
+
+On a `scout-proposals` mail, or when the user asks:
+
+1. `realm proposal list --project <key> --md`: show the user the open proposals, as is.
+2. The user answers per item (`ok P3 P5, no P4`). Only their explicit words count: no answer is no decision, and
+   the item stays `proposed`. `realm proposal decide --project <key> --approve 3,5 --reject 4`.
+3. Approved `task.add`: `realm proposal apply --project <key> --ids 3`. It lands in `realm task list`.
+4. Approved `calendar.*`: a subject to a worker, body = the proposal's exact payload (calendar `work` = the
+   `google_workspace` account, `perso` = `google_perso`), done = the event made, then
+   `realm proposal applied --project <key> --id <n> --ref <event id>` (or `--failed --ref <reason>`). No
+   invitation sent unless the payload lists attendees.
+
+The user's to-do list: `realm task list|add|done|drop|reopen --project <key>`. `task add` only on the user's own
+request.
 
 ## Ending the swarm
 
