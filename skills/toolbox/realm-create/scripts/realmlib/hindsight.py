@@ -18,7 +18,8 @@ from .state import HOME, log
 
 MCP_CONFIG = HOME / ".omp/agent/mcp.json"
 SERVER = "hindsight"
-TIMEOUT = 10
+TIMEOUT = 10  # hooks: a dispatch must not stall on a cold server
+VERB_TIMEOUT = 120  # `realm memory`: a cold recall (reranker load) measured 45 s
 REPLY_MAX = 4000
 CONTEXT_FACTS = 8
 
@@ -43,7 +44,7 @@ def _endpoint():
     return api, headers
 
 
-def _request(method, path, body=None):
+def _request(method, path, body=None, timeout=TIMEOUT):
     api, headers = _endpoint()
     req = urllib.request.Request(
         f"{api}/v1/default/banks/{path}",
@@ -53,10 +54,12 @@ def _request(method, path, body=None):
         headers={**headers, "Content-Type": "application/json", "User-Agent": "realm/1"},
     )
     try:
-        with urllib.request.urlopen(req, timeout=TIMEOUT) as r:
+        with urllib.request.urlopen(req, timeout=timeout) as r:
             raw = r.read()
     except urllib.error.HTTPError as e:
         raise RuntimeError(f"hindsight {method} {path}: HTTP {e.code} {e.read()[:200]!r}") from e
+    except (urllib.error.URLError, TimeoutError) as e:
+        raise RuntimeError(f"hindsight {method} {path}: {e}") from e
     return json.loads(raw) if raw.strip() else {}
 
 
@@ -69,16 +72,16 @@ def ensure_bank(key):
     })
 
 
-def retain(key, items, wait=False):
+def retain(key, items, wait=False, timeout=TIMEOUT):
     """items: [{content, context?, document_id?, tags?, timestamp?}]. Async unless wait: extraction is an LLM call."""
-    return _request("POST", f"{bank_id(key)}/memories", {"items": items, "async": not wait})
+    return _request("POST", f"{bank_id(key)}/memories", {"items": items, "async": not wait}, timeout)
 
 
-def recall(key, query, tags=None, max_tokens=2048):
+def recall(key, query, tags=None, max_tokens=2048, timeout=TIMEOUT):
     body = {"query": query, "max_tokens": max_tokens}
     if tags:
         body.update(tags=tags, tags_match="any")
-    return _request("POST", f"{bank_id(key)}/memories/recall", body).get("results", [])
+    return _request("POST", f"{bank_id(key)}/memories/recall", body, timeout).get("results", [])
 
 
 def hooks_enabled(key):
@@ -157,20 +160,29 @@ def _items(a):
 def register(sub):
     from . import db
 
+    def verb(fn):
+        """Network and server failures become the verb's {"error": …} instead of a traceback."""
+        def run(c, a, now):
+            try:
+                return fn(c, a, now)
+            except RuntimeError as e:
+                raise db.Refused(str(e)) from e
+        return db.run_verb(run)
+
     m = sub.add_parser("memory", help="hindsight: the realm's memory bank").add_subparsers(dest="mcmd", required=True)
     p = db.keyed_parser(m, "init", "create or update the realm's bank")
-    p.set_defaults(fn=db.run_verb(lambda c, a, now: {"bank": bank_id(a.key), **ensure_bank(a.key)}))
+    p.set_defaults(fn=verb(lambda c, a, now: {"bank": bank_id(a.key), **ensure_bank(a.key)}))
     p = db.keyed_parser(m, "retain", "store text (or a JSON list of items) in the realm's bank")
     p.add_argument("--file", default="-", help="text or JSON items; - reads stdin")
     p.add_argument("--document-id", help="upsert key: same id replaces the earlier document")
     p.add_argument("--context")
     p.add_argument("--tag", action="append", help="repeatable, e.g. --tag decision")
     p.add_argument("--wait", action="store_true", help="return after extraction, not before")
-    p.set_defaults(fn=db.run_verb(lambda c, a, now: retain(a.key, _items(a), a.wait)))
+    p.set_defaults(fn=verb(lambda c, a, now: retain(a.key, _items(a), a.wait, VERB_TIMEOUT)))
     p = db.keyed_parser(m, "recall", "facts from the realm's bank relevant to a query")
     p.add_argument("--query", required=True)
     p.add_argument("--tag", action="append")
     p.add_argument("--max-tokens", type=int, default=2048)
-    p.set_defaults(fn=db.run_verb(lambda c, a, now: [
+    p.set_defaults(fn=verb(lambda c, a, now: [
         {k: r.get(k) for k in ("text", "type", "tags", "occurred_start", "document_id") if r.get(k)}
-        for r in recall(a.key, a.query, a.tag, a.max_tokens)]))
+        for r in recall(a.key, a.query, a.tag, a.max_tokens, VERB_TIMEOUT)]))

@@ -15,7 +15,7 @@ import time
 from contextlib import closing
 from pathlib import Path
 
-from . import db
+from . import db, hindsight
 from .db import NeedsHuman, Refused
 from .herdr import herdr as _herdr
 from .state import locked_state, log
@@ -183,6 +183,7 @@ def create(conn, key, size, model, workspace, cwd, queen_pane, queen_tab, name=N
         launchd_install()
     subscribe(queen_pane, queen, key, aside=True)
     db.init_realm(conn, key, queen, queen_pane, now(), model=model, workspace=workspace, cwd=cwd, name=name)
+    hindsight.on_create(key)
     workers = [spawn(conn, key) for _ in range(size)]
     joined = wait_joined(conn, key, [w["name"] for w in workers])
     return {"queen": queen, "inbox": session.get("inbox", []), "workers": workers, **joined}
@@ -241,6 +242,7 @@ def dispatch(conn, key, to, slug, title, body, after=None):
         db.subject_row(conn, key, after)
     if after:
         body = f"queued: start after {after}\n\n{body}"
+    body += hindsight.context_block(key, f"{title}\n{body[:500]}")
     sent = call("send_message", {"project_key": key, "sender_name": r["queen"], "to": [to],
                                  "subject": f"[{slug}] {title}", "topic": slug, "body_md": body})
     msg = sent["deliveries"][0]["payload"]

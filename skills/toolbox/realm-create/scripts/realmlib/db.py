@@ -436,7 +436,12 @@ def set_state(conn, key, slug, state, status, thread_id, now, source="queen"):
             (state, new_status, thread_id, state, now, key, slug),
         )
         _event(conn, key, slug, now, state, s["worker"], new_status, source)
-    return subject_row(conn, key, slug)
+    row = subject_row(conn, key, slug)
+    if state == "done" and s["state"] != "done":
+        from . import hindsight  # best-effort, never raises: a down memory server must not block the queen
+
+        hindsight.on_done(key, row)
+    return row
 
 
 def subject_row(conn, key, slug):

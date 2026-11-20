@@ -5,7 +5,7 @@ import sys
 import time
 
 from . import __doc__ as PACKAGE_DOC
-from . import db, queen_signal, scout, swarm
+from . import db, hindsight, queen_signal, scout, swarm
 from .daemon import WAKE_TEXT, cmd_tick
 from .herdr import is_queen_pane, pane_info
 from .launchd import LABEL, cmd_install, cmd_uninstall
@@ -97,5 +97,6 @@ def main():
     swarm.register(sub)
     queen_signal.register(sub)
     scout.register(sub)
+    hindsight.register(sub)
     a = ap.parse_args()
     a.fn(a)
