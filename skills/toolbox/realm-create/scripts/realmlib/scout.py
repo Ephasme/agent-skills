@@ -47,6 +47,9 @@ FETCH_LIMIT = 300
 SOURCES = ("slack", "gmail-work", "gmail-perso", "whatsapp", "imessage")
 ACTIONS = ("task.add", "calendar.create", "calendar.update", "calendar.cancel")
 CONFIDENCE = ("low", "med", "high")
+# Why the user rejected a proposal; only `mistake` (the scout misjudged the message) is ratchet material.
+REASONS = ("mistake", "obsolete", "done", "unwanted")
+PRIORITIES = ("urgent", "normal")
 DECIDED = ("approved", "rejected")
 
 
@@ -236,18 +239,17 @@ def propose(conn, key, items, now):
 def _proposal(r):
     return {"id": r["id"], "source": r["source"], "ref": r["ref"], "permalink": r["permalink"],
             "excerpt": r["excerpt"], "action": r["action"], "payload": json.loads(r["payload"]),
-            "confidence": r["confidence"], "why": r["why"], "state": r["state"], "mail_id": r["mail_id"],
-            "created": db.iso(r["created_ts"]), "decided": db.iso(r["decided_ts"]), "applied_ref": r["applied_ref"]}
+            "confidence": r["confidence"], "why": r["why"], "state": r["state"], "reason": r["reason"],
+            "note": r["note"], "mail_id": r["mail_id"], "created": db.iso(r["created_ts"]),
+            "decided": db.iso(r["decided_ts"]), "applied_ref": r["applied_ref"]}
 
 
-def list_proposals(conn, key, states=None, ids=None):
+def list_proposals(conn, key, states=None, ids=None, reasons=None):
     q, args = "SELECT * FROM proposals WHERE realm=?", [key]
-    if states:
-        q += f" AND state IN ({','.join('?' * len(states))})"
-        args += states
-    if ids:
-        q += f" AND id IN ({','.join('?' * len(ids))})"
-        args += ids
+    for col, vals in (("state", states), ("id", ids), ("reason", reasons)):
+        if vals:
+            q += f" AND {col} IN ({','.join('?' * len(vals))})"
+            args += vals
     return [_proposal(r) for r in conn.execute(q + " ORDER BY id", args)]
 
 
@@ -265,21 +267,29 @@ def render(proposals):
     return "\n".join(lines).rstrip() or "no proposals"
 
 
-def decide(conn, key, approve, reject, now):
-    """The user's verdict, per item. Only a `proposed` item can be decided."""
+def decide(conn, key, approve, reject, now, reason=None, note=None):
+    """The user's verdict, per item. A `proposed` item can be decided; a `rejected` one can be rejected again to
+    record why (`reason`, `note`), keeping its first decision time. `reason` applies to every rejected item."""
     both = set(approve) & set(reject)
     if both:
         raise Refused(f"approved and rejected at once: {sorted(both)}")
+    if reason is not None and reason not in REASONS:
+        raise Refused(f"reason {reason!r}: one of {', '.join(REASONS)}")
+    if reason and not reject:
+        raise Refused("--reason explains a rejection: pass --reject")
     todo = [(i, "approved") for i in approve] + [(i, "rejected") for i in reject]
     rows = {r["id"]: r for r in conn.execute(
         f"SELECT id, state FROM proposals WHERE realm=? AND id IN ({','.join('?' * len(todo))})",
         (key, *[i for i, _ in todo]))} if todo else {}
-    bad = [i for i, _ in todo if i not in rows or rows[i]["state"] != "proposed"]
+    bad = [i for i, s in todo if i not in rows
+           or rows[i]["state"] not in (("proposed", "rejected") if s == "rejected" else ("proposed",))]
     if bad:
         raise Refused(f"not proposed in {key}: {bad}")
     with tx(conn):
         for i, state in todo:
-            conn.execute("UPDATE proposals SET state=?, decided_ts=? WHERE id=?", (state, now, i))
+            conn.execute("UPDATE proposals SET state=?, decided_ts=COALESCE(decided_ts, ?), reason=COALESCE(?, reason),"
+                         " note=COALESCE(?, note) WHERE id=?",
+                         (state, now, reason if state == "rejected" else None, note, i))
     out = list_proposals(conn, key, ids=[i for i, _ in todo])
     remember_approved(key, [p for p in out if p["state"] == "approved"])
     return out
@@ -345,31 +355,50 @@ def applied(conn, key, pid, ref, failed, now):
 # ---------- tasks ----------
 
 def _task(r):
-    return {"id": r["id"], "title": r["title"], "notes": r["notes"], "due": r["due"],
+    return {"id": r["id"], "title": r["title"], "notes": r["notes"], "due": r["due"], "priority": r["priority"],
             "proposal": r["proposal_id"], "state": r["state"], "created": db.iso(r["created_ts"]),
             "changed": db.iso(r["state_ts"])}
 
 
-def add_task(conn, key, ttl, notes, due, now):
+def _priority(p):
+    if p not in PRIORITIES:
+        raise Refused(f"priority {p!r}: one of {', '.join(PRIORITIES)}")
+    return p
+
+
+def add_task(conn, key, ttl, notes, due, now, priority="normal"):
     db.realm_row(conn, key)
     with tx(conn):
         cur = conn.execute(
-            "INSERT INTO tasks (realm, title, notes, due, state, created_ts, state_ts) VALUES (?,?,?,?, 'open', ?, ?)",
-            (key, ttl, notes or "", due, now, now))
+            "INSERT INTO tasks (realm, title, notes, due, priority, state, created_ts, state_ts)"
+            " VALUES (?,?,?,?,?, 'open', ?, ?)",
+            (key, ttl, notes or "", due, _priority(priority), now, now))
     return _task(conn.execute("SELECT * FROM tasks WHERE id=?", (cur.lastrowid,)).fetchone())
 
 
 def list_tasks(conn, key, states):
+    """Urgent first, then by due date (undated last)."""
     return [_task(r) for r in conn.execute(
-        f"SELECT * FROM tasks WHERE realm=? AND state IN ({','.join('?' * len(states))}) ORDER BY due IS NULL, due, id",
-        (key, *states))]
+        f"SELECT * FROM tasks WHERE realm=? AND state IN ({','.join('?' * len(states))})"
+        " ORDER BY priority='urgent' DESC, due IS NULL, due, id", (key, *states))]
+
+
+def _task_in(conn, key, tid):
+    if not conn.execute("SELECT 1 FROM tasks WHERE realm=? AND id=?", (key, tid)).fetchone():
+        raise Refused(f"no task {tid} in {key}")
 
 
 def set_task(conn, key, tid, state, now):
-    if not conn.execute("SELECT 1 FROM tasks WHERE realm=? AND id=?", (key, tid)).fetchone():
-        raise Refused(f"no task {tid} in {key}")
+    _task_in(conn, key, tid)
     with tx(conn):
         conn.execute("UPDATE tasks SET state=?, state_ts=? WHERE id=?", (state, now, tid))
+    return _task(conn.execute("SELECT * FROM tasks WHERE id=?", (tid,)).fetchone())
+
+
+def set_priority(conn, key, tid, priority):
+    _task_in(conn, key, tid)
+    with tx(conn):
+        conn.execute("UPDATE tasks SET priority=? WHERE id=?", (_priority(priority), tid))
     return _task(conn.execute("SELECT * FROM tasks WHERE id=?", (tid,)).fetchone())
 
 
@@ -778,14 +807,20 @@ def register(sub):
     pr = sub.add_parser("proposal", help="proposals awaiting the user").add_subparsers(dest="prcmd", required=True)
     p = kp(pr, "list", "proposals (default: proposed)")
     p.add_argument("--state", action="append", choices=("proposed", "approved", "rejected", "applied", "failed"))
+    p.add_argument("--reason", action="append", choices=REASONS, help="rejection reason (mistake: scout ratchet cases)")
     p.add_argument("--ids", help="P1,P2 or 1,2")
     p.add_argument("--md", action="store_true", help="markdown, as mailed and shown to the user")
     p.set_defaults(fn=run(lambda c, a, now: (render if a.md else (lambda x: x))(list_proposals(
-        c, a.key, None if a.ids else (a.state or ["proposed"]), _ids(a.ids) or None))))
-    p = kp(pr, "decide", "the user's verdict per item")
+        c, a.key, None if a.ids else a.state or (None if a.reason else ["proposed"]), _ids(a.ids) or None,
+        a.reason))))
+    p = kp(pr, "decide", "the user's verdict per item; --reject on a rejected item records its reason")
     p.add_argument("--approve", default="")
     p.add_argument("--reject", default="")
-    p.set_defaults(fn=run(lambda c, a, now: decide(c, a.key, _ids(a.approve), _ids(a.reject), now)))
+    p.add_argument("--reason", choices=REASONS,
+                   help="why rejected: mistake (scout misjudged), obsolete, done (already done), unwanted")
+    p.add_argument("--note", help="the user's own words on the verdict")
+    p.set_defaults(fn=run(lambda c, a, now: decide(c, a.key, _ids(a.approve), _ids(a.reject), now,
+                                                   a.reason, a.note)))
     p = kp(pr, "apply", "write approved task.add proposals into tasks")
     p.add_argument("--ids", required=True)
     p.set_defaults(fn=run(lambda c, a, now: apply_tasks(c, a.key, _ids(a.ids), now)))
@@ -804,11 +839,16 @@ def register(sub):
     p.add_argument("--title", required=True)
     p.add_argument("--notes")
     p.add_argument("--due", help="ISO date or datetime")
-    p.set_defaults(fn=run(lambda c, a, now: add_task(c, a.key, a.title, a.notes, a.due, now)))
-    p = kp(tk, "list", "tasks (default: open)")
+    p.add_argument("--priority", choices=PRIORITIES, default="normal")
+    p.set_defaults(fn=run(lambda c, a, now: add_task(c, a.key, a.title, a.notes, a.due, now, a.priority)))
+    p = kp(tk, "list", "tasks (default: open), urgent first")
     p.add_argument("--state", action="append", choices=("open", "done", "dropped"))
     p.set_defaults(fn=run(lambda c, a, now: list_tasks(c, a.key, a.state or ["open"])))
     for verb, state in (("done", "done"), ("drop", "dropped"), ("reopen", "open")):
         p = kp(tk, verb, f"mark a task {state}")
         p.add_argument("--id", type=int, required=True)
         p.set_defaults(fn=run(lambda c, a, now, s=state: set_task(c, a.key, a.id, s, now)))
+    p = kp(tk, "priority", "set a task's priority")
+    p.add_argument("--id", type=int, required=True)
+    p.add_argument("--priority", choices=PRIORITIES, required=True)
+    p.set_defaults(fn=run(lambda c, a, now: set_priority(c, a.key, a.id, a.priority)))

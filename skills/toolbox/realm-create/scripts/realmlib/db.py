@@ -152,6 +152,12 @@ MIGRATIONS = [
     ALTER TABLE workers ADD COLUMN workspace TEXT;
     ALTER TABLE scouts ADD COLUMN workspace TEXT;
     """,
+    # 6: why the user rejected a proposal (`mistake` = the scout misjudged: ratchet material) and task priority.
+    """
+    ALTER TABLE proposals ADD COLUMN reason TEXT CHECK (reason IN ('mistake','obsolete','done','unwanted'));
+    ALTER TABLE proposals ADD COLUMN note TEXT;
+    ALTER TABLE tasks ADD COLUMN priority TEXT NOT NULL DEFAULT 'normal' CHECK (priority IN ('urgent','normal'));
+    """,
 ]
 
 

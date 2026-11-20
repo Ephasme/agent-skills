@@ -259,11 +259,44 @@ class Proposals(Base):
             scout.decide(self.conn, KEY, [c], [], T0)
         self.assertEqual(scout.list_proposals(self.conn, KEY, ids=[c])[0]["state"], "approved")
 
+    def test_reject_reason_kept_and_exported(self):
+        a, b, c = (scout.propose(self.conn, KEY, [self.prop(ref=r)], T0)[0]["id"] for r in "abc")
+        scout.decide(self.conn, KEY, [], [a, b], T0)
+        # A rejection recorded before reasons existed gets its reason later; its decision time stays.
+        scout.decide(self.conn, KEY, [], [a], T0 + 60, reason="mistake", note="misread the message")
+        scout.decide(self.conn, KEY, [], [c], T0, reason="obsolete")
+        mistakes = scout.list_proposals(self.conn, KEY, ["rejected"], reasons=["mistake"])
+        self.assertEqual([(p["id"], p["note"], p["decided"]) for p in mistakes],
+                         [(a, "misread the message", db.iso(T0))])
+        self.assertEqual((mistakes[0]["excerpt"], mistakes[0]["why"], mistakes[0]["payload"]["title"]),
+                         ("send the deck by Friday", "asked directly", "Send deck"))
+        self.assertIsNone(scout.list_proposals(self.conn, KEY, ids=[b])[0]["reason"])
+        for bad in (dict(approve=[], reject=[b], reason="wrong"), dict(approve=[b], reject=[], reason="done")):
+            with self.assertRaises(Refused):
+                scout.decide(self.conn, KEY, now=T0, **bad)
+        p = scout.propose(self.conn, KEY, [self.prop(ref="d")], T0)[0]["id"]
+        scout.decide(self.conn, KEY, [p], [], T0)
+        with self.assertRaises(Refused):
+            scout.decide(self.conn, KEY, [], [p], T0, reason="done")  # approved: no longer a rejection to explain
+
     def test_render(self):
         scout.propose(self.conn, KEY, [self.prop()], T0)
         md = scout.render(scout.list_proposals(self.conn, KEY))
         self.assertIn("**P1** `task.add` Send deck", md)
         self.assertIn("> send the deck by Friday ([link](https://x/1))", md)
+
+
+class Tasks(Base):
+    def test_priority_add_set_and_urgent_first(self):
+        a = scout.add_task(self.conn, KEY, "later", None, "2026-11-21", T0)
+        b = scout.add_task(self.conn, KEY, "now", None, None, T0, priority="urgent")
+        self.assertEqual((a["priority"], b["priority"]), ("normal", "urgent"))
+        self.assertEqual([t["id"] for t in scout.list_tasks(self.conn, KEY, ["open"])], [b["id"], a["id"]])
+        self.assertEqual(scout.set_priority(self.conn, KEY, a["id"], "urgent")["priority"], "urgent")
+        with self.assertRaises(Refused):
+            scout.set_priority(self.conn, KEY, a["id"], "high")
+        with self.assertRaises(Refused):
+            scout.set_priority(self.conn, OTHER, a["id"], "normal")
 
 
 class Brief(unittest.TestCase):

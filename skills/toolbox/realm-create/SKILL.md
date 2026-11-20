@@ -154,14 +154,18 @@ On a `scout-proposals` mail, or when the user asks:
 2. The user answers per item (`ok P3 P5, no P4`). Only their explicit words count: no answer is no decision, and
    the item stays `proposed`. `realm proposal decide --project <key> --approve 3,5 --reject 4`. Each approved
    item is also kept as one short fact (title, why, date; never the excerpt) in the realm's Hindsight bank.
+   A rejection carries why, from the user's words, never guessed: `--reason mistake` (the scout misjudged the
+   message), `obsolete`, `done` or `unwanted`, plus `--note "<their words>"`. Re-run `--reject N --reason …` to
+   add it to an item already rejected. `realm proposal list --reason mistake` exports the scout's mistakes.
 3. Approved `task.add`: `realm proposal apply --project <key> --ids 3`. It lands in `realm task list`.
 4. Approved `calendar.*`: a subject to a worker, body = the proposal's exact payload (calendar `work` = the
    `google_workspace` account, `perso` = `google_perso`), done = the event made, then
    `realm proposal applied --project <key> --id <n> --ref <event id>` (or `--failed --ref <reason>`). No
    invitation sent unless the payload lists attendees.
 
-The user's to-do list: `realm task list|add|done|drop|reopen --project <key>`. `task add` only on the user's own
-request.
+The user's to-do list: `realm task list|add|done|drop|reopen|priority --project <key>`. `task add` only on the
+user's own request; `--priority urgent` (or `task priority --id N --priority urgent`) when the user says so.
+`task list` shows urgent first.
 
 ## Ending the swarm
 
