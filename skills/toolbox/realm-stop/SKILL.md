@@ -39,8 +39,7 @@ reported, never retried blindly.
   installed; other realms may use it.
 - Delete `${TMPDIR:-/tmp}/swarm/`, the briefs realm-create wrote.
 - Your own tab keeps its `👑 queen` label; nothing renames it.
-- Agent Mail: leave the workers registered. `retire_agent` keeps message history but needs each worker's
-  `registration_token`, which realm-create does not keep.
+- Agent Mail: leave the workers registered; their message history stays readable.
 
 ## 4. Report
 

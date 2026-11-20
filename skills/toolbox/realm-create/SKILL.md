@@ -24,7 +24,7 @@ disable-model-invocation: true
 whoever asks. Anything else that must reach the queen goes as an aside: displayed beside her session, never
 submitted.
 
-Arguments: `<key>` is the Agent Mail project key (`human_key`, e.g. `/laptop/general`); `<size>` is the number
+Arguments: `<key>` is the Agent Mail project key (`human_key`, e.g. `/laptop/general`); `<size>` is the initial number
 of workers, an integer ≥ 1. Either missing or invalid: ask, start nothing.
 
 ## 1. Connect the queen
@@ -48,7 +48,7 @@ yourself in aside mode only:
 ## 2. Register the workers
 
 For each worker, `create_agent_identity` with `project_key: <key>`, `program: "omp"`, your model,
-`task_description: "Swarm worker <i>/<size>, queen <QUEEN>"`. Keep each returned `name`.
+`task_description: "Swarm worker, queen <QUEEN>"`. Keep each returned `name`.
 
 Register them yourself, before launch, rather than letting each worker register itself: the tab label needs the
 name up front, and a worker told to "connect" without a name resumes an existing agent and shares its inbox.
@@ -69,10 +69,10 @@ Then confirm every worker joined: `list_agents` on `<key>` shows each `W` with a
 `herdr pane read <pane>` shows its connection answer. A worker that has not joined after ~60 s: report it to the
 user with its pane, do not relaunch blindly.
 
-Brief (`<W>`, `<w>`, `<KEY>`, `<QUEEN>`, `<i>`, `<size>`):
+Brief (`<W>`, `<w>`, `<KEY>`, `<QUEEN>`):
 
 ```markdown
-You are <W>, worker <i>/<size> of a swarm. The queen is <QUEEN>.
+You are <W>, a worker of a swarm. The queen is <QUEEN>.
 
 0. First, before anything else: `herdr tab rename "$HERDR_TAB_ID" "🛠️ subject-<w>"`.
 1. Connect to Agent Mail: `macro_start_session` with human_key `<KEY>`, agent_name `<W>`, program `omp`.
@@ -111,12 +111,29 @@ A subject is one self-contained unit of work, one mail thread, one owner:
    or wait for replies: realm's aside (pane token + notification) tells the user mail landed, and their next
    prompt's turn reads it. Each reply moves its subject to done, blocked (relay the question to the user) or
    redirected (answer in-thread).
-5. Keep a subject table — slug, worker, state (`assigned`, `blocked`, `done`) — and show it whenever the user
-   asks for status or a subject changes state.
+5. Keep a subject table — slug, worker, state (`assigned`, `blocked`, `done`), time of last state change — and
+   show it whenever the user asks for status or a subject changes state. Keep each worker's pane next to its name.
 
 Your `send-text` nudge wakes a worker at once; the realm service catches any unread mail it misses, within the
 subscriber's interval (60 s) once the pane is idle. A worker that stops answering: `herdr pane read <pane>`
 before deciding anything.
+
+## Scaling the realm
+
+The worker count is yours to change at any time; the skill sets no upper bound.
+
+- **Scale out** when a subject is waiting and every worker has one `assigned`: run steps 2 and 3 for one new
+  worker.
+- **Scale in** a worker whose subjects are all `done` and whose last state change (its join, if it never had a
+  subject) is over 30 min old. Never one with an `assigned` or `blocked` subject. In order:
+  1. `realm unsubscribe <pane>`.
+  2. `herdr tab close <tab_id>` (from `herdr pane get <pane>`), then `herdr tab list` to confirm it is gone.
+  3. Retire it in Agent Mail: `macro_start_session` with `human_key: <key>`, `agent_name: <W>`, `program: "omp"`
+     returns its `agent.registration_token`; pass that to `retire_agent` (`agent_name: <W>`, `project_key: <key>`).
+     Never echo the token to the user.
+  4. Delete `${TMPDIR:-/tmp}/swarm/<w>.md`.
+
+  Its `done` subjects stay in the table under its name.
 
 ## Ending the swarm
 
