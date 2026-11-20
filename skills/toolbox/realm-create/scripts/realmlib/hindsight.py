@@ -9,6 +9,7 @@ outage, so a failure logs `hindsight: skipped …` and the verb carries on. The 
 """
 
 import json
+import os
 import subprocess
 import urllib.error
 import urllib.request
@@ -80,9 +81,16 @@ def recall(key, query, tags=None, max_tokens=2048):
     return _request("POST", f"{bank_id(key)}/memories/recall", body).get("results", [])
 
 
-def _safe(what, fn, *args):
+def hooks_enabled(key):
+    """Hooks stay off for test keys (`/test/…`) and when REALM_HINDSIGHT=off, so suites never reach the server."""
+    return os.environ.get("REALM_HINDSIGHT") != "off" and not key.startswith("/test/")
+
+
+def _safe(what, fn, key, *args):
+    if not hooks_enabled(key):
+        return None
     try:
-        return fn(*args)
+        return fn(key, *args)
     except Exception as e:  # noqa: BLE001 - a hook must never break the verb it rides on
         log(f"hindsight: skipped {what}: {e}")
         return None
@@ -101,6 +109,11 @@ def on_done(key, subject, reply_body=None):
     return _safe(f"retain {subject['slug']}", retain, key, [{
         "content": text, "context": "realm subject outcome", "document_id": f"subject/{subject['slug']}",
         "tags": tags}])
+
+
+def on_create(key):
+    """A realm was created: make sure its bank exists."""
+    return _safe("ensure bank", ensure_bank, key)
 
 
 def context_block(key, query):
