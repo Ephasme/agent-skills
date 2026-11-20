@@ -10,8 +10,7 @@ from inspect_ai.util._store import Store, init_subtask_store
 
 import harness
 
-CASES = {c["id"]: c for p in ("evals.json", "brief-evals.json")
-         for c in json.loads((Path(__file__).parent / p).read_text())["evals"]}
+CASES = {c["id"]: c for c in json.loads((Path(__file__).parent / "evals.json").read_text())["evals"]}
 
 
 def bash(case, command):

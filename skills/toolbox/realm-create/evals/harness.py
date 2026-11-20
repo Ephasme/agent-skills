@@ -217,14 +217,9 @@ def read_at(ref, rel):
 
 
 def system_prompt(skill, case, ref=None):
-    if case.get("system", "skill") == "brief":
-        b = {"REALM": case["brief"]["KEY"], **case["brief"]}
-        b.setdefault("LABEL_STEP", f'`herdr workspace rename wCF "🛠️ {b["REALM"]} · {b["w"]}"`')
-        text = read_at(ref, "realm-create/scripts/brief.md").format(**b)
-    else:
-        text = read_at(ref, f"{skill}/SKILL.md")
-        for extra in case.get("also_read", []):
-            text += f"\n\n--- Contents of {extra} (already read) ---\n\n" + read_at(ref, extra)
+    text = read_at(ref, f"{skill}/SKILL.md")
+    for extra in case.get("also_read", []):
+        text += f"\n\n--- Contents of {extra} (already read) ---\n\n" + read_at(ref, extra)
     harness = ("\n\n--- Session ---\nTools: `bash` runs shell commands (herdr, realm and anything else); the Agent "
                "Mail tools; `ask` opens a question form to the user; `todo` is your to-do list. The user reads only "
                "your final reply.\n")
