@@ -314,8 +314,14 @@ def move(conn, key, name):
     # By tab, not is_queen_pane: the queen's workspace label may carry 👑 while worker tabs still sit in it.
     if r["queen_pane"] in (old, info["pane_id"]) or tab_label is None or QUEEN_TAB_MARK in tab_label:
         raise Refused(f"{old} is the queen's pane, or its tab cannot be read")
-    if info["workspace_id"] != r["workspace"]:
-        raise Refused(f"{name} is already outside the queen's workspace, in {info['workspace_id']}")
+    # Realms created before the db recorded a workspace: the queen's pane says where she lives.
+    queen_ws = r["workspace"]
+    if not queen_ws and r["queen_pane"]:
+        queen_ws = (pane(r["queen_pane"]) or {}).get("workspace_id")
+    if not queen_ws:
+        raise Refused(f"realm {key} records no queen workspace and her pane {r['queen_pane']} is gone")
+    if info["workspace_id"] != queen_ws:
+        raise Refused(f"{name} is already outside the queen's workspace {queen_ws}, in {info['workspace_id']}")
     from . import scout as scout_mod  # scout imports swarm
     label = f"{scout_mod.SCOUT_MARK} {db.label(r)} · scout" if scout else worker_label(r, name)
     res = _ok(herdr("pane", "move", old, "--new-workspace", "--label", label, "--no-focus"), "pane move")["move_result"]
@@ -341,7 +347,7 @@ def move(conn, key, name):
     log(f"moved {name} {old} → {new} ({ws}) for {key}")
     return {"name": name, "old_pane": old, "pane": new, "workspace": ws,
             "closed_tab": res.get("closed_tab_id"), "subscribed": bool(sub),
-            "queen_workspace": label_queen_workspace(r["workspace"])}
+            "queen_workspace": label_queen_workspace(queen_ws)}
 
 
 def status(conn, key):

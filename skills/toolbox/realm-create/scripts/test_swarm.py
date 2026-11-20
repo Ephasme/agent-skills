@@ -362,6 +362,13 @@ class SwarmTest(unittest.TestCase):
         with self.assertRaises(db.Refused):
             swarm.move(self.conn, KEY, "Fake")
         self.assertIn("w:p0", self.h.panes)
+        # A realm older than the db's workspace column: the queen's pane gives her workspace.
+        self.conn.execute("UPDATE realms SET workspace=NULL WHERE key=?", (KEY,))
+        self.conn.commit()
+        tab2, p2 = self.h.add_tab("w", "🛠️ subject-legacy")
+        db.add_worker(self.conn, KEY, "Legacy", p2, tab2, None, self.t)
+        self.assertEqual(swarm.move(self.conn, KEY, "Legacy")["queen_workspace"], "already marked")
+        self.assertNotIn(tab2, self.h.tabs)
 
     def test_move_takes_a_tab_era_scout_and_rewrites_its_brief(self):
         self.create(size=1)
