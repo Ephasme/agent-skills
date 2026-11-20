@@ -40,7 +40,7 @@ returned inbox; carry any unread message into step 4.
 Below, `realm` is `python3 ~/.agents/skills/realm-create/scripts/realm.py`: every 15 s a launchd job
 (`com.loup.realm`) checks each subscribed pane's Agent Mail inbox. A worker pane with unread mail that is
 neither `working` nor `blocked` gets `check your mail` + Enter typed into it. A pane subscribed with `--aside`
-is never typed into: unread mail shows as a `mail` token on the pane and a herdr notification. realm refuses
+is never typed into: unread mail shows only as a `mail` token on the pane. realm refuses
 to type into a pane whose tab label holds `👑`, whatever its subscription says. Start it, then subscribe
 yourself in aside mode only:
 

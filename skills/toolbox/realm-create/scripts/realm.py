@@ -4,7 +4,7 @@
 launchd runs `realm tick` every 15 s; each subscriber is woken at most once per its own interval,
 only when its Agent Mail inbox has unread messages and herdr reports its agent neither working nor blocked.
 A `prompt` subscriber is woken by typing WAKE_TEXT + Enter into its pane. An `aside` subscriber is never
-typed into: it gets a herdr notification and a `mail` pane token, both display-only.
+typed into: it gets a `mail` pane token, a sidebar label that never pops up or sounds.
 """
 
 import argparse
@@ -128,16 +128,12 @@ def wake(pane_id, mode):
             raise RuntimeError(f"herdr pane {args[0]} {pane_id}: {out['error']}")
 
 
-def aside(pane_id, agent, n, notify):
-    """Show unread mail beside the pane, never in it: a pane token, plus a herdr notification if notify."""
+def aside(pane_id, n):
+    """Show unread mail beside the pane, never in it: a pane token, cleared at zero."""
     token = ["--token", f"mail=📬 {n}"] if n else ["--clear-token", "mail"]
     out = herdr("pane", "report-metadata", pane_id, "--source", TOKEN_SOURCE, *token)
     if out.get("error"):
         raise RuntimeError(f"herdr pane report-metadata {pane_id}: {out['error']}")
-    if notify:
-        out = herdr("notification", "show", f"{agent}: {n} unread mail", "--body", f"pane {pane_id}", "--sound", "request")
-        if out.get("error"):
-            raise RuntimeError(f"herdr notification show: {out['error']}")
 
 
 # ---------- Agent Mail ----------
@@ -276,8 +272,7 @@ def cmd_tick(_a):
                 if n == last:
                     continue
                 try:
-                    # The token tracks the count; the notification fires only when new mail arrives.
-                    aside(pane, v["agent"], n, notify=n > last)
+                    aside(pane, n)
                 except (RuntimeError, OSError, subprocess.SubprocessError) as e:
                     log(f"{pane} ({v['agent']}): aside failed: {e}")
                     continue
@@ -348,7 +343,7 @@ def main():
     p.add_argument("--project", required=True, help="Agent Mail human_key")
     p.add_argument("--every", type=int, default=DEFAULT_EVERY, help="min seconds between wakes (default 60)")
     p.add_argument(
-        "--aside", action="store_true", help="never type into the pane: notification + pane token only (the queen)"
+        "--aside", action="store_true", help="never type into the pane: pane token only (the queen)"
     )
     p.set_defaults(fn=cmd_subscribe)
     p = sub.add_parser("unsubscribe", help="drop one pane, or every pane of --project")
