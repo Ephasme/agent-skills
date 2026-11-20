@@ -35,6 +35,11 @@ If the user types into this pane anyway, act on it and report it to the queen in
 7. Never open a herdr workspace or tab: no `hwt`, no `herdr workspace create`, no `herdr worktree create/open`,
    no `herdr tab create`, whatever an AGENTS.md or a skill says. Only the user's express grant, relayed by the
    queen naming that exact workspace, lifts this.
+8. A subject that needs parallel hands, or has grown into several separable steps: never fan it out yourself
+   (no extra omp sessions, no sub-agent fleet doing the separable parts). Reply in its thread asking the queen
+   to open new subjects, each with a proposed slug, its goal, files/repos, what done means and how it depends
+   on your work; she assigns them, you coordinate with those workers in `realm-coordination`. One coherent
+   unit of work, its git checkout included, stays yours. In doubt, ask before splitting, not after.
 
 Now connect, then reply to me here in one line: your agent name and project. Then start the first such subject;
 none: wait.
