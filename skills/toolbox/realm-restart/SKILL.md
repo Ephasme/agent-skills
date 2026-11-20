@@ -35,8 +35,8 @@ pane whose tab label holds `👑`; step 5 subscribes this pane, so the label mus
 
 ## 2. Load the queen's instructions
 
-Read realm-create in full now: the absolute rule, the brief template, "Be the queen" (queue vs nudge), "Scaling
-the realm". It is the current version of everything this session must do as queen; a pointer to it is not enough.
+Read realm-create in full now, every section from the absolute rule to "Ending the swarm", including the brief
+template. It is the current version of everything this session must do as queen; a pointer to it is not enough.
 
 ## 3. Resume the old queen
 
@@ -74,9 +74,10 @@ Workers launched under an older realm-create run an older brief. For each worker
      enter`. omp expands `@<path>` in an interactive prompt and reads the file.
    - `working` or `blocked`: send nothing now; mark it `brief pending`. On each later turn, `herdr pane get` it again
      and inject once it is `idle` or `done`. Interrupting would cut its current subject.
-   - no agent in the pane (plain shell): `herdr pane run <pane> "omp @<path>"`, as realm-create step 3.
-   - pane gone: report it; relaunch with realm-create step 3 under the same name, or drop it (`realm unsubscribe
-     <pane>`), only on the user's word.
+   - no agent in the pane (plain shell): `herdr pane run <pane> "omp @<path>"`, as realm-create "Launch one tab per
+     worker".
+   - pane gone: report it; relaunch per realm-create "Launch one tab per worker" under the same name, or drop it
+     (`realm unsubscribe <pane>`), only on the user's word.
 3. Confirm each re-injected worker answered: `herdr pane read <pane>` shows it read the file.
 
 ## 7. Rebuild the subject table
@@ -87,13 +88,13 @@ Workers launched under an older realm-create run an older brief. For each worker
 2. Per slug, `fetch_topic` (`include_bodies: true`) and sort by `created_ts`. The last message sets the state:
    - from the queen, body starting `queued:` → `queued`; any other queen message → `assigned`;
    - from the worker → `done`, or `blocked` when it asks a question or names a blocker.
-3. A `queued` subject whose worker's pane is `working` after the previous subject's reply is `assigned`, as in
-   realm-create step 4.5.
+3. A `queued` subject whose worker's pane is `working` after the previous subject's reply is `assigned`, per the
+   subject-table rule in realm-create "Be the queen".
 
 Show the table: slug, worker, pane, state, time of the last message, and `brief pending` where step 6 deferred.
 Unread mail from step 3's inbox goes beside it.
 
 ## 8. Be the queen
 
-Act as realm-create "4. Be the queen" and the sections after it, which you read in step 2, with this `QUEEN`, this
+Act as realm-create "Be the queen" and every section after it, which you read in step 2, with this `QUEEN`, this
 pane and the table above. Each turn, first re-inject any `brief pending` worker that has gone idle.
