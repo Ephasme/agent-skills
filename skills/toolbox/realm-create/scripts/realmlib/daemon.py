@@ -14,13 +14,13 @@ WAKE_TEXT = "check your mail"
 TOKEN_SOURCE = "realm"
 
 
-def wake(pane_id, mode):
+def wake(pane_id, mode, text=WAKE_TEXT):
     # Hard guard: the only call site of send-text/send-keys. An aside pane or a queen pane is never typed
     # into, whatever the state file says.
     pane = pane_info(pane_id)
     if mode != "prompt" or not isinstance(pane, dict) or is_queen_pane(pane):
         raise RuntimeError(f"refused to type into {pane_id}: aside or queen pane")
-    for args in (("send-text", pane_id, WAKE_TEXT), ("send-keys", pane_id, "enter")):
+    for args in (("send-text", pane_id, text), ("send-keys", pane_id, "enter")):
         out = herdr("pane", *args)
         if out.get("error"):
             raise RuntimeError(f"herdr pane {args[0]} {pane_id}: {out['error']}")
@@ -47,9 +47,19 @@ def cmd_tick(_a):
                 continue
             if info is None:
                 continue
+            status = info.get("agent_status") or "unknown"
+            if v.get("mode", "prompt") == "prompt":
+                try:
+                    from .swarm import deliver_brief
+
+                    # A brief typed this tick counts as busy: the mail wake waits for the next idle tick.
+                    if deliver_brief(pane, info, wake):
+                        status = "working"
+                except Exception as e:  # noqa: BLE001 - a db problem must never stop the mail wake
+                    log(f"{pane} ({v['agent']}): brief delivery failed: {e}")
             try:
                 endpoint = endpoint or mail.mail_endpoint()
-                tick_one(endpoint, pane, v, info.get("agent_status") or "unknown")
+                typed = tick_one(endpoint, pane, v, status)
             except (OSError, urllib.error.URLError, RuntimeError, KeyError, ValueError) as e:
                 log(f"{pane} ({v['agent']}): mail check failed, skip: {e}")
 

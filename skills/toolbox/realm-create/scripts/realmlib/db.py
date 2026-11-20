@@ -15,7 +15,7 @@ import time
 from contextlib import closing
 from pathlib import Path
 
-from .mail import mail_endpoint
+from . import mail
 from .state import STATE_DIR, STATE_FILE
 
 STATES = ("queued", "assigned", "blocked", "paused", "done")
@@ -74,32 +74,99 @@ MIGRATIONS = [
     );
     CREATE INDEX subject_events_by_subject ON subject_events(realm, slug, ts);
     """,
+    # 2: what spawning needs without asking again, and briefs waiting for an idle pane.
+    """
+    ALTER TABLE realms ADD COLUMN model TEXT;
+    ALTER TABLE realms ADD COLUMN workspace TEXT;
+    ALTER TABLE realms ADD COLUMN cwd TEXT;
+    ALTER TABLE workers ADD COLUMN brief_pending INTEGER NOT NULL DEFAULT 0;
+    """,
+    # 3: scout: channel tracker, proposals awaiting the user, and the user's to-do list (realmlib/scout.py).
+    """
+    CREATE TABLE scouts (
+        realm TEXT PRIMARY KEY REFERENCES realms(key),
+        agent TEXT NOT NULL,
+        pane TEXT,
+        tab TEXT,
+        brief TEXT,
+        created_ts REAL NOT NULL,
+        last_wake_ts REAL,
+        scan_start_ts REAL,
+        scan_end_ts REAL
+    );
+    CREATE TABLE scout_cursors (
+        realm TEXT NOT NULL REFERENCES realms(key),
+        source TEXT NOT NULL,
+        scope TEXT NOT NULL,
+        cursor TEXT NOT NULL,
+        updated_ts REAL NOT NULL,
+        PRIMARY KEY (realm, source, scope)
+    );
+    CREATE TABLE scout_seen (
+        realm TEXT NOT NULL REFERENCES realms(key),
+        source TEXT NOT NULL,
+        msg_id TEXT NOT NULL,
+        seen_ts REAL NOT NULL,
+        proposal_id INTEGER,
+        PRIMARY KEY (realm, source, msg_id)
+    );
+    CREATE TABLE proposals (
+        id INTEGER PRIMARY KEY,
+        realm TEXT NOT NULL REFERENCES realms(key),
+        source TEXT NOT NULL,
+        ref TEXT NOT NULL,
+        permalink TEXT,
+        excerpt TEXT NOT NULL DEFAULT '',
+        action TEXT NOT NULL CHECK (action IN ('task.add','calendar.create','calendar.update','calendar.cancel')),
+        payload TEXT NOT NULL,
+        confidence TEXT NOT NULL CHECK (confidence IN ('low','med','high')),
+        why TEXT NOT NULL DEFAULT '',
+        state TEXT NOT NULL CHECK (state IN ('proposed','approved','rejected','applied','failed')),
+        mail_id INTEGER,
+        created_ts REAL NOT NULL,
+        decided_ts REAL,
+        applied_ref TEXT,
+        UNIQUE (realm, source, ref, action)
+    );
+    CREATE INDEX proposals_by_state ON proposals(realm, state);
+    CREATE TABLE tasks (
+        id INTEGER PRIMARY KEY,
+        realm TEXT NOT NULL REFERENCES realms(key),
+        title TEXT NOT NULL,
+        notes TEXT NOT NULL DEFAULT '',
+        due TEXT,
+        proposal_id INTEGER REFERENCES proposals(id),
+        state TEXT NOT NULL CHECK (state IN ('open','done','dropped')),
+        created_ts REAL NOT NULL,
+        state_ts REAL NOT NULL
+    );
+    CREATE INDEX tasks_by_state ON tasks(realm, state);
+    """,
 ]
 
 
 def mail_call(tool, args):
-    """Call one Agent Mail tool over its MCP HTTP endpoint (stateless JSON-RPC); return the parsed result."""
-    import urllib.request
-
-    url, headers = mail_endpoint()
-    body = json.dumps({"jsonrpc": "2.0", "id": 1, "method": "tools/call",
-                       "params": {"name": tool, "arguments": args}})
-    req = urllib.request.Request(url, data=body.encode(), headers={
-        **headers, "Content-Type": "application/json",
-        "Accept": "application/json, text/event-stream", "User-Agent": "realm/1",
-    })
-    with urllib.request.urlopen(req, timeout=30) as resp:
-        reply = json.loads(resp.read())
-    if "error" in reply:
-        raise Refused(f"{tool}: {reply['error'].get('message', reply['error'])}")
-    result = reply["result"]
-    if result.get("isError"):
-        raise Refused(f"{tool}: {result['content'][0]['text'][:300]}")
-    return json.loads(result["content"][0]["text"])
+    """Call one Agent Mail tool; any failure, transport included, becomes Refused."""
+    try:
+        return mail.mail_tool(mail.mail_endpoint(), tool, args)
+    except (mail.MailToolError, RuntimeError, OSError, ValueError, KeyError) as e:
+        raise Refused(f"{tool}: {e}") from e
 
 
 class Refused(Exception):
     """A request the db rejects as stated; printed as {"error": …}, exit 1."""
+
+    exit_code = 1
+
+
+class NeedsHuman(Refused):
+    """Stopped before acting: a person must choose. Printed as {"needs": …}, exit 2."""
+
+    exit_code = 2
+
+    def __init__(self, message, **detail):
+        super().__init__(message)
+        self.detail = detail
 
 
 def db_path():
@@ -162,13 +229,17 @@ def parse_ts(s):
 
 # ---------- operations (pure: conn + now in, dicts out) ----------
 
-def init_realm(conn, key, queen, pane, now):
+def init_realm(conn, key, queen, pane, now, model=None, workspace=None, cwd=None):
+    """Record a realm (idempotent). Omitted fields keep their stored value."""
     with tx(conn):
         conn.execute(
-            """INSERT INTO realms (key, queen, queen_pane, created_ts, updated_ts) VALUES (?,?,?,?,?)
+            """INSERT INTO realms (key, queen, queen_pane, model, workspace, cwd, created_ts, updated_ts)
+                 VALUES (?,?,?,?,?,?,?,?)
                ON CONFLICT(key) DO UPDATE SET queen=excluded.queen,
-                 queen_pane=COALESCE(excluded.queen_pane, queen_pane), updated_ts=excluded.updated_ts""",
-            (key, queen, pane, now, now),
+                 queen_pane=COALESCE(excluded.queen_pane, queen_pane), model=COALESCE(excluded.model, model),
+                 workspace=COALESCE(excluded.workspace, workspace), cwd=COALESCE(excluded.cwd, cwd),
+                 updated_ts=excluded.updated_ts""",
+            (key, queen, pane, model, workspace, cwd, now, now),
         )
     return realm_row(conn, key)
 
@@ -177,8 +248,21 @@ def realm_row(conn, key):
     r = conn.execute("SELECT * FROM realms WHERE key=?", (key,)).fetchone()
     if not r:
         raise Refused(f"no realm {key!r} in the db: run `realm init` first")
-    return {"key": r["key"], "queen": r["queen"], "queen_pane": r["queen_pane"],
+    return {"key": r["key"], "queen": r["queen"], "queen_pane": r["queen_pane"], "model": r["model"],
+            "workspace": r["workspace"], "cwd": r["cwd"],
             "created": iso(r["created_ts"]), "updated": iso(r["updated_ts"])}
+
+
+def set_brief_pending(conn, key, name, pending):
+    _worker(conn, key, name)
+    with tx(conn):
+        conn.execute("UPDATE workers SET brief_pending=? WHERE realm=? AND name=?", (int(pending), key, name))
+
+
+def worker_by_pane(conn, pane):
+    """(realm key, worker row) for a live worker on this pane, or None. The pane id is unique per herdr server."""
+    r = conn.execute("SELECT * FROM workers WHERE pane=? AND retired_ts IS NULL", (pane,)).fetchone()
+    return (r["realm"], r) if r else None
 
 
 def add_worker(conn, key, name, pane, tab, brief, now):
@@ -205,14 +289,17 @@ def worker_row(conn, key, name, now):
     return next(w for w in list_workers(conn, key, now, include_retired=True) if w["name"] == name)
 
 
-def retire_worker(conn, key, name, now):
-    """Mark retired in the db only. Closing the tab and Agent Mail retirement stay separate steps."""
+def retire_worker(conn, key, name, now, keep_subjects=False):
+    """Mark retired in the db only. Closing the tab and Agent Mail retirement stay separate steps.
+
+    keep_subjects: the realm is stopping; its subjects stay with the retired worker, paused, for the record.
+    """
     _worker(conn, key, name)
     held = conn.execute(
         f"SELECT slug FROM subjects WHERE realm=? AND worker=? AND state IN ({','.join('?' * len(HELD))})",
         (key, name, *HELD),
     ).fetchall()
-    if held:
+    if held and not keep_subjects:
         raise Refused(f"{name} still holds {', '.join(r['slug'] for r in held)}: reassign or close them first")
     with tx(conn):
         conn.execute("UPDATE workers SET retired_ts=? WHERE realm=? AND name=?", (now, key, name))
@@ -243,6 +330,7 @@ def list_workers(conn, key, now, include_retired=False):
         idle = w["held"] == 0 and w["retired_ts"] is None
         out.append({
             "name": w["name"], "pane": w["pane"], "tab": w["tab"], "brief": w["brief"],
+            "brief_pending": bool(w["brief_pending"]),
             "joined": iso(w["joined_ts"]), "last_activity": iso(w["last_activity_ts"]),
             "retired": iso(w["retired_ts"]), "open_subjects": w["open_subjects"] or "",
             "idle": idle, "idle_since": iso(w["idle_since"]) if idle else None,
@@ -470,7 +558,11 @@ def list_realms(conn):
     return [r["key"] for r in conn.execute("SELECT key FROM realms ORDER BY key")]
 
 
-def _run(fn, keyed=True):
+def run_verb(fn, keyed=True):
+    """argparse handler: resolve the key, open the db, print fn's result as JSON (or text).
+
+    Refused → {"error"} exit 1; NeedsHuman → {"needs", …detail} exit 2: nothing was done past that point.
+    """
     def handler(a):
         try:
             if keyed:
@@ -478,8 +570,11 @@ def _run(fn, keyed=True):
             with closing(connect()) as conn:
                 out = fn(conn, a, time.time())
         except Refused as e:
-            _emit({"error": str(e)})
-            sys.exit(1)
+            if isinstance(e, NeedsHuman):
+                _emit({"needs": str(e), **e.detail})
+            else:
+                _emit({"error": str(e)})
+            sys.exit(e.exit_code)
         if isinstance(out, str):
             print(out)
         else:
@@ -487,7 +582,7 @@ def _run(fn, keyed=True):
     return handler
 
 
-def _parser(sub, name, help):
+def keyed_parser(sub, name, help):
     p = sub.add_parser(name, help=help)
     p.add_argument("--project", help="Agent Mail project key; default: the project of $HERDR_PANE_ID's subscription")
     return p
@@ -497,69 +592,69 @@ def register(sub):
     """Add the db verbs to realm's argparse subparsers. Each one acts on exactly one realm key."""
 
     p = sub.add_parser("realms", help="db: list realm keys (admin; keys only)")
-    p.set_defaults(fn=_run(lambda c, a, now: list_realms(c), keyed=False))
+    p.set_defaults(fn=run_verb(lambda c, a, now: list_realms(c), keyed=False))
 
-    p = _parser(sub, "init", "db: record a realm and its queen (idempotent)")
+    p = keyed_parser(sub, "init", "db: record a realm and its queen (idempotent)")
     p.add_argument("--queen", required=True)
     p.add_argument("--pane", help="queen pane id")
-    p.set_defaults(fn=_run(lambda c, a, now: init_realm(c, a.key, a.queen, a.pane, now)))
+    p.set_defaults(fn=run_verb(lambda c, a, now: init_realm(c, a.key, a.queen, a.pane, now)))
 
     w = sub.add_parser("worker", help="db: workers").add_subparsers(dest="wcmd", required=True)
-    p = _parser(w, "add", "record or update a worker (clears retired)")
+    p = keyed_parser(w, "add", "record or update a worker (clears retired)")
     p.add_argument("--name", required=True)
     p.add_argument("--pane")
     p.add_argument("--tab")
     p.add_argument("--brief")
-    p.set_defaults(fn=_run(lambda c, a, now: add_worker(c, a.key, a.name, a.pane, a.tab, a.brief, now)))
-    p = _parser(w, "list", "workers with idle and scale_in flags")
+    p.set_defaults(fn=run_verb(lambda c, a, now: add_worker(c, a.key, a.name, a.pane, a.tab, a.brief, now)))
+    p = keyed_parser(w, "list", "workers with idle and scale_in flags")
     p.add_argument("--all", action="store_true", help="include retired")
     p.add_argument("--idle", action="store_true", help="idle workers only")
     p.add_argument("--scale-in", action="store_true", help="scale-in candidates only")
-    p.set_defaults(fn=_run(lambda c, a, now: [
+    p.set_defaults(fn=run_verb(lambda c, a, now: [
         x for x in list_workers(c, a.key, now, a.all)
         if (not a.idle or x["idle"]) and (not a.scale_in or x["scale_in"])
     ]))
-    p = _parser(w, "retire", "mark a worker retired in the db (refused while it holds a subject)")
+    p = keyed_parser(w, "retire", "mark a worker retired in the db (refused while it holds a subject)")
     p.add_argument("--name", required=True)
-    p.set_defaults(fn=_run(lambda c, a, now: retire_worker(c, a.key, a.name, now)))
+    p.set_defaults(fn=run_verb(lambda c, a, now: retire_worker(c, a.key, a.name, now)))
 
     s = sub.add_parser("subject", help="db: subjects").add_subparsers(dest="scmd", required=True)
-    p = _parser(s, "add", "new subject: assigned with --worker, queued with --after or no worker")
+    p = keyed_parser(s, "add", "new subject: assigned with --worker, queued with --after or no worker")
     p.add_argument("--slug", required=True)
     p.add_argument("--title", default="")
     p.add_argument("--worker")
     p.add_argument("--after", help="slug this one waits for")
     p.add_argument("--thread-id")
     p.add_argument("--status")
-    p.set_defaults(fn=_run(lambda c, a, now: add_subject(
+    p.set_defaults(fn=run_verb(lambda c, a, now: add_subject(
         c, a.key, a.slug, a.title, a.worker, a.after, a.thread_id, a.status, now)))
-    p = _parser(s, "assign", "give a subject to a worker: state assigned")
+    p = keyed_parser(s, "assign", "give a subject to a worker: state assigned")
     p.add_argument("--slug", required=True)
     p.add_argument("--worker", required=True)
     p.add_argument("--thread-id")
-    p.set_defaults(fn=_run(lambda c, a, now: assign_subject(c, a.key, a.slug, a.worker, a.thread_id, now)))
-    p = _parser(s, "set-state", "queen sets state and/or status text")
+    p.set_defaults(fn=run_verb(lambda c, a, now: assign_subject(c, a.key, a.slug, a.worker, a.thread_id, now)))
+    p = keyed_parser(s, "set-state", "queen sets state and/or status text")
     p.add_argument("--slug", required=True)
     p.add_argument("--state", required=True, choices=STATES)
     p.add_argument("--status", help="short status text; omitted keeps the current one")
     p.add_argument("--thread-id")
-    p.set_defaults(fn=_run(lambda c, a, now: set_state(
+    p.set_defaults(fn=run_verb(lambda c, a, now: set_state(
         c, a.key, a.slug, a.state, a.status, a.thread_id, now)))
-    p = _parser(s, "list", "subjects, open first")
+    p = keyed_parser(s, "list", "subjects, open first")
     p.add_argument("--state", action="append", choices=STATES)
-    p.set_defaults(fn=_run(lambda c, a, now: list_subjects(c, a.key, a.state)))
-    p = _parser(s, "show", "one subject with its state history")
+    p.set_defaults(fn=run_verb(lambda c, a, now: list_subjects(c, a.key, a.state)))
+    p = keyed_parser(s, "show", "one subject with its state history")
     p.add_argument("--slug", required=True)
-    p.set_defaults(fn=_run(lambda c, a, now: show_subject(c, a.key, a.slug)))
+    p.set_defaults(fn=run_verb(lambda c, a, now: show_subject(c, a.key, a.slug)))
 
-    p = _parser(sub, "table", "db: the subject table as markdown (or --json)")
+    p = keyed_parser(sub, "table", "db: the subject table as markdown (or --json)")
     p.add_argument("--all", action="store_true", help="include done subjects")
     p.add_argument("--json", action="store_true")
-    p.set_defaults(fn=_run(lambda c, a, now: {
+    p.set_defaults(fn=run_verb(lambda c, a, now: {
         "realm": realm_row(c, a.key),
         "subjects": [x for x in list_subjects(c, a.key) if a.all or x["state"] != "done"],
         "workers": list_workers(c, a.key, now),
     } if a.json else render_table(c, a.key, a.all, now)))
 
-    p = _parser(sub, "sync", "db: apply what Agent Mail proves (joins, threads, replies, queued→assigned)")
-    p.set_defaults(fn=_run(lambda c, a, now: sync(c, a.key, now, mail_call)))
+    p = keyed_parser(sub, "sync", "db: apply what Agent Mail proves (joins, threads, replies, queued→assigned)")
+    p.set_defaults(fn=run_verb(lambda c, a, now: sync(c, a.key, now, mail_call)))

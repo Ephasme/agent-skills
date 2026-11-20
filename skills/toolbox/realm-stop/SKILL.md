@@ -1,13 +1,14 @@
 ---
 name: realm-stop
 description: >-
-  Stops a realm started by realm-create: lists the worker tabs of the current
-  herdr workspace (label prefix `🛠️ subject-`), closes each one, which ends
-  its omp session, deletes the brief directory, and reports what closed and
-  what failed. Run by the queen. Invoked as `/realm-stop`.
+  Stops a realm started by realm-create: one realm verb closes the tabs of the
+  realm's own subscribed worker panes, which ends their omp sessions,
+  unsubscribes every pane of the realm's key, deletes that key's brief
+  directory, pauses open subjects and retires the closed workers in realm's
+  db, then reports what closed and what failed. Run by the queen. Invoked as
+  `/realm-stop`.
 compatibility: >-
-  Requires herdr (tab list/close, agent list) and a realm launched by
-  realm-create in the current herdr workspace.
+  Requires herdr (tab list/close) and a realm launched by realm-create.
 disable-model-invocation: true
 ---
 
@@ -15,36 +16,25 @@ disable-model-invocation: true
 
 **Explicit invocation only.** It kills every worker session of the realm; never run it on a guess.
 
-## 1. List what will close
+Below, `realm` is `python3 ~/.agents/skills/realm-create/scripts/realm.py` and `<key>` the realm's Agent Mail
+project key.
 
-`herdr tab list --workspace "$HERDR_WORKSPACE_ID"`. The realm's tabs are those whose `label` starts with
-`🛠️ subject-`: the prefix realm-create sets. Never pick a tab by any other sign, and never your own tab
-(`$HERDR_TAB_ID`): closing it kills the session running this skill.
+## 1. Stop
 
-None found: say so and stop. Otherwise show the list — label, `tab_id`, `agent_status` — before closing anything.
+`realm stop --project <key>`, from the queen's pane. It acts only on panes subscribed under `<key>`, never on
+another realm sharing the workspace, and never on your own tab.
 
-## 2. Close each tab
+- Workers mid-subject (`agent_status` `working`): it stops with `needs` (exit 2) and lists them, closing nothing.
+  Name them to the user; rerun with `--close-working` only once they confirm.
+- Otherwise it closes each worker tab, checks with `herdr tab list` that each one is gone, unsubscribes every
+  pane of `<key>` (worker wakes and your mail aside), deletes `<key>`'s brief directory, sets open subjects to
+  `paused` and retires the closed workers in the db. A close that failed or a tab still open is in `failed`,
+  never retried blindly.
 
-A tab whose `agent_status` is `working` is mid-subject: name it to the user and close it only once they confirm.
-The others: `herdr tab close <tab_id>`. herdr has no command to stop an agent first; closing the tab ends the pane
-and the omp session in it.
+The launchd service stays installed (other realms may use it). Agent Mail keeps the workers registered and their
+history readable. Your own tab keeps its `👑 queen` label.
 
-Then `herdr tab list` again: every listed tab must be gone. One still there or a close that errored is a failure,
-reported, never retried blindly.
+## 2. Report
 
-## 3. Clean up
-
-- `python3 ~/.agents/skills/realm-create/scripts/realm.py unsubscribe --project <key>`, `<key>` being the realm's
-  Agent Mail project: stops the workers' mail wakes and your pane's mail aside. Leave the launchd service
-  installed; other realms may use it.
-- Delete `${TMPDIR:-/tmp}/swarm/`, the briefs realm-create wrote.
-- Your own tab keeps its `👑 queen` label; nothing renames it.
-- Agent Mail: leave the workers registered; their message history stays readable.
-- realm's db keeps the realm's subjects and history. Record the closed workers, with the same `realm.py`:
-  `subject list --project <key>`, `subject set-state … --state paused` on each one not `done`, then
-  `worker retire --project <key> --name <W>` per closed tab, so `table --project <key>` shows no live worker.
-
-## 4. Report
-
-One line per tab: label, closed or failed (with herdr's error). Then the panes `realm unsubscribe` dropped, and
-whether `${TMPDIR:-/tmp}/swarm/` was deleted.
+One line per tab from `closed` and `failed` (label, closed or failed with its error). Then the panes in
+`unsubscribed`, and `briefs_deleted`.

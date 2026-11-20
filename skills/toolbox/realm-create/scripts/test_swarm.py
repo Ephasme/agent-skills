@@ -1,0 +1,273 @@
+"""Swarm verbs against fake herdr and fake Agent Mail: `python3 -m unittest test_swarm`. No network, no sleeps."""
+
+import os
+import tempfile
+import unittest
+from pathlib import Path
+from unittest import mock
+
+from realmlib import daemon, db, herdr as herdr_mod, state, swarm
+
+KEY = "/test/swarm"
+OTHER = "/test/other"
+
+
+class FakeHerdr:
+    def __init__(self):
+        self.tabs = {"w:t0": {"label": "shell", "panes": ["w:p0"]}}
+        self.panes = {"w:p0": {"tab_id": "w:t0", "agent": "omp", "agent_status": "idle"}}
+        self.typed = []
+        self.ran = []
+        self.n = 0
+
+    def __call__(self, *args):
+        cmd = args[:2]
+        if cmd == ("tab", "rename"):
+            self.tabs[args[2]]["label"] = args[3]
+            return {}
+        if cmd == ("tab", "create"):
+            self.n += 1
+            tab, p = f"w:t{self.n}", f"w:p{self.n}"
+            label = args[args.index("--label") + 1]
+            self.tabs[tab] = {"label": label, "panes": [p]}
+            self.panes[p] = {"tab_id": tab, "agent": None, "agent_status": "unknown"}
+            return {"result": {"tab": {"tab_id": tab}, "root_pane": {"pane_id": p}}}
+        if cmd == ("tab", "list"):
+            return {"result": {"tabs": [{"tab_id": t, "label": v["label"]} for t, v in self.tabs.items()]}}
+        if cmd == ("tab", "get"):
+            t = self.tabs.get(args[2])
+            return {"result": {"tab": {"label": t["label"]}}} if t else {"error": {"code": "tab_not_found"}}
+        if cmd == ("tab", "close"):
+            for p in self.tabs.pop(args[2])["panes"]:
+                self.panes.pop(p, None)
+            return {}
+        if cmd == ("pane", "get"):
+            p = self.panes.get(args[2])
+            return {"result": {"pane": {"pane_id": args[2], **p}}} if p else {"error": {"code": "pane_not_found"}}
+        if cmd == ("pane", "run"):
+            self.ran.append((args[2], args[3]))
+            self.panes[args[2]].update(agent="omp", agent_status="idle")
+            return {}
+        if cmd == ("pane", "send-text"):
+            self.typed.append((args[2], args[3]))
+            return {}
+        if cmd == ("pane", "send-keys"):
+            return {}
+        raise AssertionError(args)
+
+
+class FakeMail:
+    def __init__(self):
+        self.agents = {}
+        self.sent = []
+        self.retired = []
+        self.n = 0
+        self.clock = None
+
+    def __call__(self, tool, args):
+        if tool == "create_agent_identity":
+            self.n += 1
+            name = f"Worker{chr(64 + self.n)}ox"
+            self.agents[name] = {"name": name, "task_description": args["task_description"],
+                                 "inception_ts": db.iso(self.clock()), "last_active_ts": db.iso(self.clock())}
+            return {"name": name}
+        if tool == "macro_start_session":
+            name = args.get("agent_name") or "QueenBee"
+            self.agents.setdefault(name, {"name": name, "task_description": args.get("task_description", ""),
+                                          "inception_ts": db.iso(self.clock()), "last_active_ts": None})
+            return {"agent": {"name": name, "registration_token": "SECRET-" + name}, "inbox": []}
+        if tool == "list_agents":
+            return list(self.agents.values())
+        if tool == "retire_agent":
+            assert args["registration_token"] == "SECRET-" + args["agent_name"]
+            self.retired.append(args["agent_name"])
+            return {"ok": True}
+        if tool == "send_message":
+            self.n += 1
+            mid = 1000 + self.n
+            self.sent.append({**args, "id": mid})
+            return {"deliveries": [{"payload": {"id": mid, "thread_id": None}}]}
+        if tool == "fetch_topic":
+            return []
+        raise AssertionError(tool)
+
+    def join(self, name, at):
+        self.agents[name]["last_active_ts"] = db.iso(at)
+
+
+class SwarmTest(unittest.TestCase):
+    def setUp(self):
+        tmp = Path(tempfile.mkdtemp())
+        self.t = 1_800_000_000.0
+        self.h = FakeHerdr()
+        self.m = FakeMail()
+        self.m.clock = lambda: self.t
+        patches = [
+            (state, "STATE_DIR", tmp), (state, "STATE_FILE", tmp / "state.json"),
+            (state, "LOCK_FILE", tmp / "state.lock"), (state, "LOG_FILE", tmp / "realm.log"),
+            (swarm, "herdr", self.h), (swarm, "call", self.m), (swarm, "now", lambda: self.t),
+            (swarm, "sleep", self.advance), (swarm, "launchd_loaded", lambda: True),
+            (herdr_mod, "herdr", self.h), (daemon, "herdr", self.h),
+        ]
+        for module, target, value in patches:
+            p = mock.patch.object(module, target, value)
+            p.start()
+            self.addCleanup(p.stop)
+        env = mock.patch.dict(os.environ, {"REALM_DB": str(tmp / "realm.db"), "TMPDIR": str(tmp)})
+        env.start()
+        self.addCleanup(env.stop)
+        self.conn = db.connect()
+        self.addCleanup(self.conn.close)
+
+    def advance(self, seconds):
+        self.t += seconds
+        for name in self.m.agents:
+            if name.startswith("Worker") and name not in getattr(self, "never_join", ()):
+                self.m.join(name, self.t)
+
+    def subs(self):
+        with state.locked_state() as s:
+            return dict(s["subscriptions"])
+
+    def create(self, size=2, key=KEY):
+        return swarm.create(self.conn, key, size, "m1", "w", "/cwd", "w:p0", "w:t0")
+
+    def test_create_bootstraps_queen_and_workers(self):
+        out = self.create()
+        self.assertEqual(out["queen"], "QueenBee")
+        self.assertEqual(self.h.tabs["w:t0"]["label"], "👑 queen")
+        self.assertEqual([w["name"] for w in out["workers"]], ["WorkerAox", "WorkerBox"])
+        self.assertEqual(out["not_joined"], [])
+        subs = self.subs()
+        self.assertEqual(subs["w:p0"]["mode"], "aside")
+        self.assertEqual({p: v["mode"] for p, v in subs.items() if p != "w:p0"}, {"w:p1": "prompt", "w:p2": "prompt"})
+        brief = Path(out["workers"][0]["brief"])
+        self.assertEqual(brief.parent, swarm.brief_dir(KEY))
+        text = brief.read_text()
+        self.assertIn("You are WorkerAox", text)
+        self.assertIn("ABSOLUTE RULE: never ask the user", text)
+        self.assertIn("subject-worker-aox", text)
+        self.assertEqual(self.h.ran[0], ("w:p1", f"omp @{brief}"))
+        self.assertEqual(self.h.tabs["w:t1"]["label"], "🛠️ subject-worker-aox")
+        self.assertTrue(all(w["joined"] for w in db.list_workers(self.conn, KEY, self.t)))
+
+    def test_wait_joined_reports_laggards_without_real_sleep(self):
+        self.never_join = {"WorkerBox"}
+        out = self.create()
+        self.assertEqual(out["joined"], ["WorkerAox"])
+        self.assertEqual(out["not_joined"], [{"name": "WorkerBox", "pane": "w:p2"}])
+
+    def test_create_refuses_bad_size_and_missing_pane(self):
+        with self.assertRaises(db.Refused):
+            self.create(size=0)
+        with self.assertRaises(db.Refused):
+            swarm.create(self.conn, KEY, 1, "m1", "w", "/cwd", None, None)
+
+    def test_dispatch_and_queue(self):
+        self.create(size=1)
+        out = swarm.dispatch(self.conn, KEY, "WorkerAox", "s1", "Do it", "body")
+        self.assertEqual(out["subject"]["state"], "assigned")
+        self.assertEqual(self.m.sent[0]["subject"], "[s1] Do it")
+        self.assertEqual(self.m.sent[0]["topic"], "s1")
+        self.assertEqual(self.m.sent[0]["sender_name"], "QueenBee")
+        q = swarm.dispatch(self.conn, KEY, "WorkerAox", "s2", "Next", "body", after="s1")
+        self.assertEqual(q["subject"]["state"], "queued")
+        self.assertTrue(self.m.sent[1]["body_md"].startswith("queued: start after s1\n"))
+        self.assertEqual(self.h.typed, [])  # dispatch never types: the daemon wakes
+
+    def test_retire_scales_in(self):
+        out = self.create(size=1)
+        brief = Path(out["workers"][0]["brief"])
+        res = swarm.retire(self.conn, KEY, "WorkerAox")
+        self.assertEqual(res["steps"]["tab_close"], "ok")
+        self.assertNotIn("w:t1", self.h.tabs)
+        self.assertNotIn("w:p1", self.subs())
+        self.assertEqual(self.m.retired, ["WorkerAox"])
+        self.assertFalse(brief.exists())
+        self.assertNotIn("SECRET", repr(res))
+        self.assertEqual(db.list_workers(self.conn, KEY, self.t), [])
+
+    def test_retire_refuses_busy_worker(self):
+        self.create(size=1)
+        swarm.dispatch(self.conn, KEY, "WorkerAox", "s1", "t", "b")
+        with self.assertRaises(db.Refused):
+            swarm.retire(self.conn, KEY, "WorkerAox")
+        self.assertIn("w:t1", self.h.tabs)
+
+    def test_stop_is_scoped_to_the_key(self):
+        self.create(size=1)
+        swarm.create(self.conn, OTHER, 1, "m1", "w", "/cwd", "w:p0", "w:t0")  # same queen pane, other realm
+        other_brief = swarm.brief_dir(OTHER)
+        swarm.dispatch(self.conn, KEY, "WorkerAox", "s1", "t", "b")
+        self.h.panes["w:p1"]["agent_status"] = "working"
+        with self.assertRaises(db.NeedsHuman):
+            swarm.stop(self.conn, KEY, "w:t0")
+        self.assertIn("w:t1", self.h.tabs)
+        out = swarm.stop(self.conn, KEY, "w:t0", close_working=True)
+        self.assertEqual(out["closed"], [{"agent": "WorkerAox", "tab": "w:t1"}])
+        self.assertIn("w:t2", self.h.tabs)  # the other realm's worker
+        self.assertIn("w:t0", self.h.tabs)  # own tab
+        self.assertTrue(other_brief.exists())
+        self.assertFalse(swarm.brief_dir(KEY).exists())
+        self.assertEqual({v["project"] for v in self.subs().values()}, {OTHER})
+        self.assertEqual(db.subject_row(self.conn, KEY, "s1")["state"], "paused")
+
+    def test_restart_resumes_queen_and_delivers_brief_on_idle_tick(self):
+        self.create(size=2)
+        self.h.tabs["w:t9"] = {"label": "new", "panes": ["w:p9"]}
+        self.h.panes["w:p9"] = {"tab_id": "w:t9", "agent": "omp", "agent_status": "idle"}
+        self.h.tabs["w:t0"]["label"] = "dead"  # old queen tab no longer marked
+        self.t += 3600
+        self.h.panes["w:p2"]["agent_status"] = "working"
+        out = swarm.restart(self.conn, KEY, "m1", "w:p9", "w:t9", "w", "/cwd")
+        self.assertEqual(out["queen"], "QueenBee")
+        self.assertEqual(sorted(out["brief_pending"]), ["WorkerAox", "WorkerBox"])
+        subs = self.subs()
+        self.assertNotIn("w:p0", subs)
+        self.assertEqual(subs["w:p9"]["mode"], "aside")
+        self.assertEqual(db.realm_row(self.conn, KEY)["queen_pane"], "w:p9")
+        # Tick hook: idle pane gets the re-read prompt once; the working one waits.
+        typed = []
+        wake = lambda p, mode, text: typed.append((p, text))  # noqa: E731
+        self.assertTrue(swarm.deliver_brief("w:p1", self.h.panes["w:p1"], wake))
+        self.assertFalse(swarm.deliver_brief("w:p1", self.h.panes["w:p1"], wake))
+        self.assertFalse(swarm.deliver_brief("w:p2", self.h.panes["w:p2"], wake))
+        self.assertEqual(len(typed), 1)
+        self.assertTrue(typed[0][1].startswith("Re-read @"))
+        self.h.panes["w:p2"]["agent_status"] = "done"
+        self.assertTrue(swarm.deliver_brief("w:p2", self.h.panes["w:p2"], wake))
+
+    def test_restart_refuses_while_old_queen_alive(self):
+        self.create(size=1)
+        self.h.tabs["w:t9"] = {"label": "new", "panes": ["w:p9"]}
+        self.h.panes["w:p9"] = {"tab_id": "w:t9", "agent": "omp", "agent_status": "idle"}
+        with self.assertRaises(db.NeedsHuman) as e:
+            swarm.restart(self.conn, KEY, "m1", "w:p9", "w:t9", "w", "/cwd")
+        self.assertEqual(e.exception.detail["queen_tabs"], ["w:t0"])
+        self.assertIn("w:p0", self.subs())
+
+    def test_restart_without_db_asks_which_queen(self):
+        self.m.agents = {n: {"name": n, "task_description": "Swarm queen", "last_active_ts": None}
+                         for n in ("Q1", "Q2")}
+        self.h.tabs["w:t9"] = {"label": "new", "panes": ["w:p9"]}
+        with self.assertRaises(db.NeedsHuman) as e:
+            swarm.restart(self.conn, KEY, "m1", "w:p9", "w:t9", "w", "/cwd")
+        self.assertEqual([c["name"] for c in e.exception.detail["candidates"]], ["Q1", "Q2"])
+
+    def test_daemon_tick_delivers_brief_through_guarded_wake(self):
+        self.create(size=1)
+        db.set_brief_pending(self.conn, KEY, "WorkerAox", True)
+        info = {"pane_id": "w:p1", **self.h.panes["w:p1"]}
+        self.assertTrue(swarm.deliver_brief("w:p1", info, daemon.wake))
+        self.assertEqual(len(self.h.typed), 1)
+        self.assertTrue(self.h.typed[0][1].startswith("Re-read @"))
+        # The queen's pane is never typed into, even with a pending flag forced on a worker row there.
+        db.add_worker(self.conn, KEY, "Fake", "w:p0", "w:t0", "/x", self.t)
+        db.set_brief_pending(self.conn, KEY, "Fake", True)
+        with self.assertRaises(RuntimeError):
+            swarm.deliver_brief("w:p0", {"pane_id": "w:p0", **self.h.panes["w:p0"]}, daemon.wake)
+        self.assertEqual(len(self.h.typed), 1)
+
+
+if __name__ == "__main__":
+    unittest.main()
