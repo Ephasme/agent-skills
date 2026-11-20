@@ -38,6 +38,15 @@ def pane_info(pane_id):
     return out["result"]["pane"]
 
 
+def canonical_pane(pane_id):
+    """herdr's current id for a pane. A moved pane keeps its old id as an alias, and the agent in it keeps
+    the old `$HERDR_PANE_ID`: lookups keyed by pane id go through this. The input when herdr cannot say."""
+    try:
+        return herdr("pane", "get", pane_id)["result"]["pane"]["pane_id"]
+    except (KeyError, TypeError, OSError, subprocess.SubprocessError):
+        return pane_id
+
+
 def is_queen_pane(pane):
     """True when the pane's tab or workspace label holds the queen mark realm-create sets, or herdr cannot say.
 

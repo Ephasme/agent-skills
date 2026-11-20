@@ -1,4 +1,4 @@
-"""Swarm verbs: create, spawn, wait-joined, retire, status, restart, reinject, dispatch, stop.
+"""Swarm verbs: create, spawn, wait-joined, retire, move, status, restart, reinject, dispatch, stop.
 
 Each does the mechanical part of a realm skill step and records it in realm's db, so the queen keeps only
 judgement. Every verb acts on one realm key. herdr and Agent Mail are reached through `herdr()` and
@@ -74,19 +74,20 @@ def brief_dir(key):
     return Path(os.environ.get("TMPDIR") or tempfile.gettempdir()) / "swarm" / slug
 
 
-def label_step(realm_label, name, own_workspace):
+def label_step(realm_label, name, workspace):
     """The brief's first step: label its own workspace, or its tab on rows older than workspaces.
 
-    Never `$HERDR_WORKSPACE_ID` for a tab worker: that is the queen's workspace."""
-    if own_workspace:
-        return f'`herdr workspace rename "$HERDR_WORKSPACE_ID" "{WORKER_MARK} {realm_label} · {kebab(name)}"`'
+    The workspace id is written out, never `$HERDR_WORKSPACE_ID`: in a tab worker's pane, and in a pane
+    `realm move` took out of a tab, that variable still names the queen's workspace."""
+    if workspace:
+        return f'`herdr workspace rename {workspace} "{WORKER_MARK} {realm_label} · {kebab(name)}"`'
     return f'`herdr tab rename "$HERDR_TAB_ID" "{WORKER_MARK} subject-{kebab(name)}"`'
 
 
-def write_brief(key, name, queen, realm_label=None, own_workspace=True):
+def write_brief(key, name, queen, workspace, realm_label=None):
     realm_label = realm_label or key
     text = BRIEF_TEMPLATE.read_text().format(W=name, w=kebab(name), KEY=key, QUEEN=queen, REALM=realm_label,
-                                             LABEL_STEP=label_step(realm_label, name, own_workspace))
+                                             LABEL_STEP=label_step(realm_label, name, workspace))
     path = brief_dir(key) / f"{kebab(name)}.md"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(text)
@@ -201,9 +202,9 @@ def spawn(conn, key):
         "task_description": f"Swarm worker, queen {r['queen']}",
     })
     name = ident["name"]
-    brief = write_brief(key, name, r["queen"], db.label(r))
     pane_id, ws = open_workspace(worker_label(r, name), r["cwd"] or os.getcwd())
     subscribe(pane_id, name, key, aside=False)  # bound before omp starts: its first poll already finds the file
+    brief = write_brief(key, name, r["queen"], ws, db.label(r))
     _ok(herdr("pane", "run", pane_id, f"{PROGRAM} @{brief}"), "pane run")
     db.add_worker(conn, key, name, pane_id, None, str(brief), now(), workspace=ws)
     log(f"spawned {name} in {pane_id} ({ws}) for {key}")
@@ -296,6 +297,59 @@ def retire(conn, key, name, park=False):
             parked.append(s["slug"])
     db.retire_worker(conn, key, name, now(), keep_subjects=park)
     return {"name": name, "steps": steps, "parked": parked}
+
+
+def move(conn, key, name):
+    """Move a tab-era worker or scout pane into its own workspace with `herdr pane move`: the process keeps
+    running, so the agent keeps its conversation. Then rekey its subscription, record the pane and workspace,
+    and rewrite its brief for a later restart. Refused while a worker holds a subject.
+    """
+    r = db.realm_row(conn, key)
+    row = conn.execute("SELECT * FROM workers WHERE realm=? AND name=? AND retired_ts IS NULL",
+                       (key, name)).fetchone()
+    scout = None if row else conn.execute("SELECT * FROM scouts WHERE realm=? AND agent=?", (key, name)).fetchone()
+    if not (row or scout):
+        raise Refused(f"no live worker or scout {name!r} in realm {key!r}")
+    if row:
+        w = db.worker_row(conn, key, name, now())
+        if not w["idle"]:
+            raise Refused(f"{name} holds {w['open_subjects']}: move it once its subjects end")
+    old = (row or scout)["pane"]
+    info = pane(old) if old else None
+    if info is None:
+        raise Refused(f"{name}'s pane {old} is gone")
+    tab_label = (herdr("tab", "get", info["tab_id"]).get("result") or {}).get("tab", {}).get("label")
+    # By tab, not is_queen_pane: the queen's workspace label may carry 👑 while worker tabs still sit in it.
+    if r["queen_pane"] in (old, info["pane_id"]) or tab_label is None or QUEEN_TAB_MARK in tab_label:
+        raise Refused(f"{old} is the queen's pane, or its tab cannot be read")
+    if info["workspace_id"] != r["workspace"]:
+        raise Refused(f"{name} is already outside the queen's workspace, in {info['workspace_id']}")
+    from . import scout as scout_mod  # scout imports swarm
+    label = f"{scout_mod.SCOUT_MARK} {db.label(r)} · scout" if scout else worker_label(r, name)
+    res = _ok(herdr("pane", "move", old, "--new-workspace", "--label", label, "--no-focus"), "pane move")["move_result"]
+    new, ws = res["pane"]["pane_id"], res["pane"]["workspace_id"]
+    with locked_state() as s:
+        subs = s["subscriptions"]
+        sub = subs.pop(old, None) or subs.pop(info["pane_id"], None)
+        if sub:
+            subs[new] = sub
+    # The realm-wake extension in the moved session still reads the old `$HERDR_PANE_ID`: its bind file stays
+    # under the old id. A copy under the new id keeps lookups by the subscribed pane working.
+    held = bind.read(old) or bind.read(info["pane_id"])
+    if held:
+        bind.write(new, held["agent"], held["project"], held["cursor"])
+    if scout:
+        brief = scout_mod.write_brief(key, name, r["queen"], label, ws)
+        sql = "UPDATE scouts SET pane=?, workspace=?, tab=NULL, brief=? WHERE realm=? AND agent=?"
+    else:
+        brief = write_brief(key, name, r["queen"], ws, db.label(r))
+        sql = "UPDATE workers SET pane=?, workspace=?, tab=NULL, brief=? WHERE realm=? AND name=?"
+    with db.tx(conn):
+        conn.execute(sql, (new, ws, str(brief), key, name))
+    log(f"moved {name} {old} → {new} ({ws}) for {key}")
+    return {"name": name, "old_pane": old, "pane": new, "workspace": ws,
+            "closed_tab": res.get("closed_tab_id"), "subscribed": bool(sub),
+            "queen_workspace": label_queen_workspace(r["workspace"])}
 
 
 def status(conn, key):
@@ -404,7 +458,7 @@ def rebrief(conn, key):
     r = db.realm_row(conn, key)
     pending, started, gone = [], [], []
     for w in db.list_workers(conn, key, now()):
-        path = write_brief(key, w["name"], r["queen"], db.label(r), own_workspace=bool(w["workspace"]))
+        path = write_brief(key, w["name"], r["queen"], w["workspace"], db.label(r))
         db.add_worker(conn, key, w["name"], None, None, str(path), now())
         p = pane(w["pane"]) if w["pane"] else None
         if p is None:
@@ -519,6 +573,10 @@ def register(sub):
     p.add_argument("--name", required=True)
     p.add_argument("--park", action="store_true", help="retire anyway: its open subjects become paused")
     p.set_defaults(fn=db.run_verb(lambda c, a, t: retire(c, a.key, a.name, a.park)))
+
+    p = db.keyed_parser(sub, "move", "move a tab-era worker or scout into its own workspace, conversation kept")
+    p.add_argument("--name", required=True, help="worker or scout agent name")
+    p.set_defaults(fn=db.run_verb(lambda c, a, t: move(c, a.key, a.name)))
 
     p = db.keyed_parser(sub, "status", "worker map: db, subscriptions and herdr panes")
     p.set_defaults(fn=db.run_verb(lambda c, a, t: status(c, a.key)))

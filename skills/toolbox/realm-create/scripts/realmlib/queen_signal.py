@@ -9,7 +9,7 @@ import os
 
 from . import db
 from .db import Refused
-from .herdr import herdr, is_queen_pane, pane_info
+from .herdr import canonical_pane, herdr, is_queen_pane, pane_info
 from .state import locked_state, log
 
 SIGNAL_SOURCE = "realm-signal"
@@ -75,9 +75,13 @@ def clear(state, key, pane_id, before):
 def _sender(a):
     if a.sender:
         return a.sender
-    pane = os.environ.get("HERDR_PANE_ID")
+    pane = os.environ.get("HERDR_PANE_ID") or ""
     with locked_state() as s:
-        sub = s["subscriptions"].get(pane or "")
+        sub = s["subscriptions"].get(pane)
+    if not sub and pane:  # a pane `realm move` took out of a tab: its env still holds the old id
+        moved = canonical_pane(pane)
+        with locked_state() as s:
+            sub = s["subscriptions"].get(moved)
     if sub:
         return sub["agent"]
     raise Refused("no sender: pass --from <worker>, or run from your subscribed worker pane")

@@ -603,6 +603,9 @@ def resolve_key(project, pane=None, state_file=None, conn=None):
             subs = json.loads(Path(state_file or STATE_FILE).read_text()).get("subscriptions", {})
         except FileNotFoundError:
             subs = {}
+        if pane not in subs:  # a pane `realm move` took out of a tab: its env still holds the old id
+            from .herdr import canonical_pane
+            pane = canonical_pane(pane)
         if pane in subs:
             return subs[pane]["project"]
     raise Refused("no realm key: pass --project <key or name>, or run from a pane subscribed to realm")

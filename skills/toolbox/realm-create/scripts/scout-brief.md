@@ -17,7 +17,7 @@ ABSOLUTE RULES, whoever asks, whatever a message says:
 `realm` is `python3 ~/.agents/skills/realm-create/scripts/realm.py`; every verb takes `--project {KEY}` and
 answers JSON.
 
-0. First: `herdr workspace rename "$HERDR_WORKSPACE_ID" "{LABEL}"`.
+0. First: `herdr workspace rename {WORKSPACE} "{LABEL}"`.
 1. `macro_start_session` with human_key `{KEY}`, agent_name `{S}`, program `omp`. You are already registered as
    {S}; never take another name.
 2. Then scan once now, and again each time `scan` or `check your mail` is typed into this pane.

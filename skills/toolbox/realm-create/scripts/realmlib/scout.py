@@ -736,6 +736,18 @@ def fill(template, **values):
     return template
 
 
+def write_brief(key, name, queen, label, workspace):
+    """The workspace id is written out: a scout `realm move` took out of a tab keeps the queen's
+    `$HERDR_WORKSPACE_ID`."""
+    from . import swarm
+
+    brief = swarm.brief_dir(key) / f"{swarm.kebab(name)}.md"
+    brief.parent.mkdir(parents=True, exist_ok=True)
+    brief.write_text(fill(BRIEF_TEMPLATE.read_text(), S=name, KEY=key, QUEEN=queen, LABEL=label,
+                          WORKSPACE=workspace))
+    return brief
+
+
 def spawn(conn, key, now):
     """Register the scout, write its brief, open its workspace, start omp on it, subscribe it as a scout, record it."""
     from . import swarm
@@ -747,12 +759,10 @@ def spawn(conn, key, now):
     name = swarm.call("create_agent_identity", {
         "project_key": key, "program": swarm.PROGRAM, "model": r["model"],
         "task_description": f"Swarm scout, queen {r['queen']}"})["name"]
-    brief = swarm.brief_dir(key) / f"{swarm.kebab(name)}.md"
-    brief.parent.mkdir(parents=True, exist_ok=True)
     label = f"{SCOUT_MARK} {db.label(r)} · scout"
-    brief.write_text(fill(BRIEF_TEMPLATE.read_text(), S=name, KEY=key, QUEEN=r["queen"], LABEL=label))
     pane_id, ws = swarm.open_workspace(label, r["cwd"] or os.getcwd())
     swarm.bind_pane(pane_id, name, key)  # before omp starts: its first poll already finds the file
+    brief = write_brief(key, name, r["queen"], label, ws)
     swarm._ok(swarm.herdr("pane", "run", pane_id, f"{swarm.PROGRAM} @{brief}"), "pane run")
     with locked_state() as s:
         s["subscriptions"][pane_id] = {

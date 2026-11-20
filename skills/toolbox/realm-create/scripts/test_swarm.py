@@ -19,6 +19,7 @@ class FakeHerdr:
         self.workspaces = {"w": {"label": "home"}}
         self.tabs = {"w:t0": {"label": "shell", "ws": "w", "panes": ["w:p0"]}}
         self.panes = {"w:p0": {"tab_id": "w:t0", "workspace_id": "w", "agent": "omp", "agent_status": "idle"}}
+        self.alias = {}  # old pane id → new one, as herdr keeps after `pane move`
         self.typed = []
         self.ran = []
         self.n = 0
@@ -69,8 +70,25 @@ class FakeHerdr:
             self._close_tab(args[2])
             return {}
         if cmd == ("pane", "get"):
-            p = self.panes.get(args[2])
-            return {"result": {"pane": {"pane_id": args[2], **p}}} if p else {"error": {"code": "pane_not_found"}}
+            pid = self.alias.get(args[2], args[2])
+            p = self.panes.get(pid)
+            return {"result": {"pane": {"pane_id": pid, **p}}} if p else {"error": {"code": "pane_not_found"}}
+        if cmd == ("pane", "move"):
+            assert "--new-workspace" in args and "--no-focus" in args
+            old = self.alias.get(args[2], args[2])
+            p = self.panes.pop(old)
+            self.tabs[p["tab_id"]]["panes"].remove(old)
+            closed = p["tab_id"] if not self.tabs[p["tab_id"]]["panes"] else None
+            if closed:
+                del self.tabs[closed]
+            self.n += 1
+            ws, tab, new = f"x{self.n}", f"x{self.n}:t1", f"x{self.n}:p1"
+            self.workspaces[ws] = {"label": args[args.index("--label") + 1]}
+            self.tabs[tab] = {"label": "1", "ws": ws, "panes": [new]}
+            self.panes[new] = {**p, "tab_id": tab, "workspace_id": ws}
+            self.alias.update({k: new for k, v in self.alias.items() if v == old}, **{old: new})
+            return {"result": {"move_result": {"pane": {"pane_id": new, "workspace_id": ws},
+                                               "closed_tab_id": closed}}}
         if cmd == ("pane", "run"):
             self.ran.append((args[2], args[3]))
             self.panes[args[2]].update(agent="omp", agent_status="idle")
@@ -174,7 +192,7 @@ class SwarmTest(unittest.TestCase):
         self.assertEqual(self.h.workspaces["x1"]["label"], "🛠️ secret garden · worker-aox")
         text = Path(out["workers"][0]["brief"]).read_text()
         self.assertIn("worker of realm `secret garden`", text)
-        self.assertIn('herdr workspace rename "$HERDR_WORKSPACE_ID" "🛠️ secret garden · worker-aox"', text)
+        self.assertIn('herdr workspace rename x1 "🛠️ secret garden · worker-aox"', text)
         self.assertEqual(swarm.status(self.conn, KEY)["realm"], "secret garden")
         self.assertIn("Realm `secret garden`", db.render_table(self.conn, KEY, False, self.t))
 
@@ -302,12 +320,73 @@ class SwarmTest(unittest.TestCase):
         self.assertIn("w", self.h.workspaces)
         self.assertIn("w:t0", self.h.tabs)
 
+    def test_move_takes_a_tab_era_worker_into_its_own_workspace(self):
+        self.create(size=1)
+        tab, p = self.h.add_tab("w", "🛠️ subject-old")
+        self.h.panes[p].update(agent="omp", agent_status="idle")
+        db.add_worker(self.conn, KEY, "Old", p, tab, None, self.t)
+        swarm.subscribe(p, "Old", KEY, aside=False)
+        ran = list(self.h.ran)
+        out = swarm.move(self.conn, KEY, "Old")
+        new, ws = out["pane"], out["workspace"]
+        self.assertEqual(out["closed_tab"], tab)
+        self.assertNotIn(tab, self.h.tabs)
+        self.assertEqual(self.h.workspaces[ws]["label"], "🛠️ /test/swarm · old")
+        self.assertEqual(self.h.ran, ran)  # nothing restarted: the agent moved live
+        self.assertNotIn(p, self.subs())
+        self.assertEqual(self.subs()[new]["agent"], "Old")
+        w = db.worker_row(self.conn, KEY, "Old", self.t)
+        self.assertEqual((w["pane"], w["workspace"], w["tab"]), (new, ws, None))
+        self.assertIn(f'herdr workspace rename {ws} "', Path(w["brief"]).read_text())
+        self.assertEqual(out["queen_workspace"], "already marked")
+        # The agent keeps its old $HERDR_PANE_ID: verbs run from it still find its realm.
+        self.assertEqual(db.resolve_key(None, p, state.STATE_FILE), KEY)
+        bound, copy = swarm.bind.read(p), swarm.bind.read(new)  # the extension reads the old id, realm the new
+        self.assertEqual({k: bound[k] for k in ("agent", "project", "cursor")}, {"agent": "Old", "project": KEY,
+                                                                               "cursor": copy["cursor"]})
+        self.assertEqual((copy["agent"], copy["project"]), ("Old", KEY))
+        with self.assertRaises(db.Refused):
+            swarm.move(self.conn, KEY, "Old")  # already out of the queen's workspace
+
+    def test_move_refuses_a_busy_worker_and_the_queen(self):
+        self.create(size=1)
+        tab, p = self.h.add_tab("w", "🛠️ subject-busy")
+        db.add_worker(self.conn, KEY, "Busy", p, tab, None, self.t)
+        db.add_subject(self.conn, KEY, "s1", "T", "Busy", None, None, None, self.t)
+        with self.assertRaises(db.Refused):
+            swarm.move(self.conn, KEY, "Busy")
+        self.assertIn(tab, self.h.tabs)
+        db.add_worker(self.conn, KEY, "Fake", "w:p0", "w:t0", None, self.t)
+        with self.assertRaises(db.Refused):
+            swarm.move(self.conn, KEY, "Fake")
+        self.assertIn("w:p0", self.h.panes)
+
+    def test_move_takes_a_tab_era_scout_and_rewrites_its_brief(self):
+        self.create(size=1)
+        tab, p = self.h.add_tab("w", "🔭 scout")
+        self.conn.execute("INSERT INTO scouts (realm, agent, pane, tab, brief, created_ts) VALUES (?,?,?,?,?,?)",
+                          (KEY, "Peek", p, tab, None, self.t))
+        self.conn.commit()
+        with state.locked_state() as s:
+            s["subscriptions"][p] = {"agent": "Peek", "project": KEY, "mode": "prompt", "kind": "scout",
+                                     "cursor": None, "pending": []}
+        out = swarm.move(self.conn, KEY, "Peek")
+        self.assertEqual(self.h.workspaces[out["workspace"]]["label"], "🔭 /test/swarm · scout")
+        self.assertEqual(self.subs()[out["pane"]]["kind"], "scout")
+        row = self.conn.execute("SELECT pane, workspace, tab, brief FROM scouts WHERE realm=?", (KEY,)).fetchone()
+        self.assertEqual((row["pane"], row["workspace"], row["tab"]), (out["pane"], out["workspace"], None))
+        self.assertIn(f'herdr workspace rename {out["workspace"]} "🔭', Path(row["brief"]).read_text())
+
     def test_queen_workspace_left_unmarked_while_tab_era_workers_live_in_it(self):
         tab, p = self.h.add_tab("w", "🛠️ subject-old")
         swarm.subscribe(p, "Old", OTHER, aside=False)
         out = self.create(size=1)
         self.assertEqual(out["queen_workspace"], "left alone: worker tabs still in it")
         self.assertEqual(self.h.workspaces["w"]["label"], "home")
+        db.init_realm(self.conn, OTHER, "Q2", "w:p0", self.t, model="m1", workspace="w", cwd="/cwd")
+        db.add_worker(self.conn, OTHER, "Old", p, tab, None, self.t)
+        self.assertEqual(swarm.move(self.conn, OTHER, "Old")["queen_workspace"], "ok")  # last tab out: 👑
+        self.assertEqual(self.h.workspaces["w"]["label"], "👑 home")
 
     def test_retire_refuses_busy_worker(self):
         self.create(size=1)
