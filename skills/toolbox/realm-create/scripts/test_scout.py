@@ -45,13 +45,13 @@ class Schedule(Base):
 
     def test_day_hourly(self):
         scout.scan_start(self.conn, KEY, T0)
-        scout.scan_end(self.conn, KEY, None, T0, push=lambda *a: "off")
+        scout.scan_end(self.conn, KEY, T0, push=lambda *a: "off")
         self.assertFalse(scout.scan_due(self.conn, KEY, T0 + 3599))
         self.assertTrue(scout.scan_due(self.conn, KEY, T0 + 3600))
 
     def test_night_every_three_hours(self):
         t = paris(2026, 11, 20, 23)
-        scout.scan_end(self.conn, KEY, None, t, push=lambda *a: "off")
+        scout.scan_end(self.conn, KEY, t, push=lambda *a: "off")
         self.assertFalse(scout.scan_due(self.conn, KEY, t + 2 * 3600))
         self.assertTrue(scout.scan_due(self.conn, KEY, t + 3 * 3600))
 
@@ -122,9 +122,45 @@ class Fetch(Base):
             scout.fetch_whatsapp(self.conn, KEY, T0, client=client)
         self.assertEqual({a["after"] for _, a in client.calls}, {int(T0 - scout.BACKFILL_SECONDS)})
 
-    def test_no_allowlist_refused(self):
-        with mock.patch.object(scout, "config", return_value={}), self.assertRaises(Refused):
-            scout.fetch_whatsapp(self.conn, KEY, T0, client=self.client({}))
+    def test_unreadable_source_is_skipped_not_failed(self):
+        with mock.patch.object(scout, "config", return_value={}):
+            out = scout.fetch(self.conn, KEY, "whatsapp", T0, 10)
+        self.assertEqual(out["source"], "whatsapp")
+        self.assertIn("allowlisted", out["skipped"])
+        with mock.patch.object(scout, "secret", side_effect=scout.Skipped("secret X not available")):
+            self.assertIn("not available", scout.fetch(self.conn, KEY, "slack", T0, 10)["skipped"])
+
+    def test_slack_drops_bots_and_pre_cursor_and_pages(self):
+        scout.ack(self.conn, KEY, {"source": "slack", "cursors": {"all": "1000"}, "ids": []}, T0)
+        pages = {1: [{"ts": "999.0", "channel": {"id": "C1"}}, {"ts": "1001.0", "channel": {"id": "C1"}, "text": "hi"},
+                     {"ts": "1002.0", "channel": {"id": "C1"}, "bot_id": "B1"}],
+                 2: [{"ts": "1003.0", "channel": {"id": "C2"}, "text": "yo"}]}
+
+        class Api:
+            def get(self, method, **p):
+                return {"messages": {"matches": pages[p["page"]], "paging": {"pages": 2}}}
+
+        b = scout.fetch_slack(self.conn, KEY, T0, api=Api())
+        self.assertEqual((b["ids"], b["cursors"], b["more"]), (["C1:1001.0", "C2:1003.0"], {"all": "1003.0"}, False))
+
+    def test_gmail_oldest_first_limit_and_cursor(self):
+        import base64
+
+        msgs = {f"m{i}": {"internalDate": str((1000 + i) * 1000), "labelIds": [],
+                          "payload": {"mimeType": "text/plain", "headers": [{"name": "Subject", "value": f"s{i}"}],
+                                      "body": {"data": base64.urlsafe_b64encode(f"body {i}".encode()).decode()}}}
+                for i in range(3)}
+
+        class Api:
+            def get(self, path, **p):
+                if path == "messages":
+                    return {"messages": [{"id": f"m{i}"} for i in (2, 1, 0)]}  # Gmail lists newest first
+                return msgs[path.split("/")[1]]
+
+        b = scout.fetch_gmail(self.conn, KEY, T0, "perso", limit=2, api=Api())
+        self.assertEqual((b["ids"], b["more"], b["cursors"]), (["m0", "m1"], True, {"all": "1001.0"}))
+        self.assertEqual(b["messages"][0]["text"], "body 0")
+        self.assertEqual(b["source"], "gmail-perso")
 
 
 class Proposals(Base):
@@ -141,17 +177,23 @@ class Proposals(Base):
             with self.assertRaises(Refused):
                 scout.propose(self.conn, KEY, [bad], T0)
 
-    def test_scan_end_stamps_mail_and_pushes_titles(self):
+    def test_scan_end_refuses_unmailed_then_pushes_titles(self):
         scout.scan_start(self.conn, KEY, T0)
-        scout.propose(self.conn, KEY, [self.prop()], T0 + 1)
+        pid = scout.propose(self.conn, KEY, [self.prop()], T0 + 1)[0]["id"]
         with self.assertRaises(Refused):
-            scout.scan_end(self.conn, KEY, None, T0 + 2, push=lambda *a: "off")
+            scout.scan_end(self.conn, KEY, T0 + 2, push=lambda *a: "off")
+        scout.mailed(self.conn, KEY, [pid], 77)
         pushes = []
-        out = scout.scan_end(self.conn, KEY, 77, T0 + 2, push=lambda t, m: pushes.append((t, m)) or "sent")
+        out = scout.scan_end(self.conn, KEY, T0 + 2, push=lambda t, m: pushes.append((t, m)) or "sent")
         self.assertEqual(out["pushed"], "sent")
         self.assertEqual(pushes, [("scout: 1 proposal(s)", "P1 task.add Send deck")])
         self.assertEqual(scout.list_proposals(self.conn, KEY)[0]["mail_id"], 77)
         self.assertFalse(scout.scan_due(self.conn, KEY, T0 + 3))
+
+    def test_mailed_other_realm_refused(self):
+        pid = scout.propose(self.conn, KEY, [self.prop()], T0)[0]["id"]
+        with self.assertRaises(Refused):
+            scout.mailed(self.conn, OTHER, [pid], 1)
 
     def test_decide_apply_task(self):
         a, b, c = (scout.propose(self.conn, KEY, [self.prop(ref=r)], T0)[0]["id"] for r in "abc")

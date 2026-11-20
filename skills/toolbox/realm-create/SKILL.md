@@ -123,9 +123,12 @@ scout: the launchd job types `scan` into it every hour from 08:00 to 22:00 and e
 `worker list`. `realm scout show --project <key>` gives its last scan and cursors.
 
 The scout reads Slack, both Gmail accounts, and the WhatsApp/iMessage chats allowlisted in
-`~/.config/realm/scout.json` (private: names contacts, never in a repository). It writes nothing anywhere;
-each calendar or to-do action it finds is a proposal, mailed to you (`[scout-proposals] N new`) and pushed as
-titles to the user's phone (ntfy, same file).
+`~/.config/realm/scout.json` (private: names contacts, never in a repository), all through `realm scout fetch`,
+which reads with read-only credentials: Slack and Gmail keys from `mcp/secrets.sops.yaml` (`SCOUT_SLACK_USER_TOKEN`,
+`SCOUT_GMAIL_CLIENT_ID`, `SCOUT_GMAIL_CLIENT_SECRET`, `SCOUT_GMAIL_WORK_REFRESH_TOKEN`,
+`SCOUT_GMAIL_PERSO_REFRESH_TOKEN`); a missing key skips that source and the scout reports it. It writes nothing
+anywhere; each calendar or to-do action it finds is a proposal, mailed to you per source
+(`[scout-proposals] <source>: N new`) and pushed as titles to the user's phone (ntfy, same file).
 
 **Nothing the scout proposes happens without the user's yes on that exact item.** The user's time is theirs:
 never accept, decline or answer a meeting or a slot for them, approved or not.

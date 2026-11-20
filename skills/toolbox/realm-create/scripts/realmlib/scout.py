@@ -19,6 +19,7 @@ import json
 import os
 import subprocess
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
@@ -30,6 +31,7 @@ from .db import Refused, tx
 from .state import HOME, locked_state, log
 
 CONFIG = Path(os.environ.get("REALM_SCOUT_CONFIG") or HOME / ".config/realm/scout.json")
+SECRETS = Path(os.environ.get("REALM_SCOUT_SECRETS") or HOME / "code/perso/agent-skills/mcp/secrets.sops.yaml")
 MCP_CONFIG = HOME / ".omp/agent/mcp.json"
 SCAN_TEXT = "scan"
 SCOUT_LABEL = "🔭 scout"
@@ -144,26 +146,33 @@ def scan_start(conn, key, now):
     return {"scan_start": db.iso(now)}
 
 
-def scan_end(conn, key, mail_id, now, push=None):
-    """Close a scan: stamp the proposals made since scan start with the mail that carried them, push their
-    titles to the phone, record the scan's end (which the schedule reads)."""
-    s = _scout(conn, key)
-    start = s["scan_start_ts"] or 0
-    new = conn.execute(
-        "SELECT id, action, payload FROM proposals WHERE realm=? AND created_ts>=? AND mail_id IS NULL ORDER BY id",
-        (key, start)).fetchall()
-    if new and mail_id is None:
-        raise Refused(f"{len(new)} new proposal(s) and no --mail-id: send them to the queen first")
+def mailed(conn, key, ids, mail_id):
+    """Record the Agent Mail message that carried these proposals to the queen."""
+    rows = list_proposals(conn, key, ids=ids)
+    missing = sorted(set(ids) - {p["id"] for p in rows})
+    if missing:
+        raise Refused(f"no such proposals in {key}: {missing}")
     with tx(conn):
-        if new:
-            conn.execute(f"UPDATE proposals SET mail_id=? WHERE id IN ({','.join('?' * len(new))})",
-                         (mail_id, *[r["id"] for r in new]))
+        conn.execute(f"UPDATE proposals SET mail_id=? WHERE realm=? AND id IN ({','.join('?' * len(ids))})",
+                     (mail_id, key, *ids))
+    return {"mail_id": mail_id, "proposals": ids}
+
+
+def scan_end(conn, key, now, push=None):
+    """Close a scan: refuse while a proposal made since scan start was never mailed, push the titles of this
+    scan's proposals to the phone, record the scan's end (which the schedule reads)."""
+    s = _scout(conn, key)
+    new = conn.execute("SELECT id, action, payload, mail_id FROM proposals WHERE realm=? AND created_ts>=? ORDER BY id",
+                       (key, s["scan_start_ts"] or 0)).fetchall()
+    unmailed = [r["id"] for r in new if r["mail_id"] is None]
+    if unmailed:
+        raise Refused(f"proposals never mailed to the queen: {unmailed}; mail them, then `proposal mailed`")
+    with tx(conn):
         conn.execute("UPDATE scouts SET scan_end_ts=? WHERE realm=?", (now, key))
     pushed = None
     if new:
-        titles = [title(r["action"], json.loads(r["payload"])) for r in new]
-        pushed = (push or notify)(f"scout: {len(new)} proposal(s)", "\n".join(f"P{r['id']} {t}" for r, t in
-                                                                           zip(new, titles)))
+        lines = [f"P{r['id']} {title(r['action'], json.loads(r['payload']))}" for r in new]
+        pushed = (push or notify)(f"scout: {len(new)} proposal(s)", "\n".join(lines))
     return {"scan_end": db.iso(now), "proposals": [r["id"] for r in new], "pushed": pushed}
 
 
@@ -405,11 +414,161 @@ def _clip(s):
     return s if len(s) <= TEXT_MAX else s[:TEXT_MAX] + "…"
 
 
+class Skipped(Refused):
+    """A source that cannot be read now (missing key, auth refused): reported, never a crash."""
+
+
+def secret(name):
+    """One key from the sops secrets file, decrypted at call time. Missing or undecryptable → Skipped."""
+    p = subprocess.run(["sops", "-d", "--extract", f'["{name}"]', str(SECRETS)], capture_output=True, text=True,
+                       timeout=30)
+    if p.returncode != 0 or not p.stdout.strip():
+        raise Skipped(f"secret {name} not available in {SECRETS}")
+    return p.stdout.strip()
+
+
+def _http_json(url, headers=None, data=None):
+    req = urllib.request.Request(url, data=data, headers={"User-Agent": "realm/1", **(headers or {})})
+    with urllib.request.urlopen(req, timeout=60) as r:
+        return json.loads(r.read())
+
+
+class SlackApi:
+    """Slack Web API with a read-only user token. Only search.messages is used."""
+
+    def __init__(self, token=None):
+        self.token = token or secret("SCOUT_SLACK_USER_TOKEN")
+
+    def get(self, method, **params):
+        d = _http_json(f"https://slack.com/api/{method}?{urllib.parse.urlencode(params)}",
+                       {"Authorization": f"Bearer {self.token}"})
+        if not d.get("ok"):
+            err = d.get("error", "unknown")
+            if err in ("invalid_auth", "not_authed", "token_revoked", "missing_scope", "account_inactive"):
+                raise Skipped(f"slack: {err}")
+            raise RuntimeError(f"slack {method}: {err}")
+        return d
+
+
+def fetch_slack(conn, key, now, limit=None, api=None):
+    """Every message the user can read since the cursor, via search (the user's own index), oldest first.
+
+    search's `after:` filter is day-granular and exclusive of that day, so the query starts the day before the
+    cursor and drops older messages here; `seen` absorbs the overlap.
+    """
+    state = cursors(conn, key, "slack", now)
+    after = float(state["cursors"].get("all", state["default"]))
+    api = api or SlackApi()
+    day = datetime.fromtimestamp(after - 86400, timezone.utc).strftime("%Y-%m-%d")
+    msgs, page, top = [], 1, after
+    while True:
+        d = api.get("search.messages", query=f"after:{day}", sort="timestamp", sort_dir="asc", count=100, page=page)
+        res = d.get("messages") or {}
+        for m in res.get("matches") or []:
+            ts = float(m["ts"])
+            if ts < after or m.get("subtype") == "bot_message" or m.get("bot_id"):
+                continue
+            ch = m.get("channel") or {}
+            top = max(top, ts)
+            msgs.append({"id": f"{ch.get('id')}:{m['ts']}", "scope": "all", "epoch": ts, "chat": ch.get("name"),
+                         "ts": db.iso(ts), "from_me": False, "sender": m.get("username") or m.get("user"),
+                         "kind": "text", "text": _clip(m.get("text")), "permalink": m.get("permalink")})
+        pages = (res.get("paging") or {}).get("pages", 1)
+        if page >= pages or (limit and len(msgs) > limit):
+            more_pages = page < pages
+            break
+        page += 1
+    out = _batch(conn, key, "slack", msgs, {"all": str(top)}, state["first"], limit)
+    out["more"] = out["more"] or more_pages
+    return out
+
+
+class GmailApi:
+    """Gmail REST with a gmail.readonly refresh token; one account."""
+
+    def __init__(self, account, token=None):
+        if token is None:
+            body = urllib.parse.urlencode({
+                "client_id": secret("SCOUT_GMAIL_CLIENT_ID"), "client_secret": secret("SCOUT_GMAIL_CLIENT_SECRET"),
+                "refresh_token": secret(f"SCOUT_GMAIL_{account.upper()}_REFRESH_TOKEN"),
+                "grant_type": "refresh_token"}).encode()
+            try:
+                token = _http_json("https://oauth2.googleapis.com/token", data=body)["access_token"]
+            except urllib.error.HTTPError as e:
+                raise Skipped(f"gmail-{account}: token refresh refused ({e.code})") from e
+        self.token = token
+
+    def get(self, path, **params):
+        return _http_json(f"https://gmail.googleapis.com/gmail/v1/users/me/{path}?{urllib.parse.urlencode(params)}",
+                          {"Authorization": f"Bearer {self.token}"})
+
+
+def _gmail_text(payload):
+    """The first text/plain part, decoded; None when the message has none."""
+    import base64
+
+    stack = [payload]
+    while stack:
+        part = stack.pop(0)
+        if part.get("mimeType") == "text/plain" and (part.get("body") or {}).get("data"):
+            return base64.urlsafe_b64decode(part["body"]["data"] + "==").decode("utf-8", "replace")
+        stack += part.get("parts") or []
+    return None
+
+
+def fetch_gmail(conn, key, now, account, limit=None, api=None):
+    """New mail since the cursor (Promotions and Social skipped), oldest first; nothing is marked read."""
+    source = f"gmail-{account}"
+    state = cursors(conn, key, source, now)
+    after = float(state["cursors"].get("all", state["default"]))
+    api = api or GmailApi(account)
+    ids, page = [], None
+    while True:
+        params = {"q": f"after:{int(after)} -category:promotions -category:social", "maxResults": 500}
+        if page:
+            params["pageToken"] = page
+        d = api.get("messages", **params)
+        ids += [m["id"] for m in d.get("messages") or []]
+        page = d.get("nextPageToken")
+        if not page:
+            break
+    todo = unseen(conn, key, source, ids)
+    msgs, top = [], after
+    # Gmail lists newest first: read the oldest `limit` (+1 to know there is more), the rest comes next fetch.
+    for mid in list(reversed(todo))[: (limit + 1) if limit else None]:
+        m = api.get(f"messages/{mid}", format="full")
+        ts = int(m["internalDate"]) / 1000
+        top = max(top, ts)
+        hdr = {h["name"].lower(): h["value"] for h in (m.get("payload") or {}).get("headers") or []}
+        body = _gmail_text(m.get("payload") or {}) or m.get("snippet")
+        msgs.append({"id": mid, "scope": "all", "epoch": ts, "chat": hdr.get("subject"), "ts": db.iso(ts),
+                     "from_me": "SENT" in (m.get("labelIds") or []), "sender": hdr.get("from"), "kind": "mail",
+                     "text": _clip(body), "permalink": f"https://mail.google.com/mail/u/0/#all/{mid}"})
+    return _batch(conn, key, source, msgs, {"all": str(top)}, state["first"], limit)
+
+
+FETCHERS = {
+    "whatsapp": lambda c, k, n, lim: fetch_whatsapp(c, k, n, lim),
+    "imessage": lambda c, k, n, lim: fetch_imessage(c, k, n, lim),
+    "slack": lambda c, k, n, lim: fetch_slack(c, k, n, lim),
+    "gmail-work": lambda c, k, n, lim: fetch_gmail(c, k, n, "work", lim),
+    "gmail-perso": lambda c, k, n, lim: fetch_gmail(c, k, n, "perso", lim),
+}
+
+
+def fetch(conn, key, source, now, limit):
+    """One source's next batch; an unreadable source answers {source, skipped: reason} instead of failing."""
+    try:
+        return FETCHERS[source](conn, key, now, limit)
+    except Skipped as e:
+        return {"source": source, "skipped": str(e)}
+
+
 def fetch_whatsapp(conn, key, now, limit=None, client=None):
     """New messages in the allowlisted WhatsApp chats since their cursors; nothing is marked read."""
     chats = (config().get("whatsapp") or {}).get("chats") or {}
     if not chats:
-        raise Refused(f"no WhatsApp chats allowlisted in {CONFIG}")
+        raise Skipped(f"no WhatsApp chats allowlisted in {CONFIG}")
     state = cursors(conn, key, "whatsapp", now)
     client = client or Mcp("whatsapp")
     msgs, curs = [], {}
@@ -438,7 +597,7 @@ def fetch_imessage(conn, key, now, limit=None, client=None):
     """New messages in the allowlisted iMessage chats since their cursors; nothing is marked read."""
     chats = (config().get("imessage") or {}).get("chats") or {}
     if not chats:
-        raise Refused(f"no iMessage chats allowlisted in {CONFIG}")
+        raise Skipped(f"no iMessage chats allowlisted in {CONFIG}")
     state = cursors(conn, key, "imessage", now)
     client = client or Mcp("imessage")
     msgs, curs = [], {}
@@ -553,9 +712,8 @@ def register(sub):
     p.set_defaults(fn=run(lambda c, a, now: show(c, a.key, now)))
     p = kp(sc, "scan-start", "record a scan's start")
     p.set_defaults(fn=run(lambda c, a, now: scan_start(c, a.key, now)))
-    p = kp(sc, "scan-end", "record a scan's end; stamps its proposals with the mail that carried them, pushes")
-    p.add_argument("--mail-id", type=int, help="Agent Mail id of the proposal mail (required if any)")
-    p.set_defaults(fn=run(lambda c, a, now: scan_end(c, a.key, a.mail_id, now)))
+    p = kp(sc, "scan-end", "record a scan's end (refused while a proposal of it was never mailed); pushes titles")
+    p.set_defaults(fn=run(lambda c, a, now: scan_end(c, a.key, now)))
     p = kp(sc, "cursor", "a source's cursors (first=true: backfill a month)")
     p.add_argument("--source", required=True, choices=SOURCES)
     p.set_defaults(fn=run(lambda c, a, now: cursors(c, a.key, a.source, now)))
@@ -565,11 +723,10 @@ def register(sub):
     p.set_defaults(fn=run(lambda c, a, now: unseen(c, a.key, a.source, [x for x in a.ids.split(",") if x])))
     p = kp(sc, "ack", "stdin {source, cursors, ids}: mark judged, advance cursors")
     p.set_defaults(fn=run(lambda c, a, now: ack(c, a.key, _stdin_json(), now)))
-    p = kp(sc, "fetch", "new allowlisted messages (whatsapp|imessage), in ack's shape; marks nothing read")
-    p.add_argument("source", choices=("whatsapp", "imessage"))
+    p = kp(sc, "fetch", "a source's next unjudged messages, in ack's shape; marks nothing read")
+    p.add_argument("source", choices=SOURCES)
     p.add_argument("--limit", type=int, default=FETCH_LIMIT, help="oldest N unjudged; more=true means fetch again")
-    p.set_defaults(fn=run(lambda c, a, now: (fetch_whatsapp if a.source == "whatsapp" else fetch_imessage)(
-        c, a.key, now, a.limit)))
+    p.set_defaults(fn=run(lambda c, a, now: fetch(c, a.key, a.source, now, a.limit)))
     p = kp(sc, "propose", "stdin [proposal, …]: record them; duplicates come back flagged")
     p.set_defaults(fn=run(lambda c, a, now: propose(c, a.key, _stdin_json(), now)))
 
@@ -587,6 +744,10 @@ def register(sub):
     p = kp(pr, "apply", "write approved task.add proposals into tasks")
     p.add_argument("--ids", required=True)
     p.set_defaults(fn=run(lambda c, a, now: apply_tasks(c, a.key, _ids(a.ids), now)))
+    p = kp(pr, "mailed", "record the Agent Mail message that carried these proposals to the queen")
+    p.add_argument("--ids", required=True)
+    p.add_argument("--mail-id", type=int, required=True)
+    p.set_defaults(fn=run(lambda c, a, now: mailed(c, a.key, _ids(a.ids), a.mail_id)))
     p = kp(pr, "applied", "a worker executed (or failed) an approved calendar proposal")
     p.add_argument("--id", required=True)
     p.add_argument("--ref", required=True, help="event id, or the failure reason with --failed")
