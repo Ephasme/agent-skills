@@ -8,7 +8,7 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from realmlib import backup, cli, daemon, herdr, mail, state
+from realmlib import backup, bind, cli, daemon, herdr, mail, state, swarm
 from realmlib.mail import MailToolError
 
 
@@ -61,6 +61,7 @@ class Harness(unittest.TestCase):
             (daemon, "scan_due", self.scan_due),
             (daemon, "herdr", self.herdr),
             (backup, "due_backup", lambda now: None),
+            (swarm, "call", lambda tool, args: {"tail_cursor": 700}),
         ):
             patcher = mock.patch.object(module, target, value)
             patcher.start()
@@ -161,6 +162,19 @@ class WakeTest(Harness):
         self.mail.read.add(101)
         self.tick()
         self.assertEqual(self.tokens[-1], ("wC:p1", "mail"))
+
+    def test_subscribe_binds_every_pane_the_queen_aside_included_and_unsubscribe_unbinds(self):
+        """realm-wake wakes a bound pane with an aside, never typed: the queen's pane is bound like a worker's."""
+        self.subscribe("wC:p1", aside=True)
+        self.subscribe("wC:p2")
+        self.assertEqual({k: bind.read("wC:p1")[k] for k in ("agent", "project", "cursor")},
+                         {"agent": "W", "project": "/p", "cursor": 700})
+        self.assertIsNotNone(bind.read("wC:p2"))
+        self.mail.deliver(101)
+        self.tick()
+        self.assertEqual(self.typed, ["wC:p2"])  # the tick still never types into the queen's pane
+        cli.cmd_unsubscribe(mock.Mock(pane_id=None, project="/p"))
+        self.assertEqual(list(bind.bind_dir().glob("*")), [])
 
     def test_queen_tab_is_never_typed_into_even_if_subscribed_prompt(self):
         # A state file edited by hand: the queen's pane as a prompt subscriber.

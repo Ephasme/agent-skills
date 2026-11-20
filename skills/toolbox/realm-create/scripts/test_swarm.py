@@ -358,6 +358,8 @@ class SwarmTest(unittest.TestCase):
         self.h.panes[p].update(agent="omp", agent_status="idle")
         db.add_worker(self.conn, KEY, "Old", p, tab, None, self.t)
         swarm.subscribe(p, "Old", KEY, aside=False)
+        bound = swarm.bind.read(p)
+        swarm.bind.path(p).with_suffix(".cursor").write_text('{"id": "c", "cursor": 9}')  # saved by realm-wake
         ran = list(self.h.ran)
         out = swarm.move(self.conn, KEY, "Old")
         new, ws = out["pane"], out["workspace"]
@@ -373,10 +375,10 @@ class SwarmTest(unittest.TestCase):
         self.assertEqual(out["queen_workspace"], "already marked")
         # The agent keeps its old $HERDR_PANE_ID: verbs run from it still find its realm.
         self.assertEqual(db.resolve_key(None, p, state.STATE_FILE), KEY)
-        bound, copy = swarm.bind.read(p), swarm.bind.read(new)  # the extension reads the old id, realm the new
-        self.assertEqual({k: bound[k] for k in ("agent", "project", "cursor")}, {"agent": "Old", "project": KEY,
-                                                                               "cursor": copy["cursor"]})
-        self.assertEqual((copy["agent"], copy["project"]), ("Old", KEY))
+        # realm-wake asks herdr for the moved pane's id: the binding, with its id and saved cursor, moves with it.
+        self.assertIsNone(swarm.bind.read(p))
+        self.assertEqual(swarm.bind.read(new), bound)
+        self.assertEqual(swarm.bind.path(new).with_suffix(".cursor").read_text(), '{"id": "c", "cursor": 9}')
         with self.assertRaises(db.Refused):
             swarm.move(self.conn, KEY, "Old")  # already out of the queen's workspace
 
@@ -483,6 +485,9 @@ class SwarmTest(unittest.TestCase):
         self.assertNotIn("w:p0", subs)
         self.assertEqual(subs["w:p9"]["mode"], "aside")
         self.assertEqual(db.realm_row(self.conn, KEY)["queen_pane"], "w:p9")
+        # The queen's new pane is bound: realm-wake wakes her with an aside, nothing typed.
+        self.assertEqual(swarm.bind.read("w:p9")["agent"], "QueenBee")
+        self.assertIsNone(swarm.bind.read("w:p0"))
         # Tick hook: idle pane gets the re-read prompt once; the working one waits.
         typed = []
         wake = lambda p, mode, text: typed.append((p, text))  # noqa: E731

@@ -353,11 +353,9 @@ def move(conn, key, name):
         sub = subs.pop(old, None) or subs.pop(info["pane_id"], None)
         if sub:
             subs[new] = sub
-    # The realm-wake extension in the moved session still reads the old `$HERDR_PANE_ID`: its bind file stays
-    # under the old id. A copy under the new id keeps lookups by the subscribed pane working.
-    held = bind.read(old) or bind.read(info["pane_id"])
-    if held:
-        bind.write(new, held["agent"], held["project"], held["cursor"])
+    # The moved session keeps its old `$HERDR_PANE_ID`; realm-wake asks herdr for the pane's current id when no
+    # file sits under the old one, so the binding and its saved cursor move to the new id.
+    bind.move(old, new) or bind.move(info["pane_id"], new)
     if scout:
         brief = scout_mod.write_brief(key, name, r["queen"], label, ws)
         sql = "UPDATE scouts SET pane=?, workspace=?, tab=NULL, brief=? WHERE realm=? AND agent=?"

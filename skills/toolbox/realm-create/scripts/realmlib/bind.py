@@ -46,3 +46,19 @@ def remove(pane_ids):
         if p:
             path(p).unlink(missing_ok=True)
             path(p).with_suffix(".cursor").unlink(missing_ok=True)
+
+
+def move(old, new):
+    """Carry a binding to the pane's new id after `herdr pane move`, keeping its id and saved cursor.
+
+    The extension resolves its pane through herdr on every poll, so after a move it reads the new id; the same
+    binding id lets it keep the cursor it saved under the old one. Returns the binding, None when old had none."""
+    held = read(old)
+    if held is None:
+        return None
+    target = path(new)
+    for suffix in (".cursor", ".json"):  # the cursor first: the binding never lands without the cursor beside it
+        src = path(old).with_suffix(suffix)
+        if src.exists():
+            src.replace(target.with_suffix(suffix))
+    return held

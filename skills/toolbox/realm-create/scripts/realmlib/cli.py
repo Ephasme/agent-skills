@@ -36,6 +36,8 @@ def cmd_subscribe(a):
             "wake_text": a.wake_text,
             "last_scan_wake": old.get("last_scan_wake", 0),
         }
+    # The realm-wake extension wakes every bound pane with an aside, the queen's included: it never types.
+    swarm.bind_pane(a.pane_id, a.agent, a.project)
     if a.wake_text != WAKE_TEXT:
         kind += f" wake_text={a.wake_text!r}"
     log(f"subscribed {a.pane_id} agent={a.agent} project={a.project} mode={mode} kind={kind}")
@@ -49,6 +51,7 @@ def cmd_unsubscribe(a):
         gone = [p for p, v in subs.items() if p == a.pane_id or (a.project and v["project"] == a.project)]
         for p in gone:
             del subs[p]
+    swarm.bind.remove(gone)
     for p in gone:
         log(f"unsubscribed {p}")
     if not gone:
