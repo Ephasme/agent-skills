@@ -508,20 +508,35 @@ def _http_json(url, headers=None, data=None):
 
 
 class SlackApi:
-    """Slack Web API with a read-only user token. Only search.messages is used."""
+    """Slack Web API with a read-only user token: search.messages, and auth.test for the user's own id."""
+
+    RETRIES = 5  # search.messages is rate-limited; a 429 carries the wait in Retry-After
 
     def __init__(self, token=None):
         self.token = token or secret("SCOUT_SLACK_USER_TOKEN")
+        self._me = None
 
     def get(self, method, **params):
-        d = _http_json(f"https://slack.com/api/{method}?{urllib.parse.urlencode(params)}",
-                       {"Authorization": f"Bearer {self.token}"})
+        url = f"https://slack.com/api/{method}?{urllib.parse.urlencode(params)}"
+        for attempt in range(self.RETRIES + 1):
+            try:
+                d = _http_json(url, {"Authorization": f"Bearer {self.token}"})
+                break
+            except urllib.error.HTTPError as e:
+                if e.code != 429 or attempt == self.RETRIES:
+                    raise
+                time.sleep(int(e.headers.get("Retry-After") or 30))
         if not d.get("ok"):
             err = d.get("error", "unknown")
             if err in ("invalid_auth", "not_authed", "token_revoked", "missing_scope", "account_inactive"):
                 raise Skipped(f"slack: {err}")
             raise RuntimeError(f"slack {method}: {err}")
         return d
+
+    def me(self):
+        if self._me is None:
+            self._me = self.get("auth.test")["user_id"]
+        return self._me
 
 
 def fetch_slack(conn, key, now, limit=None, api=None):
@@ -545,7 +560,8 @@ def fetch_slack(conn, key, now, limit=None, api=None):
             ch = m.get("channel") or {}
             top = max(top, ts)
             msgs.append({"id": f"{ch.get('id')}:{m['ts']}", "scope": "all", "epoch": ts, "chat": ch.get("name"),
-                         "ts": db.iso(ts), "from_me": False, "sender": m.get("username") or m.get("user"),
+                         "ts": db.iso(ts), "from_me": m.get("user") == api.me(),
+                         "sender": m.get("username") or m.get("user"),
                          "kind": "text", "text": _clip(m.get("text")), "permalink": m.get("permalink")})
         pages = (res.get("paging") or {}).get("pages", 1)
         if page >= pages or (limit and len(msgs) > limit):

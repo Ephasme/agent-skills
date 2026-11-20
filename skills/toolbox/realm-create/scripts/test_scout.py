@@ -150,14 +150,31 @@ class Fetch(Base):
         scout.ack(self.conn, KEY, {"source": "slack", "cursors": {"all": "1000"}, "ids": [], "proposed": []}, T0)
         pages = {1: [{"ts": "999.0", "channel": {"id": "C1"}}, {"ts": "1001.0", "channel": {"id": "C1"}, "text": "hi"},
                      {"ts": "1002.0", "channel": {"id": "C1"}, "bot_id": "B1"}],
-                 2: [{"ts": "1003.0", "channel": {"id": "C2"}, "text": "yo"}]}
+                 2: [{"ts": "1003.0", "channel": {"id": "C2"}, "text": "yo", "user": "U_ME"}]}
 
         class Api:
             def get(self, method, **p):
                 return {"messages": {"matches": pages[p["page"]], "paging": {"pages": 2}}}
 
+            def me(self):
+                return "U_ME"
+
         b = scout.fetch_slack(self.conn, KEY, T0, api=Api())
         self.assertEqual((b["ids"], b["cursors"], b["more"]), (["C1:1001.0", "C2:1003.0"], {"all": "1003.0"}, False))
+        self.assertEqual([m["from_me"] for m in b["messages"]], [False, True])
+
+    def test_slack_waits_out_rate_limit(self):
+        import io
+        import urllib.error
+
+        limited = urllib.error.HTTPError("u", 429, "Too Many Requests", {"Retry-After": "7"}, io.BytesIO())
+        with mock.patch.object(scout, "_http_json", side_effect=[limited, {"ok": True, "x": 1}]), \
+                mock.patch.object(scout.time, "sleep") as sleep:
+            self.assertEqual(scout.SlackApi(token="t").get("search.messages")["x"], 1)
+        sleep.assert_called_once_with(7)
+        with mock.patch.object(scout, "_http_json", side_effect=limited), mock.patch.object(scout.time, "sleep"):
+            with self.assertRaises(urllib.error.HTTPError):
+                scout.SlackApi(token="t").get("search.messages")
 
     def test_gmail_oldest_first_limit_and_cursor(self):
         import base64

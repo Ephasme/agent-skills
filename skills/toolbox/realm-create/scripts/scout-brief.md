@@ -46,7 +46,8 @@ answers JSON.
    - `calendar.update` / `calendar.cancel`, payload `{"calendar", "event_id"?, "title", "start"?, "end"?}`
    Calendar: `work` for Slack and gmail-work, `perso` for WhatsApp, iMessage and gmail-perso. Times you
    cannot pin down → lower confidence and say so in `why`, or make it a `task.add`. One action per need; don't
-   propose what the user plainly already did.
+   propose what the user plainly already did. A message keeps one proposal per action: several to-dos in one
+   message go in one `task.add`, its title naming them all and its `notes` listing them.
 5. `realm scout ack` for each batch, stdin = `{source, cursors, ids, proposed}`: `ids` all judged ids,
    `proposed` the ids you made proposals from (`[]` when none). It refuses until those proposals are recorded:
    propose first, ack second.
