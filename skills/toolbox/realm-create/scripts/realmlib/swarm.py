@@ -189,13 +189,16 @@ def create(conn, key, size, model, workspace, cwd, queen_pane, queen_tab, name=N
     return {"queen": queen, "inbox": session.get("inbox", []), "workers": workers, **joined}
 
 
-def retire(conn, key, name):
-    """Scale in one idle worker: unsubscribe, close its tab, retire it in Agent Mail, delete its brief."""
+def retire(conn, key, name, park=False):
+    """Scale in one worker: unsubscribe, close its tab, retire it in Agent Mail, delete its brief.
+
+    Refused while it holds a subject, unless park: its open subjects are set paused and stay on it, for the record.
+    """
     w = db.worker_row(conn, key, name, now())
     if w["retired"]:
         raise Refused(f"{name} is already retired")
-    if not w["idle"]:
-        raise Refused(f"{name} still holds {w['open_subjects']}: reassign or close them first")
+    if not w["idle"] and not park:
+        raise Refused(f"{name} still holds {w['open_subjects']}: reassign or close them first, or pass --park")
     steps = {}
     unsubscribe([w["pane"]])
     steps["unsubscribe"] = "ok"
@@ -213,8 +216,13 @@ def retire(conn, key, name):
     if w["brief"]:
         Path(w["brief"]).unlink(missing_ok=True)
     steps["brief"] = "deleted"
-    db.retire_worker(conn, key, name, now())
-    return {"name": name, "steps": steps}
+    parked = []
+    for s in db.list_subjects(conn, key):
+        if s["worker"] == name and s["state"] in ("queued", "assigned", "blocked"):
+            db.set_state(conn, key, s["slug"], "paused", None, None, now())
+            parked.append(s["slug"])
+    db.retire_worker(conn, key, name, now(), keep_subjects=park)
+    return {"name": name, "steps": steps, "parked": parked}
 
 
 def status(conn, key):
@@ -401,7 +409,8 @@ def register(sub):
 
     p = db.keyed_parser(sub, "retire", "scale in: unsubscribe, close tab, retire_agent, delete brief")
     p.add_argument("--name", required=True)
-    p.set_defaults(fn=db.run_verb(lambda c, a, t: retire(c, a.key, a.name)))
+    p.add_argument("--park", action="store_true", help="retire anyway: its open subjects become paused")
+    p.set_defaults(fn=db.run_verb(lambda c, a, t: retire(c, a.key, a.name, a.park)))
 
     p = db.keyed_parser(sub, "status", "worker map: db, subscriptions and herdr panes")
     p.set_defaults(fn=db.run_verb(lambda c, a, t: status(c, a.key)))

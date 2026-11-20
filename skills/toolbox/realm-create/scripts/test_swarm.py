@@ -212,6 +212,20 @@ class SwarmTest(unittest.TestCase):
             swarm.retire(self.conn, KEY, "WorkerAox")
         self.assertIn("w:t1", self.h.tabs)
 
+    def test_retire_park_pauses_open_subjects_and_retires(self):
+        self.create(size=1)
+        swarm.dispatch(self.conn, KEY, "WorkerAox", "s1", "t", "b")
+        db.set_state(self.conn, KEY, "s1", "blocked", "needs token", None, self.t)
+        swarm.dispatch(self.conn, KEY, "WorkerAox", "s2", "t", "b", after="s1")
+        res = swarm.retire(self.conn, KEY, "WorkerAox", park=True)
+        self.assertEqual(sorted(res["parked"]), ["s1", "s2"])
+        self.assertEqual(self.m.retired, ["WorkerAox"])
+        self.assertNotIn("w:t1", self.h.tabs)
+        subjects = {s["slug"]: s for s in db.list_subjects(self.conn, KEY)}
+        self.assertEqual({s["state"] for s in subjects.values()}, {"paused"})
+        self.assertEqual(subjects["s1"]["status"], "needs token")
+        self.assertEqual(db.list_workers(self.conn, KEY, self.t), [])
+
     def test_stop_is_scoped_to_the_key(self):
         self.create(size=1)
         swarm.create(self.conn, OTHER, 1, "m1", "w", "/cwd", "w:p0", "w:t0")  # same queen pane, other realm

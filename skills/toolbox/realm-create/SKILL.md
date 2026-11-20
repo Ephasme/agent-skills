@@ -119,10 +119,10 @@ No upper bound on workers.
   `assigned`, `blocked` or `paused` subject, and nothing changed for it for 30 min):
   `realm retire --project <key> --name <W>`. It unsubscribes the pane, closes the tab, retires the agent in
   Agent Mail and deletes the brief; each step's outcome is in `steps`. Its subjects stay in the db.
-- A worker holding an `assigned` or `blocked` subject is never retired on your own initiative. On the user's word,
-  first move each of its subjects off it (`realm subject set-state … --state done`, or `realm subject assign` to
-  another worker plus a mail in the thread), then `realm retire`. Never close its tab or call `retire_agent` by
-  hand.
+- A worker holding a subject is never retired on your own initiative. On the user's word:
+  `realm retire --project <key> --name <W> --park`; its `queued`, `assigned` and `blocked` subjects become
+  `paused` (listed in `parked`; name them in your answer) and it retires anyway. Never close its tab or call
+  `retire_agent` by hand.
 
 ## The scout
 
