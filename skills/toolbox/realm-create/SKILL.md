@@ -55,8 +55,8 @@ session's turn on each new mail, as an aside: nothing is typed. Re-briefs and th
 - records the realm in realm's db with your model, workspace and the realm repository (`spare-cycles/realm` at
   `~/code/perso/realm` or `$REALM_REPO`; refused before anything else when it is missing or another repo): every
   worker and the scout start there, whatever directory you run this from;
-- per worker: registers it, writes its brief (`briefs/brief.md` of the realm repository, filled) to
-  `~/.local/state/realm/briefs/<key>/<w>.md`, opens its own top-level workspace `🛠️ <name> · <w>` (unfocused, in
+- per worker: registers it, writes its brief (`src/realm/briefs/brief.md` of the realm repository, filled) to
+  `$REALM_STATE_DIR/briefs/<key-slug>/<w>.md`, opens its own top-level workspace `🛠️ <name> · <w>` (unfocused, in
   the realm repository), binds its pane, starts `omp @<brief>` in it, records it;
 - waits up to 60 s for each worker to join.
 
@@ -138,7 +138,7 @@ No upper bound on workers.
 ## The scout
 
 Optional, one per realm, only when the user asks for it: `realm scout spawn --project <key>`. It registers an
-agent, writes its brief (`briefs/scout-brief.md` of the realm repository, filled), opens its own
+agent, writes its brief (`src/realm/briefs/scout-brief.md` of the realm repository, filled), opens its own
 `🔭 <name> · scout` workspace and binds its pane. A queue job mails it `[scan]` every hour from 08:00 to 22:00
 and every three hours otherwise (Europe/Paris); its realm-wake wakes it on that mail as on any other. It is not
 a worker: never dispatch a subject to it, it never shows in `worker list`. `realm scout show --project <key>`
