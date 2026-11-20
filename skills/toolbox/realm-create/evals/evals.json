@@ -332,27 +332,38 @@
           "[{\"name\": \"BlueOwl\", \"pane\": \"wC8:p3\", \"tab\": \"wC8:t3\", \"open_subjects\": \"ci:blocked\", \"idle\": false}]"
         ],
         [
+          "realm(\\.py)?\\s+retire\\b.*--park",
+          "{\"name\": \"BlueOwl\", \"steps\": {\"unsubscribe\": \"ok\", \"tab_close\": \"ok\", \"retire_agent\": \"ok\", \"brief\": \"deleted\"}, \"parked\": [\"ci\"]}"
+        ],
+        [
           "realm(\\.py)?\\s+retire",
-          "{\"error\": \"BlueOwl still holds ci:blocked: reassign or close them first\"}"
+          "{\"error\": \"BlueOwl still holds ci:blocked: reassign or close them first, or pass --park\"}"
         ]
       ],
-      "expected_output": "A worker holding a blocked subject is never removed outright: the queen first parks or closes the subject on the user's word (set-state paused/done) and only then retires, or explains and asks. Never closes the tab by hand.",
+      "expected_output": "On the user's word the queen retires BlueOwl with `realm retire --park` (ci becomes paused) and names ci in the reply. Never closes the tab or calls retire_agent by hand; never a plain retire first.",
       "expectations": [
-        "No herdr tab close",
-        "No retire while 'ci' is still blocked: set-state first, or a question to the user",
-        "Reply names the blocked subject"
+        "realm retire --park for BlueOwl",
+        "No herdr tab close or retire_agent by hand",
+        "No plain retire (without --park) attempted",
+        "Reply names the parked subject ci"
       ],
       "checks": [
         {
-          "no_call": {
+          "call": {
             "tool": "bash",
-            "match": "tab close"
+            "match": "realm(\\.py)?\\s+retire\\b.*--name\\s+BlueOwl.*--park|realm(\\.py)?\\s+retire\\b.*--park.*BlueOwl"
           }
         },
         {
           "no_call": {
             "tool": "bash",
-            "match": "retire_agent|unsubscribe"
+            "match": "tab close|retire_agent|unsubscribe"
+          }
+        },
+        {
+          "no_call": {
+            "tool": "bash",
+            "match": "realm(\\.py)?\\s+retire\\b(?![^\\n;&|]*--park)"
           }
         },
         {
