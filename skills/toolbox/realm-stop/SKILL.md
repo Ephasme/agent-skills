@@ -40,6 +40,9 @@ reported, never retried blindly.
 - Delete `${TMPDIR:-/tmp}/swarm/`, the briefs realm-create wrote.
 - Your own tab keeps its `👑 queen` label; nothing renames it.
 - Agent Mail: leave the workers registered; their message history stays readable.
+- realm's db keeps the realm's subjects and history. Record the closed workers, with the same `realm.py`:
+  `subject list --key <key>`, `subject set-state … --state paused` on each one not `done`, then
+  `worker retire --key <key> --name <W>` per closed tab, so `table --key <key>` shows no live worker.
 
 ## 4. Report
 

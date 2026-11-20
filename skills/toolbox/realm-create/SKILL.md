@@ -46,6 +46,8 @@ subscription says. Start it, then subscribe yourself in aside mode only:
 
 1. `launchctl print "gui/$(id -u)/com.loup.realm"` fails: `realm install`.
 2. `realm subscribe "$HERDR_PANE_ID" --agent <QUEEN> --project <key> --aside`.
+3. `realm init --key <key> --queen <QUEEN> --pane "$HERDR_PANE_ID"`: records the realm in realm's SQLite db,
+   which holds the subject table from now on.
 
 ## 2. Register the workers
 
@@ -62,14 +64,15 @@ For each worker name `W` (`w` = its kebab-case form: `SapphireSwan` → `sapphir
 
 1. Write the brief below to `${TMPDIR:-/tmp}/swarm/<w>.md`, placeholders filled.
 2. `herdr tab create --workspace "$HERDR_WORKSPACE_ID" --cwd "$PWD" --label "🛠️ subject-<w>" --no-focus`; keep
-   `result.root_pane.pane_id` as the worker's pane.
+   `result.root_pane.pane_id` as the worker's pane and `result.tab.tab_id` as its tab.
 3. `herdr pane run <pane> "omp @${TMPDIR:-/tmp}/swarm/<w>.md"`. The brief travels as a file, so no shell
    quoting of the prompt.
 4. `realm subscribe <pane> --agent <W> --project <key>`.
+5. `realm worker add --key <key> --name <W> --pane <pane> --tab <tab_id> --brief ${TMPDIR:-/tmp}/swarm/<w>.md`.
 
-Then confirm every worker joined: `list_agents` on `<key>` shows each `W` with a fresh `last_active_ts`, or
-`herdr pane read <pane>` shows its connection answer. A worker that has not joined after ~60 s: report it to the
-user with its pane, do not relaunch blindly.
+Then confirm every worker joined: `realm sync --key <key>` and `realm worker list --key <key>` shows `joined` set,
+or `herdr pane read <pane>` shows its connection answer. A worker that has not joined after ~60 s: report it to
+the user with its pane, do not relaunch blindly.
 
 Brief (`<W>`, `<w>`, `<KEY>`, `<QUEEN>`):
 
@@ -104,27 +107,30 @@ Until the user ends the swarm:
 - **Every word costs $10,000.** No preamble, restating, recap. Fragments.
 
 **Subject:** one self-contained unit of work, one kebab-case slug, one mail thread, one worker until done.
-States: `queued` → `assigned` ⇄ `blocked` → `done`.
+States: `queued` → `assigned` ⇄ `blocked` → `done`, and `paused` when the user parks one.
 
-**Table:** per subject: slug, worker, pane, state, time of last state change. Shown only on a state change or
-when asked.
+**Table:** lives in realm's db, never in your head. Every state change goes through `realm subject` the moment
+you decide it; `realm table --key <key>` prints it (`--all` adds done subjects, `--json` for workers and
+history). Shown only on a state change or when asked. All `realm subject`/`worker` verbs answer JSON;
+`{"error": …}` with exit 1 means nothing changed.
 
 Each turn, in order:
 
-1. `fetch_inbox` for `QUEEN` (unread_only, include_bodies). Never poll or wait: realm's aside tells the user mail
-   landed, and their next prompt runs this turn.
-2. Each reply sets its subject `done` or `blocked`; a `blocked` question goes to the user. It also turns that
-   worker's next `queued` subject `assigned`. To answer or redirect a worker, write in its thread:
-   `reply_message` to the worker's message, or `send_message` with `to: [<W>]` and the `thread_id`. Never
-   `reply_message` to your own message: it comes back to you.
+1. `fetch_inbox` for `QUEEN` (unread_only, include_bodies), then `realm sync --key <key>`. Never poll or wait:
+   realm's aside tells the user mail landed, and their next prompt runs this turn. `sync` records joins, each
+   subject's thread and latest worker reply (`· reply` in the table), and turns a `queued` subject `assigned`
+   once the subject it waits for is replied to. It never decides done or blocked.
+2. Each reply: `realm subject set-state --key <key> --slug <slug> --state done|blocked --status "<a few
+   words>"`; a `blocked` question goes to the user. To answer or redirect a worker, write in its thread:
+   `reply_message` to the worker's message, or `send_message` with `to: [<W>]` and the `thread_id`, then
+   `set-state … --state assigned`. Never `reply_message` to your own message: it comes back to you.
 3. Apply [Scaling the realm](#scaling-the-realm). Act; never report "no change".
 4. Split new requests into subjects. Before assigning each, apply [Scaling the realm](#scaling-the-realm), then
-   give it to an idle worker, else queue it. `send_message` from `QUEEN`: `subject: [<slug>] <title>`,
-   `topic: <slug>`, body = goal, files or links, what done means, what is not allowed. Then:
-   - **Nudge** when urgent or the worker is idle: `herdr pane send-text <pane> "check your mail"`, then
-     `herdr pane send-keys <pane> enter`.
-   - **Queue** otherwise: no nudge; body starts `queued: start after <current-slug>`. Safe because realm types
-     into a worker pane only when it is idle with unread mail.
+   give it to an idle worker (`realm worker list --key <key> --idle`), else queue it. `send_message` from
+   `QUEEN`: `subject: [<slug>] <title>`, `topic: <slug>`, body = goal, files or links, what done means, what is
+   not allowed. Then `realm subject add --key <key> --slug <slug> --title "<title>" --worker <W>
+   --thread-id <id>`, with `--after <current-slug>` when queued. A queued body starts
+   `queued: start after <current-slug>`. Never wake the worker yourself: realm does it once its pane is idle.
 5. Answer the user.
 
 A worker that stops answering: `herdr pane read <pane>` before deciding anything.
@@ -133,18 +139,19 @@ A worker that stops answering: `herdr pane read <pane>` before deciding anything
 
 No upper bound on workers.
 
-- **Out:** no worker is idle. Queue instead when the subject must follow a current one, or is not urgent and a
-  worker frees soon. Otherwise run steps 2 and 3 for one new worker.
-- **In:** a worker holding no `queued`, `assigned` or `blocked` subject, with no state change (or, never used,
-  no join) for 30 min. In order:
+- **Out:** `realm worker list --key <key> --idle` is empty. Queue instead when the subject must follow a current
+  one, or is not urgent and a worker frees soon. Otherwise run steps 2 and 3 for one new worker.
+- **In:** each worker `realm worker list --key <key> --scale-in` returns: it holds no `queued`, `assigned`,
+  `blocked` or `paused` subject, and nothing changed for it (state, join, registration) for 30 min. In order:
   1. `realm unsubscribe <pane>`.
   2. `herdr tab close <tab_id>` (tab from `herdr pane get <pane>`); `herdr tab list` confirms it is gone.
   3. `macro_start_session` (`human_key: <key>`, `agent_name: <W>`, `program: "omp"`) returns
      `agent.registration_token`; pass it to `retire_agent` (`agent_name: <W>`, `project_key: <key>`). Never show
      the token.
   4. Delete `${TMPDIR:-/tmp}/swarm/<w>.md`.
+  5. `realm worker retire --key <key> --name <W>`.
 
-  Its rows stay in the table.
+  Its subjects stay in the db.
 
 ## Ending the swarm
 

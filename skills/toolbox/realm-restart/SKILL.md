@@ -4,8 +4,8 @@ description: >-
   Makes the current session the queen of a realm that is already running:
   reloads realm-create's queen instructions, resumes the old queen's Agent
   Mail identity by name, re-subscribes this pane to realm in aside mode,
-  re-injects the current brief into each worker once it is idle, rebuilds the
-  subject table from mail, then runs the queen loop. Use after the queen's omp
+  re-injects the current brief into each worker once it is idle, reloads the
+  subject table from realm's SQLite db, then runs the queen loop. Use after the queen's omp
   session died or when continuing a live realm from a new session. Invoked as
   `/realm-restart KEY`, e.g. `/realm-restart /laptop/general`.
 compatibility: >-
@@ -53,14 +53,17 @@ If the old queen's session may still be alive (recent `last_active_ts`, a `👑`
 ## 4. Rebuild the worker map
 
 - `realm list`: the rows for `<key>` give pane → agent, mode and last wake.
+- `realm worker list --key <key>`: the workers the db holds, with pane, tab and brief.
 - `herdr tab list --workspace "$HERDR_WORKSPACE_ID"` and `herdr pane get <pane>`: each `🛠️ subject-*` tab, its
-  pane, `agent` and `agent_status`.
+  pane, `agent` and `agent_status`. A pane that moved: `realm worker add --key <key> --name <W> --pane <pane>
+  --tab <tab>` updates it.
 
 ## 5. Re-subscribe this pane
 
 The old queen's row in `realm list` has a pane id. If it differs from `$HERDR_PANE_ID`:
 `realm unsubscribe <old pane>`. Then `realm subscribe "$HERDR_PANE_ID" --agent <QUEEN> --project <key> --aside`,
-and check `realm list` shows it in `aside` mode.
+and check `realm list` shows it in `aside` mode. Then `realm init --key <key> --queen <QUEEN> --pane
+"$HERDR_PANE_ID"`: it keeps every subject and worker, and records the new pane.
 
 ## 6. Re-inject each worker's brief
 
@@ -80,21 +83,29 @@ Workers launched under an older realm-create run an older brief. For each worker
      (`realm unsubscribe <pane>`), only on the user's word.
 3. Confirm each re-injected worker answered: `herdr pane read <pane>` shows it read the file.
 
-## 7. Rebuild the subject table
+## 7. Reload the subject table
 
-1. The queen's subjects: `search_messages` on `<key>` with `sender: <QUEEN>`, `limit: 1000`, and a query of common
-   words such as `a OR the OR to` (a bare `*` matches nothing). Keep messages with a `topic` and a `[<slug>]`
-   subject; `topic` is the slug, the first recipient is the worker.
-2. Per slug, `fetch_topic` (`include_bodies: true`) and sort by `created_ts`. The last message sets the state:
-   - from the queen, body starting `queued:` → `queued`; any other queen message → `assigned`;
-   - from the worker → `done`, or `blocked` when it asks a question or names a blocker.
-3. A `queued` subject whose worker's pane is `working` after the previous subject's reply is `assigned`, per the
-   subject-table rule in realm-create "Be the queen".
+`realm sync --key <key>`, then `realm table --key <key>`. The db survived the old session: every subject, its
+worker, state, status and history are already there. `sync` brings in what happened while no queen ran: joins,
+threads, replies (`· reply`), queued subjects released by a reply. Decide each `· reply` with `realm subject
+set-state`, as in realm-create "Be the queen".
 
-Show the table: slug, worker, pane, state, time of the last message, and `brief pending` where step 6 deferred.
-Unread mail from step 3's inbox goes beside it.
+`realm worker list --key <key> --all` is empty: the realm predates the db. Rebuild it once:
+
+1. `realm worker add` per worker from step 4.
+2. `search_messages` on `<key>` with `sender: <QUEEN>`, `limit: 1000`, and a query of common words such as
+   `a OR the OR to` (a bare `*` matches nothing). Keep messages with a `topic` and a `[<slug>]` subject; `topic`
+   is the slug, the first recipient is the worker.
+3. Per slug, `realm subject add --key <key> --slug <slug> --worker <W>`, plus `--after <slug it names>` when the
+   last queen message's body starts `queued:`. Then `fetch_topic` (`include_bodies: true`) sorted by
+   `created_ts`: when the last message is the worker's, `set-state` `done`, or `blocked` when it asks a
+   question or names a blocker.
+4. `realm sync --key <key>` again: it fills threads and replies.
+
+Show the table, with `brief pending` named beside it where step 6 deferred. Unread mail from step 3's inbox goes
+beside it.
 
 ## 8. Be the queen
 
 Act as realm-create "Be the queen" and every section after it, which you read in step 2, with this `QUEEN`, this
-pane and the table above. Each turn, first re-inject any `brief pending` worker that has gone idle.
+pane and the db. Each turn, first re-inject any `brief pending` worker that has gone idle.

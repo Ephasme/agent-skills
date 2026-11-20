@@ -5,6 +5,7 @@ import sys
 import time
 
 from . import __doc__ as PACKAGE_DOC
+from . import db
 from .daemon import cmd_tick
 from .herdr import is_queen_pane, pane_info
 from .launchd import LABEL, cmd_install, cmd_uninstall
@@ -81,5 +82,6 @@ def main():
         ("uninstall", cmd_uninstall, f"unload and remove the {LABEL} LaunchAgent"),
     ):
         sub.add_parser(name, help=h).set_defaults(fn=fn)
+    db.register(sub)
     a = ap.parse_args()
     a.fn(a)
