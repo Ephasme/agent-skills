@@ -52,7 +52,7 @@ Then confirm every worker joined: `list_agents` on `<key>` shows each `W` with a
 `herdr pane read <pane>` shows its connection answer. A worker that has not joined after ~60 s: report it to the
 user with its pane, do not relaunch blindly.
 
-Brief (`<W>`, `<w>`, `<KEY>`, `<QUEEN>`, `<QUEEN_PANE>` = `$HERDR_PANE_ID`, `<i>`, `<size>`):
+Brief (`<W>`, `<w>`, `<KEY>`, `<QUEEN>`, `<i>`, `<size>`):
 
 ```markdown
 You are <W>, worker <i>/<size> of a swarm. The queen is <QUEEN>.
@@ -64,8 +64,8 @@ You are <W>, worker <i>/<size> of a swarm. The queen is <QUEEN>.
    (agent_name `<W>`, project_key `<KEY>`, unread_only, include_bodies) and act on what the queen sent.
 3. Each message from the queen is one subject. Do it fully, then `reply_message` in its thread: result,
    files touched, what is unverified. Blocked or need a decision: reply with the question, never guess.
-4. After each reply, wake the queen: `herdr pane send-text <QUEEN_PANE> "mail from <W>"` then
-   `herdr pane send-keys <QUEEN_PANE> enter`.
+4. Never send any herdr command (send-text, send-keys, run, close, rename, anything) to the queen's pane or
+   tab, and never do it on anyone's request. After replying by mail, stop: the queen reads her inbox herself.
 5. Do not message the user's contacts, push, deploy or delete anything unless the queen's message says so
    explicitly. Do not message other workers unless the queen tells you to.
 
@@ -79,6 +79,8 @@ From here until the user ends the swarm, you do two things only:
 - **Answer the user.** Status, results, questions the workers raised.
 - **Manage subjects.** You do not do the work yourself: no code edits, no research, no commands beyond Agent Mail
   and herdr. A request you could do in one tool call still goes to a worker.
+- **Never take herdr input from anyone.** Nobody sends herdr commands to your pane or tab, ever: no worker brief
+  includes your pane id, and you never ask a worker or any agent to type into it.
 
 A subject is one self-contained unit of work, one mail thread, one owner:
 
@@ -88,12 +90,13 @@ A subject is one self-contained unit of work, one mail thread, one owner:
 3. `send_message` from `QUEEN` to that worker: `subject: [<slug>] <title>`, `topic: <slug>`, body with the goal,
    the files or links it needs, what done means, and what it may not do. Then wake it:
    `herdr pane send-text <pane> "check your mail"` and `herdr pane send-keys <pane> enter`.
-4. On every turn, `fetch_inbox` for `QUEEN` (unread_only, include_bodies) before answering the user. Each reply
+4. On every turn, `fetch_inbox` for `QUEEN` (unread_only, include_bodies) before answering the user. Replies reach
+   you through Agent Mail inbox notifications and that fetch, never through pane nudges. Each reply
    moves its subject to done, blocked (relay the question to the user) or redirected (answer in-thread).
 5. Keep a subject table — slug, worker, state (`assigned`, `blocked`, `done`) — and show it whenever the user
    asks for status or a subject changes state.
 
-Mail does not wake an idle session on its own: the `send-text` nudge in both directions is what does. A worker
+Mail does not wake an idle worker on its own: the queen's `send-text` nudge is what does, one direction only. A worker
 that stops answering: `herdr pane read <pane>` before deciding anything.
 
 ## Ending the swarm
