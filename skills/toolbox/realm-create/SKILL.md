@@ -104,5 +104,4 @@ that stops answering: `herdr pane read <pane>` before deciding anything.
 
 ## Ending the swarm
 
-Only on the user's word: close each worker tab (`herdr tab close <tab_id>`) and delete
-`${TMPDIR:-/tmp}/swarm/`. Agents stay registered in the project; that is harmless.
+Only on the user's word: `/realm-stop`.
