@@ -1,12 +1,12 @@
 ---
-name: swarm-start
+name: realm-create
 description: >-
   Starts an agent swarm on Agent Mail: connects the current session as the
   queen under a project key, registers N worker agents, opens one herdr tab per
   worker running a fresh omp session that joins the same project, then runs the
   queen loop — answer the user, split work into subjects, dispatch each subject
-  to a worker by mail, track it to done. Invoked as `/swarm-start KEY SIZE`,
-  e.g. `/swarm-start /laptop/general 3`.
+  to a worker by mail, track it to done. Invoked as `/realm-create KEY SIZE`,
+  e.g. `/realm-create /laptop/general 3`.
 compatibility: >-
   Requires herdr (tabs, pane run/send-text), the omp CLI, and an Agent Mail MCP
   server exposing macro_start_session, create_agent_identity, send_message,
@@ -14,7 +14,7 @@ compatibility: >-
 disable-model-invocation: true
 ---
 
-# Swarm start
+# Realm create
 
 **Explicit invocation only.** It launches `<size>` long-lived agent sessions; never start one on a guess.
 
@@ -43,7 +43,7 @@ Do not request or forward `registration_token`; the worker resumes by name.
 For each worker name `W` (`w` = its kebab-case form: `SapphireSwan` → `sapphire-swan`):
 
 1. Write the brief below to `${TMPDIR:-/tmp}/swarm/<w>.md`, placeholders filled.
-2. `herdr tab create --workspace "$HERDR_WORKSPACE_ID" --cwd "$PWD" --label "🛠️ worker-<w>" --no-focus`; keep
+2. `herdr tab create --workspace "$HERDR_WORKSPACE_ID" --cwd "$PWD" --label "🛠️ subject-<w>" --no-focus`; keep
    `result.root_pane.pane_id` as the worker's pane.
 3. `herdr pane run <pane> "omp @${TMPDIR:-/tmp}/swarm/<w>.md"`. The brief travels as a file, so no shell
    quoting of the prompt.
@@ -57,7 +57,7 @@ Brief (`<W>`, `<w>`, `<KEY>`, `<QUEEN>`, `<QUEEN_PANE>` = `$HERDR_PANE_ID`, `<i>
 ```markdown
 You are <W>, worker <i>/<size> of a swarm. The queen is <QUEEN>.
 
-0. First, before anything else: `herdr tab rename "$HERDR_TAB_ID" "🛠️ worker-<w>"`.
+0. First, before anything else: `herdr tab rename "$HERDR_TAB_ID" "🛠️ subject-<w>"`.
 1. Connect to Agent Mail: `macro_start_session` with human_key `<KEY>`, agent_name `<W>`, program `omp`.
    You are already registered as <W>; never take another name.
 2. Your work comes only from the queen, by mail. Whenever you are told to check mail, `fetch_inbox`
