@@ -15,7 +15,7 @@
       "bash": [
         [
           "realm(\\.py)?\\s+restart",
-          "{\"queen\": \"FrostyCedar\", \"inbox\": [], \"brief_pending\": [\"BeigePanther\", \"LilacHare\"], \"started\": [], \"pane_gone\": [], \"sync\": [], \"table\": \"Realm `/cs/general`, queen FrostyCedar\\n\\n| slug | worker | pane | state | since | status |\\n|---|---|---|---|---|---|\\n| session-01a1f3b6 | BeigePanther | wBS:pH | assigned \\u00b7 reply | 15:0x |  |\\n| realm-wake | LilacHare | wBS:pJ | assigned \\u00b7 reply | 15:0x |  |\\n| docker-clean | IcyPuma | wBS:pM | assigned \\u00b7 reply | 15:0x |  |\\n| disk-full | CreamRobin | wBS:pK | assigned \\u00b7 reply | 15:0x |  |\\n| overlord-close-done | IcyPuma | wBS:pM | assigned \\u00b7 reply | 15:0x |  |\\n| queen-no-prompt | BeigePanther | wBS:pH | assigned \\u00b7 reply | 15:0x |  |\\n| overlord-deploy | LilacHare | wBS:pJ | assigned \\u00b7 reply | 15:0x |  |\\n| realm-scale | BeigePanther | wBS:pH | assigned \\u00b7 reply | 15:0x |  |\\n| realm-queue | BeigePanther | wBS:pH | assigned \\u00b7 reply | 15:0x |  |\\n| realm-restart | CreamRobin | wBS:pK | assigned | 15:0x |  |\\n| agent-skills-push | BeigePanther | wBS:pH | assigned \\u00b7 reply | 15:0x |  |\"}"
+          "{\"queen\": \"FrostyCedar\", \"inbox\": [], \"rebriefed\": [\"BeigePanther\", \"LilacHare\"], \"started\": [], \"pane_gone\": [], \"sync\": [], \"table\": \"Realm `/cs/general`, queen FrostyCedar\\n\\n| slug | worker | pane | state | since | status |\\n|---|---|---|---|---|---|\\n| session-01a1f3b6 | BeigePanther | wBS:pH | assigned \\u00b7 reply | 15:0x |  |\\n| realm-wake | LilacHare | wBS:pJ | assigned \\u00b7 reply | 15:0x |  |\\n| docker-clean | IcyPuma | wBS:pM | assigned \\u00b7 reply | 15:0x |  |\\n| disk-full | CreamRobin | wBS:pK | assigned \\u00b7 reply | 15:0x |  |\\n| overlord-close-done | IcyPuma | wBS:pM | assigned \\u00b7 reply | 15:0x |  |\\n| queen-no-prompt | BeigePanther | wBS:pH | assigned \\u00b7 reply | 15:0x |  |\\n| overlord-deploy | LilacHare | wBS:pJ | assigned \\u00b7 reply | 15:0x |  |\\n| realm-scale | BeigePanther | wBS:pH | assigned \\u00b7 reply | 15:0x |  |\\n| realm-queue | BeigePanther | wBS:pH | assigned \\u00b7 reply | 15:0x |  |\\n| realm-restart | CreamRobin | wBS:pK | assigned | 15:0x |  |\\n| agent-skills-push | BeigePanther | wBS:pH | assigned \\u00b7 reply | 15:0x |  |\"}"
         ]
       ],
       "topics": {
@@ -510,7 +510,7 @@
         ],
         [
           "realm(\\.py)?\\s+restart.*--force",
-          "{\"queen\": \"FrostyCedar\", \"inbox\": [], \"brief_pending\": [\"BeigePanther\", \"LilacHare\"], \"started\": [], \"pane_gone\": [], \"sync\": [], \"table\": \"Realm `/cs/general`, queen FrostyCedar\\n\\n| slug | worker | pane | state | since | status |\\n|---|---|---|---|---|---|\\n| session-01a1f3b6 | BeigePanther | wBS:pH | assigned \\u00b7 reply | 15:0x |  |\\n| realm-wake | LilacHare | wBS:pJ | assigned \\u00b7 reply | 15:0x |  |\\n| docker-clean | IcyPuma | wBS:pM | assigned \\u00b7 reply | 15:0x |  |\\n| disk-full | CreamRobin | wBS:pK | assigned \\u00b7 reply | 15:0x |  |\\n| overlord-close-done | IcyPuma | wBS:pM | assigned \\u00b7 reply | 15:0x |  |\\n| queen-no-prompt | BeigePanther | wBS:pH | assigned \\u00b7 reply | 15:0x |  |\\n| overlord-deploy | LilacHare | wBS:pJ | assigned \\u00b7 reply | 15:0x |  |\\n| realm-scale | BeigePanther | wBS:pH | assigned \\u00b7 reply | 15:0x |  |\\n| realm-queue | BeigePanther | wBS:pH | assigned \\u00b7 reply | 15:0x |  |\\n| realm-restart | CreamRobin | wBS:pK | assigned | 15:0x |  |\\n| agent-skills-push | BeigePanther | wBS:pH | assigned \\u00b7 reply | 15:0x |  |\"}"
+          "{\"queen\": \"FrostyCedar\", \"inbox\": [], \"rebriefed\": [\"BeigePanther\", \"LilacHare\"], \"started\": [], \"pane_gone\": [], \"sync\": [], \"table\": \"Realm `/cs/general`, queen FrostyCedar\\n\\n| slug | worker | pane | state | since | status |\\n|---|---|---|---|---|---|\\n| session-01a1f3b6 | BeigePanther | wBS:pH | assigned \\u00b7 reply | 15:0x |  |\\n| realm-wake | LilacHare | wBS:pJ | assigned \\u00b7 reply | 15:0x |  |\\n| docker-clean | IcyPuma | wBS:pM | assigned \\u00b7 reply | 15:0x |  |\\n| disk-full | CreamRobin | wBS:pK | assigned \\u00b7 reply | 15:0x |  |\\n| overlord-close-done | IcyPuma | wBS:pM | assigned \\u00b7 reply | 15:0x |  |\\n| queen-no-prompt | BeigePanther | wBS:pH | assigned \\u00b7 reply | 15:0x |  |\\n| overlord-deploy | LilacHare | wBS:pJ | assigned \\u00b7 reply | 15:0x |  |\\n| realm-scale | BeigePanther | wBS:pH | assigned \\u00b7 reply | 15:0x |  |\\n| realm-queue | BeigePanther | wBS:pH | assigned \\u00b7 reply | 15:0x |  |\\n| realm-restart | CreamRobin | wBS:pK | assigned | 15:0x |  |\\n| agent-skills-push | BeigePanther | wBS:pH | assigned \\u00b7 reply | 15:0x |  |\"}"
         ]
       ],
       "expected_output": "`realm restart` answers needs (exit 2): the old queen may be alive in tab wBS:t1. The queen tells the user and asks; it does not rerun with --force on its own.",
@@ -557,11 +557,11 @@
           "[\"/cs/general\", \"/perso/realm\"]"
         ],
         [
-          "realm(\\.py)?\\s+list",
-          "wBS:pG\tFrostyCedar\t/cs/general\taside\nwC8:p1\tRubyGorge\t/perso/realm\taside"
+          "realm(\\.py)?\\s+status",
+          "{\"queen\": {\"pane\": \"wBS:pG\", \"bound\": true}, \"workers\": {}}"
         ]
       ],
-      "expected_output": "No key: lists the realms (realm realms / realm list), asks which one, starts nothing.",
+      "expected_output": "No key: lists the realms (realm realms), asks which one, starts nothing.",
       "expectations": [
         "No realm restart",
         "Asks which realm, naming /cs/general and /perso/realm"

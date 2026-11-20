@@ -45,7 +45,7 @@
       "bash": [
         [
           "realm(\\.py)?\\s+stop",
-          "{\"closed\": [{\"agent\": \"AmberFox\", \"tab\": \"wC8:t2\"}], \"failed\": [{\"agent\": \"BlueOwl\", \"tab\": \"wC8:t3\", \"error\": \"still open\"}], \"unsubscribed\": [\"wC8:p1\", \"wC8:p2\", \"wC8:p3\"], \"briefs_deleted\": \"/tmp/swarm/test-r\"}"
+          "{\"closed\": [{\"agent\": \"AmberFox\", \"workspace\": \"wC9\"}], \"failed\": [{\"agent\": \"BlueOwl\", \"workspace\": \"wCA\", \"error\": \"still open\"}], \"unbound\": [\"wC8:p1\", \"wC8:p2\", \"wC8:p3\"], \"briefs_deleted\": \"~/.local/state/realm/briefs/test-r\"}"
         ]
       ],
       "expected_output": "One `realm stop --project /test/r`; reports AmberFox closed and BlueOwl failed (still open) without retrying blindly; never touches /test/other or its tab wC8:t7.",
