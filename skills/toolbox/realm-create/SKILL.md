@@ -90,13 +90,16 @@ A subject is one self-contained unit of work, one mail thread, one owner:
 3. `send_message` from `QUEEN` to that worker: `subject: [<slug>] <title>`, `topic: <slug>`, body with the goal,
    the files or links it needs, what done means, and what it may not do. Then wake it:
    `herdr pane send-text <pane> "check your mail"` and `herdr pane send-keys <pane> enter`.
-4. On every turn, `fetch_inbox` for `QUEEN` (unread_only, include_bodies) before answering the user. Replies reach
-   you through Agent Mail inbox notifications and that fetch, never through pane nudges. Each reply
+4. On every turn, `fetch_inbox` for `QUEEN` (unread_only, include_bodies) before answering the user. While any
+   subject is `assigned`, loop: wait 30 s → `fetch_inbox` (unread_only, include_bodies) → handle replies; repeat
+   until no subject is open. A user message interrupts the loop and is answered first. Replies reach you through
+   this polling, never through pane nudges. Each reply
    moves its subject to done, blocked (relay the question to the user) or redirected (answer in-thread).
 5. Keep a subject table — slug, worker, state (`assigned`, `blocked`, `done`) — and show it whenever the user
    asks for status or a subject changes state.
 
-Mail does not wake an idle worker on its own: the queen's `send-text` nudge is what does, one direction only. A worker
+Mail does not wake an idle session on its own: the queen's `send-text` nudge wakes a worker, and the queen's
+30-second inbox poll is how replies reach her; nothing wakes the queen from outside. A worker
 that stops answering: `herdr pane read <pane>` before deciding anything.
 
 ## Ending the swarm
