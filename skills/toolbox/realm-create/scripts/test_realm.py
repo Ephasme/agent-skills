@@ -8,7 +8,7 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from realmlib import cli, daemon, herdr, mail, state
+from realmlib import backup, cli, daemon, herdr, mail, state
 from realmlib.mail import MailToolError
 
 
@@ -60,6 +60,7 @@ class Harness(unittest.TestCase):
             (daemon, "clock", lambda: self.now),
             (daemon, "scan_due", self.scan_due),
             (daemon, "herdr", self.herdr),
+            (backup, "due_backup", lambda now: None),
         ):
             patcher = mock.patch.object(module, target, value)
             patcher.start()

@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from realmlib import daemon, db, herdr, mail, queen_signal, state
+from realmlib import backup, daemon, db, herdr, mail, queen_signal, state
 from realmlib.db import Refused
 
 KEY = "/test/realm"
@@ -38,6 +38,7 @@ class SignalTest(unittest.TestCase):
             (mail, "mail_endpoint", lambda: ("http://mail", {})),
             (mail, "fetch_events", lambda *_a: ([], 0)),
             (mail, "unread_ids", lambda *_a: set(self.unread)),
+            (backup, "due_backup", lambda now: None),
         ):
             patcher = mock.patch.object(module, target, value)
             patcher.start()

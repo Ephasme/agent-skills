@@ -86,6 +86,10 @@ def cmd_tick(_a):
                             log(f"{pane} ({v['agent']}): inbox read, signals cleared")
                 except (OSError, urllib.error.URLError, RuntimeError, KeyError, ValueError) as e:
                     log(f"{pane} ({v['agent']}): signal clear failed: {e}")
+    # Outside the state lock: a backup reads state.json itself and may wait on an ssh timeout.
+    from .backup import due_backup
+
+    due_backup(clock())
 
 
 def scan_due(key, now):
