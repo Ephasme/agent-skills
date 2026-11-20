@@ -51,12 +51,67 @@ class Schema(Base):
         with self.assertRaises(sqlite3.IntegrityError):
             self.conn.execute("UPDATE subjects SET state='bogus'")
 
-    def test_realms_are_isolated(self):
-        db.init_realm(self.conn, "/other", "Q2", None, T0)
-        db.add_worker(self.conn, "/other", "Ann", "p9", None, None, T0)
-        db.add_subject(self.conn, "/other", "s", "", "Ann", None, None, None, T0)
-        self.assertEqual(db.list_subjects(self.conn, KEY), [])
-        self.assertEqual(self.worker("Ann", T0)["pane"], "p1")
+
+class Isolation(Base):
+    """Two realms in one db, with the same worker name and the same slug: neither sees the other."""
+
+    OTHER = "/other/realm"
+
+    def setUp(self):
+        super().setUp()
+        db.init_realm(self.conn, self.OTHER, "Queen2", "q0", T0)
+        db.add_worker(self.conn, self.OTHER, "Ann", "p9", "t9", None, T0)
+        db.add_subject(self.conn, self.OTHER, "s", "theirs", "Ann", None, None, "B", T0)
+        db.add_subject(self.conn, KEY, "s", "ours", "Ann", None, None, "A", T0)
+
+    def other(self):
+        return (db.list_subjects(self.conn, self.OTHER), db.list_workers(self.conn, self.OTHER, T0 + 9999, True),
+                db.show_subject(self.conn, self.OTHER, "s")["history"], db.realm_row(self.conn, self.OTHER))
+
+    def test_every_verb_on_a_leaves_b_untouched(self):
+        before = self.other()
+        db.init_realm(self.conn, KEY, "QueenX", "p00", T0 + 1)
+        db.add_worker(self.conn, KEY, "Ann", "p11", None, None, T0 + 1)
+        db.set_state(self.conn, KEY, "s", "blocked", "stuck", "77", T0 + 2)
+        db.assign_subject(self.conn, KEY, "s", "Bob", None, T0 + 3)
+        db.add_subject(self.conn, KEY, "t", "", "Ann", "s", None, None, T0 + 4)
+        db.set_state(self.conn, KEY, "t", "done", None, None, T0 + 5)
+        db.retire_worker(self.conn, KEY, "Ann", T0 + 6)
+        mail = FakeMail()
+        mail.agents = [{"name": "Ann", "inception_ts": iso(T0), "last_active_ts": iso(T0 + 50)}]
+        mail.msg("s", 1, "QueenX", "[s] go", T0)
+        mail.msg("s", 2, "Bob", "Re: [s] go", T0 + 8, thread="1")
+        db.sync(self.conn, KEY, T0 + 9, mail)
+        self.assertEqual(self.other(), before)
+
+    def test_reads_are_scoped(self):
+        self.assertEqual([s["title"] for s in db.list_subjects(self.conn, KEY)], ["ours"])
+        self.assertEqual(db.subject_row(self.conn, KEY, "s")["pane"], "p1")
+        self.assertEqual(db.subject_row(self.conn, self.OTHER, "s")["pane"], "p9")
+        self.assertNotIn("p9", db.render_table(self.conn, KEY, True, T0))
+        self.assertEqual([w["name"] for w in db.list_workers(self.conn, self.OTHER, T0)], ["Ann"])
+        self.assertEqual(db.list_realms(self.conn), [self.OTHER, KEY])
+
+    def test_unknown_key_refused(self):
+        with self.assertRaises(db.Refused):
+            db.list_subjects(self.conn, "/nope")
+
+
+class ResolveKey(unittest.TestCase):
+    def test_project_then_subscription_then_refuse(self):
+        with tempfile.TemporaryDirectory() as d:
+            state = Path(d) / "state.json"
+            state.write_text('{"subscriptions": {"wX:p1": {"project": "/from/pane"}}}')
+            self.assertEqual(db.resolve_key("/explicit", "wX:p1", state), "/explicit")
+            self.assertEqual(db.resolve_key(None, "wX:p1", state), "/from/pane")
+            for pane in ("wX:p2", None):
+                with self.assertRaises(db.Refused):
+                    env = os.environ.pop("HERDR_PANE_ID", None)
+                    try:
+                        db.resolve_key(None, pane, state)
+                    finally:
+                        if env is not None:
+                            os.environ["HERDR_PANE_ID"] = env
 
 
 class Subjects(Base):
@@ -232,12 +287,15 @@ class Cli(unittest.TestCase):
                 self.assertEqual(p.returncode == 0, ok, p.stdout + p.stderr)
                 return p.stdout
 
-            run("init", "--key", KEY, "--queen", "Queen", "--pane", "p0")
-            run("worker", "add", "--key", KEY, "--name", "Ann", "--pane", "p1")
-            run("subject", "add", "--key", KEY, "--slug", "a", "--worker", "Ann", "--status", "go")
-            run("subject", "set-state", "--key", KEY, "--slug", "a", "--state", "nope", ok=False)
-            self.assertIn('"error"', run("subject", "show", "--key", KEY, "--slug", "zz", ok=False))
-            self.assertIn("| a | Ann | p1 | assigned |", run("table", "--key", KEY))
+            run("init", "--project", KEY, "--queen", "Queen", "--pane", "p0")
+            run("worker", "add", "--project", KEY, "--name", "Ann", "--pane", "p1")
+            run("subject", "add", "--project", KEY, "--slug", "a", "--worker", "Ann", "--status", "go")
+            run("subject", "set-state", "--project", KEY, "--slug", "a", "--state", "nope", ok=False)
+            self.assertIn('"error"', run("subject", "show", "--project", KEY, "--slug", "zz", ok=False))
+            self.assertIn("| a | Ann | p1 | assigned |", run("table", "--project", KEY))
+            env.pop("HERDR_PANE_ID", None)
+            self.assertIn("no realm key", run("table", ok=False))
+            self.assertIn(KEY, run("realms"))
 
 
 if __name__ == "__main__":

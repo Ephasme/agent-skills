@@ -41,8 +41,8 @@ reported, never retried blindly.
 - Your own tab keeps its `👑 queen` label; nothing renames it.
 - Agent Mail: leave the workers registered; their message history stays readable.
 - realm's db keeps the realm's subjects and history. Record the closed workers, with the same `realm.py`:
-  `subject list --key <key>`, `subject set-state … --state paused` on each one not `done`, then
-  `worker retire --key <key> --name <W>` per closed tab, so `table --key <key>` shows no live worker.
+  `subject list --project <key>`, `subject set-state … --state paused` on each one not `done`, then
+  `worker retire --project <key> --name <W>` per closed tab, so `table --project <key>` shows no live worker.
 
 ## 4. Report
 

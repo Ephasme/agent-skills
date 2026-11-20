@@ -53,16 +53,16 @@ If the old queen's session may still be alive (recent `last_active_ts`, a `👑`
 ## 4. Rebuild the worker map
 
 - `realm list`: the rows for `<key>` give pane → agent, mode and last wake.
-- `realm worker list --key <key>`: the workers the db holds, with pane, tab and brief.
+- `realm worker list --project <key>`: the workers the db holds, with pane, tab and brief.
 - `herdr tab list --workspace "$HERDR_WORKSPACE_ID"` and `herdr pane get <pane>`: each `🛠️ subject-*` tab, its
-  pane, `agent` and `agent_status`. A pane that moved: `realm worker add --key <key> --name <W> --pane <pane>
+  pane, `agent` and `agent_status`. A pane that moved: `realm worker add --project <key> --name <W> --pane <pane>
   --tab <tab>` updates it.
 
 ## 5. Re-subscribe this pane
 
 The old queen's row in `realm list` has a pane id. If it differs from `$HERDR_PANE_ID`:
 `realm unsubscribe <old pane>`. Then `realm subscribe "$HERDR_PANE_ID" --agent <QUEEN> --project <key> --aside`,
-and check `realm list` shows it in `aside` mode. Then `realm init --key <key> --queen <QUEEN> --pane
+and check `realm list` shows it in `aside` mode. Then `realm init --project <key> --queen <QUEEN> --pane
 "$HERDR_PANE_ID"`: it keeps every subject and worker, and records the new pane.
 
 ## 6. Re-inject each worker's brief
@@ -85,22 +85,22 @@ Workers launched under an older realm-create run an older brief. For each worker
 
 ## 7. Reload the subject table
 
-`realm sync --key <key>`, then `realm table --key <key>`. The db survived the old session: every subject, its
+`realm sync --project <key>`, then `realm table --project <key>`. The db survived the old session: every subject, its
 worker, state, status and history are already there. `sync` brings in what happened while no queen ran: joins,
 threads, replies (`· reply`), queued subjects released by a reply. Decide each `· reply` with `realm subject
 set-state`, as in realm-create "Be the queen".
 
-`realm worker list --key <key> --all` is empty: the realm predates the db. Rebuild it once:
+`realm worker list --project <key> --all` is empty: the realm predates the db. Rebuild it once:
 
 1. `realm worker add` per worker from step 4.
 2. `search_messages` on `<key>` with `sender: <QUEEN>`, `limit: 1000`, and a query of common words such as
    `a OR the OR to` (a bare `*` matches nothing). Keep messages with a `topic` and a `[<slug>]` subject; `topic`
    is the slug, the first recipient is the worker.
-3. Per slug, `realm subject add --key <key> --slug <slug> --worker <W>`, plus `--after <slug it names>` when the
+3. Per slug, `realm subject add --project <key> --slug <slug> --worker <W>`, plus `--after <slug it names>` when the
    last queen message's body starts `queued:`. Then `fetch_topic` (`include_bodies: true`) sorted by
    `created_ts`: when the last message is the worker's, `set-state` `done`, or `blocked` when it asks a
    question or names a blocker.
-4. `realm sync --key <key>` again: it fills threads and replies.
+4. `realm sync --project <key>` again: it fills threads and replies.
 
 Show the table, with `brief pending` named beside it where step 6 deferred. Unread mail from step 3's inbox goes
 beside it.

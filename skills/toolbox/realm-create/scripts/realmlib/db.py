@@ -16,6 +16,7 @@ from contextlib import closing
 from pathlib import Path
 
 from .mail import mail_endpoint
+from .state import STATE_DIR, STATE_FILE
 
 STATES = ("queued", "assigned", "blocked", "paused", "done")
 # A worker holding a subject in one of these states is busy: never idle, never a scale-in candidate.
@@ -102,7 +103,7 @@ class Refused(Exception):
 
 
 def db_path():
-    return Path(os.environ.get("REALM_DB") or Path.home() / ".local/state/realm/realm.db")
+    return Path(os.environ.get("REALM_DB") or STATE_DIR / "realm.db")
 
 
 def connect(path=None):
@@ -446,9 +447,34 @@ def _emit(obj):
     print(json.dumps(obj, indent=2, ensure_ascii=False))
 
 
-def _run(fn):
+def resolve_key(project, pane=None, state_file=None):
+    """The realm key a verb acts on: --project, else the project of the caller's pane subscription.
+
+    No default and no guessing: neither given → Refused. A realm never reads another key's rows.
+    """
+    if project:
+        return project
+    pane = pane or os.environ.get("HERDR_PANE_ID")
+    if pane:
+        try:
+            subs = json.loads(Path(state_file or STATE_FILE).read_text()).get("subscriptions", {})
+        except FileNotFoundError:
+            subs = {}
+        if pane in subs:
+            return subs[pane]["project"]
+    raise Refused("no realm key: pass --project <key>, or run from a pane subscribed to realm")
+
+
+def list_realms(conn):
+    """Admin listing: the keys only, never their rows."""
+    return [r["key"] for r in conn.execute("SELECT key FROM realms ORDER BY key")]
+
+
+def _run(fn, keyed=True):
     def handler(a):
         try:
+            if keyed:
+                a.key = resolve_key(a.project)
             with closing(connect()) as conn:
                 out = fn(conn, a, time.time())
         except Refused as e:
@@ -461,25 +487,31 @@ def _run(fn):
     return handler
 
 
-def register(sub):
-    """Add the db verbs to realm's argparse subparsers."""
+def _parser(sub, name, help):
+    p = sub.add_parser(name, help=help)
+    p.add_argument("--project", help="Agent Mail project key; default: the project of $HERDR_PANE_ID's subscription")
+    return p
 
-    p = sub.add_parser("init", help="db: record a realm and its queen (idempotent)")
-    p.add_argument("--key", required=True)
+
+def register(sub):
+    """Add the db verbs to realm's argparse subparsers. Each one acts on exactly one realm key."""
+
+    p = sub.add_parser("realms", help="db: list realm keys (admin; keys only)")
+    p.set_defaults(fn=_run(lambda c, a, now: list_realms(c), keyed=False))
+
+    p = _parser(sub, "init", "db: record a realm and its queen (idempotent)")
     p.add_argument("--queen", required=True)
     p.add_argument("--pane", help="queen pane id")
     p.set_defaults(fn=_run(lambda c, a, now: init_realm(c, a.key, a.queen, a.pane, now)))
 
     w = sub.add_parser("worker", help="db: workers").add_subparsers(dest="wcmd", required=True)
-    p = w.add_parser("add", help="record or update a worker (clears retired)")
-    p.add_argument("--key", required=True)
+    p = _parser(w, "add", "record or update a worker (clears retired)")
     p.add_argument("--name", required=True)
     p.add_argument("--pane")
     p.add_argument("--tab")
     p.add_argument("--brief")
     p.set_defaults(fn=_run(lambda c, a, now: add_worker(c, a.key, a.name, a.pane, a.tab, a.brief, now)))
-    p = w.add_parser("list", help="workers with idle and scale_in flags")
-    p.add_argument("--key", required=True)
+    p = _parser(w, "list", "workers with idle and scale_in flags")
     p.add_argument("--all", action="store_true", help="include retired")
     p.add_argument("--idle", action="store_true", help="idle workers only")
     p.add_argument("--scale-in", action="store_true", help="scale-in candidates only")
@@ -487,14 +519,12 @@ def register(sub):
         x for x in list_workers(c, a.key, now, a.all)
         if (not a.idle or x["idle"]) and (not a.scale_in or x["scale_in"])
     ]))
-    p = w.add_parser("retire", help="mark a worker retired in the db (refused while it holds a subject)")
-    p.add_argument("--key", required=True)
+    p = _parser(w, "retire", "mark a worker retired in the db (refused while it holds a subject)")
     p.add_argument("--name", required=True)
     p.set_defaults(fn=_run(lambda c, a, now: retire_worker(c, a.key, a.name, now)))
 
     s = sub.add_parser("subject", help="db: subjects").add_subparsers(dest="scmd", required=True)
-    p = s.add_parser("add", help="new subject: assigned with --worker, queued with --after or no worker")
-    p.add_argument("--key", required=True)
+    p = _parser(s, "add", "new subject: assigned with --worker, queued with --after or no worker")
     p.add_argument("--slug", required=True)
     p.add_argument("--title", default="")
     p.add_argument("--worker")
@@ -503,31 +533,26 @@ def register(sub):
     p.add_argument("--status")
     p.set_defaults(fn=_run(lambda c, a, now: add_subject(
         c, a.key, a.slug, a.title, a.worker, a.after, a.thread_id, a.status, now)))
-    p = s.add_parser("assign", help="give a subject to a worker: state assigned")
-    p.add_argument("--key", required=True)
+    p = _parser(s, "assign", "give a subject to a worker: state assigned")
     p.add_argument("--slug", required=True)
     p.add_argument("--worker", required=True)
     p.add_argument("--thread-id")
     p.set_defaults(fn=_run(lambda c, a, now: assign_subject(c, a.key, a.slug, a.worker, a.thread_id, now)))
-    p = s.add_parser("set-state", help="queen sets state and/or status text")
-    p.add_argument("--key", required=True)
+    p = _parser(s, "set-state", "queen sets state and/or status text")
     p.add_argument("--slug", required=True)
     p.add_argument("--state", required=True, choices=STATES)
     p.add_argument("--status", help="short status text; omitted keeps the current one")
     p.add_argument("--thread-id")
     p.set_defaults(fn=_run(lambda c, a, now: set_state(
         c, a.key, a.slug, a.state, a.status, a.thread_id, now)))
-    p = s.add_parser("list", help="subjects, open first")
-    p.add_argument("--key", required=True)
+    p = _parser(s, "list", "subjects, open first")
     p.add_argument("--state", action="append", choices=STATES)
     p.set_defaults(fn=_run(lambda c, a, now: list_subjects(c, a.key, a.state)))
-    p = s.add_parser("show", help="one subject with its state history")
-    p.add_argument("--key", required=True)
+    p = _parser(s, "show", "one subject with its state history")
     p.add_argument("--slug", required=True)
     p.set_defaults(fn=_run(lambda c, a, now: show_subject(c, a.key, a.slug)))
 
-    p = sub.add_parser("table", help="db: the subject table as markdown (or --json)")
-    p.add_argument("--key", required=True)
+    p = _parser(sub, "table", "db: the subject table as markdown (or --json)")
     p.add_argument("--all", action="store_true", help="include done subjects")
     p.add_argument("--json", action="store_true")
     p.set_defaults(fn=_run(lambda c, a, now: {
@@ -536,6 +561,5 @@ def register(sub):
         "workers": list_workers(c, a.key, now),
     } if a.json else render_table(c, a.key, a.all, now)))
 
-    p = sub.add_parser("sync", help="db: apply what Agent Mail proves (joins, threads, replies, queued→assigned)")
-    p.add_argument("--key", required=True)
+    p = _parser(sub, "sync", "db: apply what Agent Mail proves (joins, threads, replies, queued→assigned)")
     p.set_defaults(fn=_run(lambda c, a, now: sync(c, a.key, now, mail_call)))
