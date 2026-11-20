@@ -121,6 +121,20 @@
       "CF-Access-Client-Secret": "${WHATSAPP_CF_ACCESS_CLIENT_SECRET}"
     }
   },
+  "rea": {
+    "type": "stdio",
+    "command": "rea",
+    "args": ["mcp"],
+    "env": {
+      "GHIDRA_INSTALL_DIR": "/opt/homebrew/opt/ghidra/libexec",
+      "JAVA_HOME": "/opt/homebrew/opt/openjdk@25/libexec/openjdk.jdk/Contents/Home"
+    }
+  },
+  "overlord": {
+    "type": "stdio",
+    "command": "docker",
+    "args": ["exec", "-i", "overlord", "overlord", "mcp"]
+  },
   "shadcn": {
     "type": "stdio",
     "command": "npx",
