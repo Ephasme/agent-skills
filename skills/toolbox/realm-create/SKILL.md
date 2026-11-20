@@ -47,9 +47,9 @@ another key's rows.
 Every 15 s a launchd job (`com.loup.realm`) reads each subscribed agent's Agent Mail delivery events. Each new
 mail to a worker gets `check your mail` + Enter typed into its pane once, as soon as the pane is neither
 `working` nor `blocked`, unless the worker read it first. The same job types a pending brief's re-read prompt
-into an idle worker. A pane subscribed with `--aside` is never typed into: unread mail shows only as a `mail`
-token on the pane. realm refuses to type into a pane whose tab or workspace label holds `👑`, whatever its
-subscription says.
+into an idle worker. A pane subscribed with `--aside` is never typed into: unread mail shows as a `mail` token on
+the pane, and the realm-wake omp extension, reading the pane's bind file, starts its session's turn on each new
+mail. realm refuses to type into a pane whose tab or workspace label holds `👑`, whatever its subscription says.
 
 ## 1. Start the realm
 
@@ -81,7 +81,9 @@ Until the user ends the swarm:
   Every worker question goes through you to the user, and the answer back by mail.
 - **Voice.** The answer or the table comes first. No opening status line ("Sure", "Here is", "Checked mail"),
   no restating, no recap, no closing offer ("Let me know…"). Never report an absence ("no new mail", "no
-  change", "nothing to retire"). Fragments. A question to the user goes last, on one line.
+  change", "nothing to retire"). Fragments. No question in the reply: see the next rule.
+- **Ask with the `ask` tool, always.** One form per turn, every pending decision batched in it, your recommended
+  option preselected, plain words and the context needed to decide inside the form.
 
 **Subject:** one self-contained unit of work, one kebab-case slug, one mail thread, one worker until done.
 States: `queued` → `assigned` ⇄ `blocked` → `done`, and `paused` when the user parks one.
@@ -92,10 +94,10 @@ subjects, `--json` for workers and history). Shown only on a state change or whe
 Each turn, in order:
 
 1. `fetch_inbox` for `QUEEN` (unread_only, include_bodies), then `realm sync --project <key>`. Never poll or wait:
-   realm's aside tells the user mail landed, and their next prompt runs this turn. `sync` records joins, each
-   subject's thread and latest worker reply (`· reply` in the table), and turns a `queued` subject `assigned`
-   once the subject it waits for is replied to. It never decides done or blocked. Mail from the scout (topic
-   `scout-proposals`): see [The scout](#the-scout).
+   realm-wake starts this turn by itself when mail reaches `QUEEN`, as does the user's prompt. `sync` records
+   joins, each subject's thread and latest worker reply (`· reply` in the table), and turns a `queued` subject
+   `assigned` once the subject it waits for is replied to. It never decides done or blocked. Mail from the scout
+   (topic `scout-proposals`): see [The scout](#the-scout).
 2. Each reply: `realm subject set-state --project <key> --slug <slug> --state done|blocked --status "<a few
    words>"`; a `blocked` question goes to the user. To answer or redirect a worker, write in its thread:
    `reply_message` to the worker's message, or `send_message` with `to: [<W>]` and the `thread_id`, then
@@ -113,6 +115,11 @@ Each turn, in order:
 
 A worker that stops answering: `realm status --project <key>`, then `herdr pane read <pane>`, before deciding
 anything.
+
+Restarting a worker's omp is your job and keeps its conversation: exit its omp, then in the same pane relaunch
+`omp --resume <session>` (`--restore <session>` if it stopped mid-turn; the path is `agent_session.value` in
+`herdr pane get <pane>`), with `HERDR_PANE_ID`/`HERDR_WORKSPACE_ID` set to the pane's current ids (a moved pane
+keeps stale ones) and its bind file `~/.local/state/realm/bind/<pane>.json` present. Never respawn to restart.
 
 ## Scaling the realm
 
