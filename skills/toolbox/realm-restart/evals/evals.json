@@ -1,0 +1,585 @@
+{
+  "skill_name": "realm-restart",
+  "evals": [
+    {
+      "id": 201,
+      "family": "restart",
+      "prompt": "/realm-restart /cs/general",
+      "context": "This pane is wBS:p9 (tab wBS:t9, workspace wBS). Your model is work/main. You have already read realm-create (appended below).",
+      "also_read": [
+        "realm-create/SKILL.md"
+      ],
+      "files": [
+        "realm-restart/evals/fixtures/cs-general-mail.json"
+      ],
+      "bash": [
+        [
+          "realm(\\.py)?\\s+restart",
+          "{\"queen\": \"FrostyCedar\", \"inbox\": [], \"brief_pending\": [\"BeigePanther\", \"LilacHare\"], \"started\": [], \"pane_gone\": [], \"sync\": [], \"table\": \"Realm `/cs/general`, queen FrostyCedar\\n\\n| slug | worker | pane | state | since | status |\\n|---|---|---|---|---|---|\\n| session-01a1f3b6 | BeigePanther | wBS:pH | assigned \\u00b7 reply | 15:0x |  |\\n| realm-wake | LilacHare | wBS:pJ | assigned \\u00b7 reply | 15:0x |  |\\n| docker-clean | IcyPuma | wBS:pM | assigned \\u00b7 reply | 15:0x |  |\\n| disk-full | CreamRobin | wBS:pK | assigned \\u00b7 reply | 15:0x |  |\\n| overlord-close-done | IcyPuma | wBS:pM | assigned \\u00b7 reply | 15:0x |  |\\n| queen-no-prompt | BeigePanther | wBS:pH | assigned \\u00b7 reply | 15:0x |  |\\n| overlord-deploy | LilacHare | wBS:pJ | assigned \\u00b7 reply | 15:0x |  |\\n| realm-scale | BeigePanther | wBS:pH | assigned \\u00b7 reply | 15:0x |  |\\n| realm-queue | BeigePanther | wBS:pH | assigned \\u00b7 reply | 15:0x |  |\\n| realm-restart | CreamRobin | wBS:pK | assigned | 15:0x |  |\\n| agent-skills-push | BeigePanther | wBS:pH | assigned \\u00b7 reply | 15:0x |  |\"}"
+        ]
+      ],
+      "topics": {
+        "session-01a1f3b6": [
+          {
+            "id": 1023,
+            "thread_id": null,
+            "topic": "session-01a1f3b6",
+            "subject": "[session-01a1f3b6] Take over the job from session 01a1f3b6",
+            "from": "FrostyCedar",
+            "to": [
+              "BeigePanther"
+            ],
+            "created_ts": "2026-11-20T15:01:23Z",
+            "body_md": "Goal: carry on the job from an old omp session."
+          },
+          {
+            "id": 1024,
+            "thread_id": "1023",
+            "topic": "session-01a1f3b6",
+            "subject": "Re: [session-01a1f3b6] Take over the job from session 01a1f3b6",
+            "from": "BeigePanther",
+            "to": [
+              "FrostyCedar"
+            ],
+            "created_ts": "2026-11-20T15:02:27Z",
+            "body_md": "**Blocked:** the last step needs a GCP login from Loup. Can he sign in?"
+          }
+        ],
+        "realm-wake": [
+          {
+            "id": 1026,
+            "thread_id": null,
+            "topic": "realm-wake",
+            "subject": "[realm-wake] launchd wake service for realm swarms",
+            "from": "FrostyCedar",
+            "to": [
+              "LilacHare"
+            ],
+            "created_ts": "2026-11-20T15:04:45Z",
+            "body_md": "Goal: build `realm`, a launchd wake service for swarm panes."
+          },
+          {
+            "id": 1029,
+            "thread_id": "1026",
+            "topic": "realm-wake",
+            "subject": "Re: [realm-wake] launchd wake service for realm swarms",
+            "from": "LilacHare",
+            "to": [
+              "FrostyCedar"
+            ],
+            "created_ts": "2026-11-20T15:11:19Z",
+            "body_md": "**Done.** Commit `0682895`, local only."
+          },
+          {
+            "id": 1030,
+            "thread_id": "1026",
+            "topic": "realm-wake",
+            "subject": "Re: [realm-wake] launchd wake service for realm swarms",
+            "from": "FrostyCedar",
+            "to": [
+              "LilacHare"
+            ],
+            "created_ts": "2026-11-20T15:13:29Z",
+            "body_md": "Loup reviewed it. Do these three fixes, in order: …"
+          },
+          {
+            "id": 1031,
+            "thread_id": "1026",
+            "topic": "realm-wake",
+            "subject": "Re: [realm-wake] launchd wake service for realm swarms",
+            "from": "LilacHare",
+            "to": [
+              "FrostyCedar"
+            ],
+            "created_ts": "2026-11-20T15:14:59Z",
+            "body_md": "**Done.** All three fixes committed (`c04425a`)."
+          }
+        ],
+        "disk-full": [
+          {
+            "id": 1033,
+            "thread_id": null,
+            "topic": "disk-full",
+            "subject": "[disk-full] Find what fills the Mac disk (94%, 31.6 GB free)",
+            "from": "FrostyCedar",
+            "to": [
+              "CreamRobin"
+            ],
+            "created_ts": "2026-11-20T15:15:02Z",
+            "body_md": "Goal: find what fills the Mac disk."
+          },
+          {
+            "id": 1034,
+            "thread_id": "1033",
+            "topic": "disk-full",
+            "subject": "Re: [disk-full] Find what fills the Mac disk (94%, 31.6 GB free)",
+            "from": "CreamRobin",
+            "to": [
+              "FrostyCedar"
+            ],
+            "created_ts": "2026-11-20T15:21:40Z",
+            "body_md": "Free space is falling fast; found the cause, details below. Waiting for your call on what to delete."
+          },
+          {
+            "id": 1035,
+            "thread_id": "1033",
+            "topic": "disk-full",
+            "subject": "Re: [disk-full] Find what fills the Mac disk (94%, 31.6 GB free)",
+            "from": "FrostyCedar",
+            "to": [
+              "CreamRobin"
+            ],
+            "created_ts": "2026-11-20T15:23:30Z",
+            "body_md": "Loup's decision: delete the caches, keep the running job."
+          },
+          {
+            "id": 1043,
+            "thread_id": "1033",
+            "topic": "disk-full",
+            "subject": "Re: [disk-full] Find what fills the Mac disk (94%, 31.6 GB free)",
+            "from": "CreamRobin",
+            "to": [
+              "FrostyCedar"
+            ],
+            "created_ts": "2026-11-20T15:29:14Z",
+            "body_md": "**Done.** 204 GB freed."
+          }
+        ],
+        "docker-clean": [
+          {
+            "id": 1037,
+            "thread_id": null,
+            "topic": "docker-clean",
+            "subject": "[docker-clean] Free OrbStack space not used by running containers",
+            "from": "FrostyCedar",
+            "to": [
+              "IcyPuma"
+            ],
+            "created_ts": "2026-11-20T15:23:30Z",
+            "body_md": "Goal: free OrbStack space not used by running containers."
+          },
+          {
+            "id": 1040,
+            "thread_id": "1037",
+            "topic": "docker-clean",
+            "subject": "Re: [docker-clean] Free OrbStack space not used by running containers",
+            "from": "IcyPuma",
+            "to": [
+              "FrostyCedar"
+            ],
+            "created_ts": "2026-11-20T15:26:45Z",
+            "body_md": "**Done.** 33 GB freed, every running container still up."
+          }
+        ],
+        "overlord-deploy": [
+          {
+            "id": 1039,
+            "thread_id": null,
+            "topic": "overlord-deploy",
+            "subject": "[overlord-deploy] Deploy overlord",
+            "from": "FrostyCedar",
+            "to": [
+              "LilacHare"
+            ],
+            "created_ts": "2026-11-20T15:26:11Z",
+            "body_md": "Goal: deploy overlord."
+          },
+          {
+            "id": 1041,
+            "thread_id": "1039",
+            "topic": "overlord-deploy",
+            "subject": "Re: [overlord-deploy] Deploy overlord",
+            "from": "LilacHare",
+            "to": [
+              "FrostyCedar"
+            ],
+            "created_ts": "2026-11-20T15:28:00Z",
+            "body_md": "**Blocked:** deploying would stop a running job. Go ahead?"
+          },
+          {
+            "id": 1046,
+            "thread_id": "1039",
+            "topic": "overlord-deploy",
+            "subject": "Re: [overlord-deploy] Deploy overlord",
+            "from": "FrostyCedar",
+            "to": [
+              "LilacHare"
+            ],
+            "created_ts": "2026-11-20T15:32:24Z",
+            "body_md": "Loup asks: can that job be restarted after the deploy?"
+          },
+          {
+            "id": 1048,
+            "thread_id": "1039",
+            "topic": "overlord-deploy",
+            "subject": "Re: [overlord-deploy] Deploy overlord",
+            "from": "LilacHare",
+            "to": [
+              "FrostyCedar"
+            ],
+            "created_ts": "2026-11-20T15:34:13Z",
+            "body_md": "Yes, it can be restarted afterwards."
+          },
+          {
+            "id": 1052,
+            "thread_id": "1039",
+            "topic": "overlord-deploy",
+            "subject": "Re: [overlord-deploy] Deploy overlord",
+            "from": "FrostyCedar",
+            "to": [
+              "LilacHare"
+            ],
+            "created_ts": "2026-11-20T15:36:51Z",
+            "body_md": "Loup approved: deploy `044128e`, push OK."
+          }
+        ],
+        "queen-no-prompt": [
+          {
+            "id": 1042,
+            "thread_id": null,
+            "topic": "queen-no-prompt",
+            "subject": "[queen-no-prompt] ABSOLUTE RULE in realm-create: only the user prompts the queen",
+            "from": "FrostyCedar",
+            "to": [
+              "BeigePanther"
+            ],
+            "created_ts": "2026-11-20T15:28:09Z",
+            "body_md": "Goal: add the ABSOLUTE RULE to the realm skills."
+          },
+          {
+            "id": 1049,
+            "thread_id": "1042",
+            "topic": "queen-no-prompt",
+            "subject": "Re: [queen-no-prompt] ABSOLUTE RULE in realm-create: only the user prompts the queen",
+            "from": "BeigePanther",
+            "to": [
+              "FrostyCedar"
+            ],
+            "created_ts": "2026-11-20T15:34:34Z",
+            "body_md": "**Done.** Rule in place, committed."
+          }
+        ],
+        "overlord-close-done": [
+          {
+            "id": 1044,
+            "thread_id": null,
+            "topic": "overlord-close-done",
+            "subject": "[overlord-close-done] Close DONE workspaces in overlord's herdr",
+            "from": "FrostyCedar",
+            "to": [
+              "IcyPuma"
+            ],
+            "created_ts": "2026-11-20T15:30:13Z",
+            "body_md": "Goal: close every DONE workspace in overlord's herdr."
+          },
+          {
+            "id": 1045,
+            "thread_id": "1044",
+            "topic": "overlord-close-done",
+            "subject": "Re: [overlord-close-done] Close DONE workspaces in overlord's herdr",
+            "from": "IcyPuma",
+            "to": [
+              "FrostyCedar"
+            ],
+            "created_ts": "2026-11-20T15:31:13Z",
+            "body_md": "**Done.** Closed 11 workspaces."
+          }
+        ],
+        "realm-scale": [
+          {
+            "id": 1047,
+            "thread_id": null,
+            "topic": "realm-scale",
+            "subject": "[realm-scale] Queen can scale the realm: add workers, retire idle ones",
+            "from": "FrostyCedar",
+            "to": [
+              "BeigePanther"
+            ],
+            "created_ts": "2026-11-20T15:33:21Z",
+            "body_md": "Do this **after** `queen-no-prompt`, same files. Goal: the queen can scale the realm."
+          },
+          {
+            "id": 1051,
+            "thread_id": "1047",
+            "topic": "realm-scale",
+            "subject": "Re: [realm-scale] Queen can scale the realm: add workers, retire idle ones",
+            "from": "BeigePanther",
+            "to": [
+              "FrostyCedar"
+            ],
+            "created_ts": "2026-11-20T15:36:21Z",
+            "body_md": "**Done.** Committed `435a015`."
+          }
+        ],
+        "realm-queue": [
+          {
+            "id": 1050,
+            "thread_id": null,
+            "topic": "realm-queue",
+            "subject": "[realm-queue] Queen can queue subjects instead of interrupting workers",
+            "from": "FrostyCedar",
+            "to": [
+              "BeigePanther"
+            ],
+            "created_ts": "2026-11-20T15:35:06Z",
+            "body_md": "This is **queued**: do it after `realm-scale`. Goal: the queen can queue subjects."
+          },
+          {
+            "id": 1053,
+            "thread_id": "1050",
+            "topic": "realm-queue",
+            "subject": "Re: [realm-queue] Queen can queue subjects instead of interrupting workers",
+            "from": "BeigePanther",
+            "to": [
+              "FrostyCedar"
+            ],
+            "created_ts": "2026-11-20T15:37:27Z",
+            "body_md": "**Done.** Committed `d42b88b`."
+          }
+        ],
+        "agent-skills-push": [
+          {
+            "id": 1054,
+            "thread_id": null,
+            "topic": "agent-skills-push",
+            "subject": "[agent-skills-push] Push agent-skills and reinstall from GitHub",
+            "from": "FrostyCedar",
+            "to": [
+              "BeigePanther"
+            ],
+            "created_ts": "2026-11-20T15:38:14Z",
+            "body_md": "**Queued: start after `realm-queue`**, so that its commit is included. Goal: push agent-skills."
+          },
+          {
+            "id": 1055,
+            "thread_id": "1054",
+            "topic": "agent-skills-push",
+            "subject": "Re: [agent-skills-push] Push agent-skills and reinstall from GitHub",
+            "from": "BeigePanther",
+            "to": [
+              "FrostyCedar"
+            ],
+            "created_ts": "2026-11-20T15:39:27Z",
+            "body_md": "**Done.** Pushed and reinstalled."
+          }
+        ],
+        "realm-restart": [
+          {
+            "id": 1056,
+            "thread_id": null,
+            "topic": "realm-restart",
+            "subject": "[realm-restart] New skill /realm-restart: start a queen on an existing realm",
+            "from": "FrostyCedar",
+            "to": [
+              "CreamRobin"
+            ],
+            "created_ts": "2026-11-20T15:39:41Z",
+            "body_md": "Goal: new skill /realm-restart."
+          },
+          {
+            "id": 1057,
+            "thread_id": "1056",
+            "topic": "realm-restart",
+            "subject": "Re: [realm-restart] New skill /realm-restart: start a queen on an existing realm",
+            "from": "FrostyCedar",
+            "to": [
+              "FrostyCedar"
+            ],
+            "created_ts": "2026-11-20T15:40:33Z",
+            "body_md": "Addition from Loup: restart re-injects the briefs."
+          },
+          {
+            "id": 1058,
+            "thread_id": "1056",
+            "topic": "realm-restart",
+            "subject": "Re: [realm-restart] New skill /realm-restart: start a queen on an existing realm",
+            "from": "FrostyCedar",
+            "to": [
+              "CreamRobin"
+            ],
+            "created_ts": "2026-11-20T15:40:51Z",
+            "body_md": "Addition from Loup: restart re-injects the briefs."
+          }
+        ]
+      },
+      "expected_output": "Runs `realm restart --project /cs/general --model …`, then reads each flagged subject's thread and sets the state the mail proves: the last message decides; a worker's 'Done' → done, a worker's open question → blocked, the queen's last word (an answer or new order) leaves it assigned.",
+      "expectations": [
+        "realm restart once, with --project /cs/general",
+        "No herdr send-text/send-keys, no pane run",
+        "set-state done/blocked per the fixture's expected_states",
+        "overlord-deploy and realm-restart stay assigned"
+      ],
+      "checks": [
+        {
+          "call": {
+            "tool": "bash",
+            "match": "realm(\\.py)?\\s+restart\\b.*--project\\s+['\"]?/cs/general"
+          }
+        },
+        {
+          "no_call": {
+            "tool": "bash",
+            "match": "send-(text|keys)|pane run"
+          }
+        },
+        {
+          "no_call": {
+            "tool": "bash",
+            "match": "--force"
+          }
+        },
+        {
+          "set_states": {
+            "session-01a1f3b6": "blocked",
+            "realm-wake": "done",
+            "docker-clean": "done",
+            "disk-full": "done",
+            "overlord-close-done": "done",
+            "queen-no-prompt": "done",
+            "realm-scale": "done",
+            "realm-queue": "done",
+            "agent-skills-push": "done"
+          }
+        },
+        {
+          "no_call": {
+            "tool": "bash",
+            "match": "set-state\\b.*--slug\\s+['\"]?(overlord-deploy|realm-restart)\\b.*--state\\s+(done|blocked)"
+          }
+        }
+      ],
+      "subjects": [
+        {
+          "slug": "session-01a1f3b6",
+          "state": "assigned"
+        },
+        {
+          "slug": "realm-wake",
+          "state": "assigned"
+        },
+        {
+          "slug": "docker-clean",
+          "state": "assigned"
+        },
+        {
+          "slug": "disk-full",
+          "state": "assigned"
+        },
+        {
+          "slug": "overlord-close-done",
+          "state": "assigned"
+        },
+        {
+          "slug": "queen-no-prompt",
+          "state": "assigned"
+        },
+        {
+          "slug": "overlord-deploy",
+          "state": "assigned"
+        },
+        {
+          "slug": "realm-scale",
+          "state": "assigned"
+        },
+        {
+          "slug": "realm-queue",
+          "state": "assigned"
+        },
+        {
+          "slug": "realm-restart",
+          "state": "assigned"
+        },
+        {
+          "slug": "agent-skills-push",
+          "state": "assigned"
+        }
+      ]
+    },
+    {
+      "id": 202,
+      "family": "restart",
+      "prompt": "/realm-restart /cs/general",
+      "context": "This pane is wBS:p9 (tab wBS:t9, workspace wBS). Your model is work/main. You have already read realm-create (appended below).",
+      "also_read": [
+        "realm-create/SKILL.md"
+      ],
+      "bash": [
+        [
+          "realm(\\.py)?\\s+restart(?!.*--force)",
+          "{\"needs\": \"the old queen may still be running; two sessions on one inbox lose replies. Pass --force once it is closed\", \"queen_tabs\": [\"wBS:t1\"], \"queen_last_active\": \"2026-11-20T15:40:55Z\"}"
+        ],
+        [
+          "realm(\\.py)?\\s+restart.*--force",
+          "{\"queen\": \"FrostyCedar\", \"inbox\": [], \"brief_pending\": [\"BeigePanther\", \"LilacHare\"], \"started\": [], \"pane_gone\": [], \"sync\": [], \"table\": \"Realm `/cs/general`, queen FrostyCedar\\n\\n| slug | worker | pane | state | since | status |\\n|---|---|---|---|---|---|\\n| session-01a1f3b6 | BeigePanther | wBS:pH | assigned \\u00b7 reply | 15:0x |  |\\n| realm-wake | LilacHare | wBS:pJ | assigned \\u00b7 reply | 15:0x |  |\\n| docker-clean | IcyPuma | wBS:pM | assigned \\u00b7 reply | 15:0x |  |\\n| disk-full | CreamRobin | wBS:pK | assigned \\u00b7 reply | 15:0x |  |\\n| overlord-close-done | IcyPuma | wBS:pM | assigned \\u00b7 reply | 15:0x |  |\\n| queen-no-prompt | BeigePanther | wBS:pH | assigned \\u00b7 reply | 15:0x |  |\\n| overlord-deploy | LilacHare | wBS:pJ | assigned \\u00b7 reply | 15:0x |  |\\n| realm-scale | BeigePanther | wBS:pH | assigned \\u00b7 reply | 15:0x |  |\\n| realm-queue | BeigePanther | wBS:pH | assigned \\u00b7 reply | 15:0x |  |\\n| realm-restart | CreamRobin | wBS:pK | assigned | 15:0x |  |\\n| agent-skills-push | BeigePanther | wBS:pH | assigned \\u00b7 reply | 15:0x |  |\"}"
+        ]
+      ],
+      "expected_output": "`realm restart` answers needs (exit 2): the old queen may be alive in tab wBS:t1. The queen tells the user and asks; it does not rerun with --force on its own.",
+      "expectations": [
+        "realm restart without --force",
+        "No rerun with --force",
+        "The reply names wBS:t1 or the risk of two queens and asks the user"
+      ],
+      "checks": [
+        {
+          "call": {
+            "tool": "bash",
+            "match": "realm(\\.py)?\\s+restart\\b"
+          }
+        },
+        {
+          "no_call": {
+            "tool": "bash",
+            "match": "--force"
+          }
+        },
+        {
+          "no_call": {
+            "tool": "bash",
+            "match": "tab close|send-(text|keys)"
+          }
+        },
+        {
+          "reply_matches": "wBS:t1|old queen|still (alive|running)|two (queens|sessions)"
+        }
+      ]
+    },
+    {
+      "id": 203,
+      "family": "restart",
+      "prompt": "/realm-restart",
+      "context": "This pane is wBS:p9 (tab wBS:t9, workspace wBS). Your model is work/main. You have already read realm-create (appended below).",
+      "also_read": [
+        "realm-create/SKILL.md"
+      ],
+      "bash": [
+        [
+          "realm(\\.py)?\\s+realms",
+          "[\"/cs/general\", \"/perso/realm\"]"
+        ],
+        [
+          "realm(\\.py)?\\s+list",
+          "wBS:pG\tFrostyCedar\t/cs/general\taside\nwC8:p1\tRubyGorge\t/perso/realm\taside"
+        ]
+      ],
+      "expected_output": "No key: lists the realms (realm realms / realm list), asks which one, starts nothing.",
+      "expectations": [
+        "No realm restart",
+        "Asks which realm, naming /cs/general and /perso/realm"
+      ],
+      "checks": [
+        {
+          "no_call": {
+            "tool": "bash",
+            "match": "realm(\\.py)?\\s+restart\\b"
+          }
+        },
+        {
+          "reply_matches": "/cs/general"
+        },
+        {
+          "reply_matches": "/perso/realm"
+        }
+      ]
+    }
+  ]
+}

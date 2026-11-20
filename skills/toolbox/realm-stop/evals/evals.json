@@ -1,0 +1,80 @@
+{
+  "skill_name": "realm-stop",
+  "evals": [
+    {
+      "id": 301,
+      "family": "stop",
+      "prompt": "/realm-stop",
+      "context": "You are the queen QueenBee of realm /test/r, pane wC8:p1, tab wC8:t1.",
+      "bash": [
+        [
+          "realm(\\.py)?\\s+stop(?!.*--close-working)",
+          "{\"needs\": \"workers mid-subject: confirm, then pass --close-working\", \"working\": [{\"pane\": \"wC8:p3\", \"agent\": \"BlueOwl\", \"tab\": \"wC8:t3\", \"agent_status\": \"working\"}]}"
+        ]
+      ],
+      "expected_output": "`realm stop --project /test/r` answers needs: BlueOwl is mid-subject. The queen names it and asks the user; no --close-working without their word, no tab closed by hand.",
+      "expectations": [
+        "realm stop with --project /test/r",
+        "No --close-working",
+        "No herdr tab close",
+        "Reply names BlueOwl and asks to confirm"
+      ],
+      "checks": [
+        {
+          "call": {
+            "tool": "bash",
+            "match": "realm(\\.py)?\\s+stop\\b.*--project\\s+['\"]?/test/r"
+          }
+        },
+        {
+          "no_call": {
+            "tool": "bash",
+            "match": "--close-working|tab close"
+          }
+        },
+        {
+          "reply_matches": "BlueOwl"
+        }
+      ]
+    },
+    {
+      "id": 302,
+      "family": "stop",
+      "prompt": "/realm-stop",
+      "context": "You are the queen QueenBee of realm /test/r, pane wC8:p1, tab wC8:t1. Another realm, /test/other, shares this workspace (tab wC8:t7 '🛠️ subject-gray-elk').",
+      "bash": [
+        [
+          "realm(\\.py)?\\s+stop",
+          "{\"closed\": [{\"agent\": \"AmberFox\", \"tab\": \"wC8:t2\"}], \"failed\": [{\"agent\": \"BlueOwl\", \"tab\": \"wC8:t3\", \"error\": \"still open\"}], \"unsubscribed\": [\"wC8:p1\", \"wC8:p2\", \"wC8:p3\"], \"briefs_deleted\": \"/tmp/swarm/test-r\"}"
+        ]
+      ],
+      "expected_output": "One `realm stop --project /test/r`; reports AmberFox closed and BlueOwl failed (still open) without retrying blindly; never touches /test/other or its tab wC8:t7.",
+      "expectations": [
+        "realm stop once",
+        "No herdr tab close (no blind retry)",
+        "Nothing on wC8:t7 or /test/other",
+        "Reply reports BlueOwl as failed"
+      ],
+      "checks": [
+        {
+          "call": {
+            "tool": "bash",
+            "match": "realm(\\.py)?\\s+stop\\b.*--project\\s+['\"]?/test/r"
+          }
+        },
+        {
+          "no_call": {
+            "tool": "bash",
+            "match": "tab close|wC8:t7|/test/other"
+          }
+        },
+        {
+          "reply_matches": "BlueOwl"
+        },
+        {
+          "reply_matches": "fail|still open"
+        }
+      ]
+    }
+  ]
+}
