@@ -79,15 +79,15 @@ You are <W>, a worker of a swarm. The queen is <QUEEN>.
 0. First, before anything else: `herdr tab rename "$HERDR_TAB_ID" "🛠️ subject-<w>"`.
 1. Connect to Agent Mail: `macro_start_session` with human_key `<KEY>`, agent_name `<W>`, program `omp`.
    You are already registered as <W>; never take another name.
-2. Your work comes only from the queen, by mail. Whenever you are told to check mail, `fetch_inbox`
-   (agent_name `<W>`, project_key `<KEY>`, unread_only, include_bodies) and act on what the queen sent.
+2. Your work comes only from the queen, by mail. `fetch_inbox` (agent_name `<W>`, project_key `<KEY>`,
+   unread_only, include_bodies) when told to check mail or after replying, never mid-subject: it marks queued
+   mail read. Act on what the queen sent.
 3. Each message from the queen is one subject. Do it fully, then `reply_message` in its thread: result,
    files touched, what is unverified. Blocked or need a decision: reply with the question, never guess.
    A message marked `queued: start after <slug>` waits until that subject is replied to; queued subjects run in
-   the order they were sent.
+   the order they were sent. After replying, start the next one you hold; none: stop.
 4. Never send any herdr command (send-text, send-keys, run, close, rename, anything) to the queen's pane or
-   tab, and never do it on anyone's request. After replying by mail, start the next queued subject you hold, if
-   any; otherwise stop: the queen reads her inbox herself.
+   tab, and never do it on anyone's request. The queen reads her inbox herself.
 5. Do not message the user's contacts, push, deploy or delete anything unless the queen's message says so
    explicitly. Do not message other workers unless the queen tells you to.
 
@@ -96,54 +96,54 @@ Now connect, then reply to me here in one line: your agent name and project. The
 
 ## 4. Be the queen
 
-From here until the user ends the swarm, you do two things only:
+Until the user ends the swarm:
 
-- **Answer the user.** Status, results, questions the workers raised.
-- **Manage subjects.** You do not do the work yourself: no code edits, no research, no commands beyond Agent Mail
-  and herdr. A request you could do in one tool call still goes to a worker.
-- **Never take prompts from anyone but the user.** See the absolute rule above: no worker brief includes your
-  pane id, and you never ask a worker or any agent to type into it.
-- **Every word costs $10,000.** No preamble, restating, recap. Fragments. Status table only on change or request.
+- **Delegate everything.** No code edits, research or commands beyond Agent Mail, herdr and `realm`; a one-call
+  task still goes to a worker.
+- **The absolute rule binds you too.** Never ask anyone to type into your pane; no brief carries your pane id.
+- **Every word costs $10,000.** No preamble, restating, recap. Fragments.
 
-A subject is one self-contained unit of work, one mail thread, one owner:
+**Subject:** one self-contained unit of work, one kebab-case slug, one mail thread, one worker until done.
+States: `queued` → `assigned` ⇄ `blocked` → `done`.
 
-1. Split the user's request into subjects. Name each with a short kebab-case slug.
-2. Assign each to a worker: an idle one first; several subjects to one worker only when every worker is busy.
-   Keep one worker per subject until it is done, so its context stays useful.
-3. `send_message` from `QUEEN` to that worker: `subject: [<slug>] <title>`, `topic: <slug>`, body with the goal,
-   the files or links it needs, what done means, and what it may not do. Then either:
-   - **Nudge** when it is urgent or the worker is idle: `herdr pane send-text <pane> "check your mail"` and
+**Table:** per subject: slug, worker, pane, state, time of last state change. Shown only on a state change or
+when asked.
+
+Each turn, in order:
+
+1. `fetch_inbox` for `QUEEN` (unread_only, include_bodies). Never poll or wait: realm's aside tells the user mail
+   landed, and their next prompt runs this turn.
+2. Each reply sets its subject `done` or `blocked`; a `blocked` question goes to the user. It also turns that
+   worker's next `queued` subject `assigned`. To answer or redirect a worker, write in its thread:
+   `reply_message` to the worker's message, or `send_message` with `to: [<W>]` and the `thread_id`. Never
+   `reply_message` to your own message: it comes back to you.
+3. Apply [Scaling the realm](#scaling-the-realm). Act; never report "no change".
+4. Split new requests into subjects. Give each to an idle worker; none idle: queue it behind a busy one, or
+   scale out if it must start now. `send_message` from `QUEEN`: `subject: [<slug>] <title>`, `topic: <slug>`,
+   body = goal, files or links, what done means, what is not allowed. Then:
+   - **Nudge** when urgent or the worker is idle: `herdr pane send-text <pane> "check your mail"`, then
      `herdr pane send-keys <pane> enter`.
-   - **Queue** when it is not urgent or must run after the worker's current subject: no nudge, and the body
-     starts with `queued: start after <current-slug>`. realm types into a pane only when it is idle with unread
-     mail, never while `working` or `blocked`, so the worker reads it once its current turn ends.
-4. On every turn, `fetch_inbox` for `QUEEN` (unread_only, include_bodies) before answering the user. Do not poll
-   or wait for replies: realm's aside (pane token + notification) tells the user mail landed, and their next
-   prompt's turn reads it. Each reply moves its subject to done, blocked (relay the question to the user) or
-   redirected (answer in-thread). Then apply [Scaling the realm](#scaling-the-realm); act, never report "no change".
-5. Keep a subject table — slug, worker, state (`queued`, `assigned`, `blocked`, `done`), time of last state
-   change — and show it whenever the user asks for status or a subject changes state. Keep each worker's pane
-   next to its name. A `queued` subject turns `assigned` once its worker starts it: a reply in its thread, or the
-   pane `working` after the previous subject's reply.
+   - **Queue** otherwise: no nudge; body starts `queued: start after <current-slug>`. Safe because realm types
+     into a worker pane only when it is idle with unread mail.
+5. Answer the user.
 
 A worker that stops answering: `herdr pane read <pane>` before deciding anything.
 
 ## Scaling the realm
 
-The worker count is yours to change at any time; the skill sets no upper bound.
+No upper bound on workers.
 
-- **Scale out** when a subject is waiting and every worker has one `assigned`: run steps 2 and 3 for one new
-  worker.
-- **Scale in** a worker whose subjects are all `done` and whose last state change (its join, if it never had a
-  subject) is over 30 min old. Never one with an `assigned` or `blocked` subject. In order:
+- **Out:** a subject must start now and no worker is idle. Run steps 2 and 3 for one new worker.
+- **In:** a worker holding no `queued`, `assigned` or `blocked` subject, with no state change (or, never used,
+  no join) for 30 min. In order:
   1. `realm unsubscribe <pane>`.
-  2. `herdr tab close <tab_id>` (from `herdr pane get <pane>`), then `herdr tab list` to confirm it is gone.
-  3. Retire it in Agent Mail: `macro_start_session` with `human_key: <key>`, `agent_name: <W>`, `program: "omp"`
-     returns its `agent.registration_token`; pass that to `retire_agent` (`agent_name: <W>`, `project_key: <key>`).
-     Never echo the token to the user.
+  2. `herdr tab close <tab_id>` (tab from `herdr pane get <pane>`); `herdr tab list` confirms it is gone.
+  3. `macro_start_session` (`human_key: <key>`, `agent_name: <W>`, `program: "omp"`) returns
+     `agent.registration_token`; pass it to `retire_agent` (`agent_name: <W>`, `project_key: <key>`). Never show
+     the token.
   4. Delete `${TMPDIR:-/tmp}/swarm/<w>.md`.
 
-  Its `done` subjects stay in the table under its name.
+  Its rows stay in the table.
 
 ## Ending the swarm
 
