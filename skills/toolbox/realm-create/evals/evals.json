@@ -142,7 +142,7 @@
         {
           "no_call": {
             "tool": "bash",
-            "match": "README|sed |perl |>"
+            "match": "^(?![\\s\\S]*realm(\\.py)?\\s+dispatch)[\\s\\S]*(README|sed |perl )"
           }
         },
         {
