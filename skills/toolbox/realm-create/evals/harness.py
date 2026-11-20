@@ -78,11 +78,14 @@ def _realm(seg):
         store().set("subjects", subjects)
         return json.dumps(subjects[slug])
     if verb == "dispatch":
-        slug = _flag(seg, "slug")
+        slug, to = _flag(seg, "slug"), _flag(seg, "to")
+        missing = [f"--{n}" for n, v in (("slug", slug), ("to", to), ("title", _flag(seg, "title"))) if not v]
+        if missing:
+            return f"realm dispatch: error: the following arguments are required: {', '.join(missing)}"
         if slug in subjects:
             return json.dumps({"error": f"subject {slug!r} already exists"})
         after = _flag(seg, "after")
-        subjects[slug] = {"slug": slug, "worker": _flag(seg, "to"), "state": "queued" if after else "assigned",
+        subjects[slug] = {"slug": slug, "worker": to, "state": "queued" if after else "assigned",
                           "after": after}
         store().set("subjects", subjects)
         return json.dumps({"message_id": _ids(), "thread_id": "t-" + slug, "subject": subjects[slug]})
@@ -107,8 +110,13 @@ async def _bash(command: str) -> str:
         rule = next((o for p, o in _case().get("bash", []) if re.search(p, seg)), None)
         if rule is not None:
             outs.append(rule if isinstance(rule, str) else json.dumps(rule))
+        elif re.search(r"\s(-h|--help)\b", seg):
+            outs.append("usage: realm <verb> [--project KEY] …")
         elif REALM_VERB.search(seg):
-            outs.append(_realm(seg))
+            try:
+                outs.append(_realm(seg))
+            except Exception as e:  # noqa: BLE001 - a stub gap must show as a tool error, not end the eval
+                outs.append(f"realm: error: {e}")
         elif re.match(r"echo\b", seg):
             outs.append(seg[4:].strip().strip("'\"").replace("$?", "0"))
     return "\n".join(o for o in outs if o)
