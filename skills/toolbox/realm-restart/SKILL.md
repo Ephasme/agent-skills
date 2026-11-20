@@ -39,7 +39,9 @@ version of everything this session must do as queen; a pointer to it is not enou
 
 ## 2. Take over
 
-`realm restart --project <realm> --model <your model>`, from this pane. It:
+`realm restart --project <realm> --model <your model>`, from this pane (any directory: it refuses, before
+anything else, unless the realm repository `spare-cycles/realm` is at `~/code/perso/realm` or `$REALM_REPO`,
+and records it as the directory every worker starts in). It:
 
 - labels this tab `👑 queen · <name>` (realm's guard then refuses to type into it), and puts `👑` in front of this
   workspace's label unless worker tabs still live in it (`queen_workspace` says which);

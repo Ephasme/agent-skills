@@ -817,7 +817,7 @@ def spawn(conn, key, now):
         "project_key": key, "program": swarm.PROGRAM, "model": r["model"],
         "task_description": f"Swarm scout, queen {r['queen']}"})["name"]
     label = f"{SCOUT_MARK} {db.label(r)} · scout"
-    pane_id, ws = swarm.open_workspace(label, r["cwd"] or os.getcwd())
+    pane_id, ws = swarm.open_workspace(label, r["cwd"])
     swarm.bind_pane(pane_id, name, key)  # before omp starts: its first poll already finds the file
     brief = write_brief(key, name, r["queen"], label, ws)
     swarm._ok(swarm.herdr("pane", "run", pane_id, f"{swarm.PROGRAM} @{brief}"), "pane run")

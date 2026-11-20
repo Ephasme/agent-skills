@@ -28,6 +28,7 @@ PROGRAM = "omp"
 IDLE = ("idle", "done")
 JOIN_TIMEOUT = 60
 LIVE_QUEEN_SECONDS = 300
+REALM_ORIGIN = re.compile(r"[:/]spare-cycles/realm(\.git)?$")
 
 
 # ---------- seams (tests replace these) ----------
@@ -185,10 +186,30 @@ def subscriptions(key):
         return {p: v for p, v in s["subscriptions"].items() if v["project"] == key}
 
 
+def realm_repo(path=None):
+    """The realm git repository every worker and the scout start in: `path`, else $REALM_REPO, else
+    ~/code/perso/realm. Refused unless it is that repo's work tree root with origin spare-cycles/realm: never the
+    caller's directory."""
+    p = Path(path or os.environ.get("REALM_REPO") or Path.home() / "code/perso/realm").expanduser()
+
+    def git(*args):
+        r = subprocess.run(["git", "-C", str(p), *args], capture_output=True, text=True)
+        return r.stdout.strip() if r.returncode == 0 else None
+
+    top = git("rev-parse", "--show-toplevel") if p.is_dir() else None
+    origin = git("remote", "get-url", "origin") if top else None
+    if not top or Path(top).resolve() != p.resolve() or not origin or not REALM_ORIGIN.search(origin):
+        raise Refused(f"{p} is not the realm repository (a work tree root whose origin is spare-cycles/realm): "
+                      "clone it there or set REALM_REPO")
+    return str(p.resolve())
+
+
 def _spawnable(conn, key):
+    """The realm row, its cwd checked to be the realm repo: a worker never starts anywhere else."""
     r = db.realm_row(conn, key)
     if not r["model"] or not r["workspace"]:
         raise Refused(f"realm {key} has no model/workspace recorded: run `realm create` or `realm restart`")
+    r["cwd"] = realm_repo(r["cwd"])
     return r
 
 
@@ -202,7 +223,7 @@ def spawn(conn, key):
         "task_description": f"Swarm worker, queen {r['queen']}",
     })
     name = ident["name"]
-    pane_id, ws = open_workspace(worker_label(r, name), r["cwd"] or os.getcwd())
+    pane_id, ws = open_workspace(worker_label(r, name), r["cwd"])
     subscribe(pane_id, name, key, aside=False)  # bound before omp starts: its first poll already finds the file
     brief = write_brief(key, name, r["queen"], ws, db.label(r))
     _ok(herdr("pane", "run", pane_id, f"{PROGRAM} @{brief}"), "pane run")
@@ -243,13 +264,14 @@ def label_queen_workspace(workspace):
     return "ok"
 
 
-def create(conn, key, size, model, workspace, cwd, queen_pane, queen_tab, name=None):
+def create(conn, key, size, model, workspace, queen_pane, queen_tab, name=None):
     """Bootstrap a realm from the queen's pane: label, identity, launchd, aside, db, size workers, joins."""
     if size < 1:
         raise Refused("size must be an integer ≥ 1")
     if not (queen_pane and queen_tab and workspace):
         raise Refused("run from the queen's herdr pane: HERDR_PANE_ID, HERDR_TAB_ID and HERDR_WORKSPACE_ID")
     db._check_name(conn, key, name)  # before any side effect
+    cwd = realm_repo()
     _ok(herdr("tab", "rename", queen_tab, queen_label(name)), "tab rename")
     ws_label = label_queen_workspace(workspace)
     session = call("macro_start_session", {"human_key": key, "program": PROGRAM, "model": model,
@@ -404,10 +426,11 @@ def _pick_queen(conn, key, agents, queen):
         {"name": a["name"], "last_active": a.get("last_active_ts")} for a in cands])
 
 
-def restart(conn, key, model, queen_pane, queen_tab, workspace, cwd, queen=None, force=False):
+def restart(conn, key, model, queen_pane, queen_tab, workspace, queen=None, force=False):
     """Take over a live realm from this pane: find and resume the queen, move the aside, re-brief workers."""
     if not (queen_pane and queen_tab and workspace):
         raise Refused("run from the new queen's herdr pane: HERDR_PANE_ID, HERDR_TAB_ID and HERDR_WORKSPACE_ID")
+    cwd = realm_repo()  # before any side effect; the realm's cwd is the realm repo, never this pane's directory
     known = conn.execute("SELECT name FROM realms WHERE key=?", (key,)).fetchone()
     _ok(herdr("tab", "rename", queen_tab, queen_label(known and known["name"])), "tab rename")
     agents = call("list_agents", {"project_key": key})
@@ -556,7 +579,7 @@ def register(sub):
     p.add_argument("--model", required=True)
     p.add_argument("--name", help="human name of the new realm, unique; --project stays its key")
     p.set_defaults(fn=db.run_verb(lambda c, a, t: create(
-        c, a.key, a.size, a.model, env("HERDR_WORKSPACE_ID"), os.getcwd(), env("HERDR_PANE_ID"),
+        c, a.key, a.size, a.model, env("HERDR_WORKSPACE_ID"), env("HERDR_PANE_ID"),
         env("HERDR_TAB_ID"), a.name)))
 
     p = db.keyed_parser(sub, "spawn", "add one worker to the realm")
@@ -593,7 +616,7 @@ def register(sub):
     p.add_argument("--queen", help="queen agent name, when several candidates exist")
     p.add_argument("--force", action="store_true", help="resume even if the old queen looks alive")
     p.set_defaults(fn=db.run_verb(lambda c, a, t: restart(
-        c, a.key, a.model, env("HERDR_PANE_ID"), env("HERDR_TAB_ID"), env("HERDR_WORKSPACE_ID"), os.getcwd(),
+        c, a.key, a.model, env("HERDR_PANE_ID"), env("HERDR_TAB_ID"), env("HERDR_WORKSPACE_ID"),
         a.queen, a.force)))
 
     p = db.keyed_parser(sub, "reinject", "rewrite every worker's brief; the tick delivers it once idle")

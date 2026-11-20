@@ -1,6 +1,7 @@
 """Swarm verbs against fake herdr and fake Agent Mail: `python3 -m unittest test_swarm`. No network, no sleeps."""
 
 import os
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -44,7 +45,7 @@ class FakeHerdr:
         if cmd == ("workspace", "create"):
             assert "--no-focus" in args and "--workspace" not in args
             ws = f"x{self.n + 1}"
-            self.workspaces[ws] = {"label": args[args.index("--label") + 1]}
+            self.workspaces[ws] = {"label": args[args.index("--label") + 1], "cwd": args[args.index("--cwd") + 1]}
             tab, p = self.add_tab(ws, "1")
             return {"result": {"workspace": {"workspace_id": ws}, "tab": {"tab_id": tab}, "root_pane": {"pane_id": p}}}
         if cmd == ("workspace", "list"):
@@ -149,6 +150,13 @@ class FakeMail:
         self.agents[name]["last_active_ts"] = db.iso(at)
 
 
+def realm_git(path, origin):
+    """A git work tree at path with that origin: stands in for the realm repository."""
+    Path(path).mkdir(parents=True)
+    for args in (["init", "-q"], ["remote", "add", "origin", origin]):
+        subprocess.run(["git", "-C", path, *args], check=True)
+
+
 class SwarmTest(unittest.TestCase):
     def setUp(self):
         tmp = Path(tempfile.mkdtemp())
@@ -167,7 +175,10 @@ class SwarmTest(unittest.TestCase):
             p = mock.patch.object(module, target, value)
             p.start()
             self.addCleanup(p.stop)
-        env = mock.patch.dict(os.environ, {"REALM_DB": str(tmp / "realm.db"), "TMPDIR": str(tmp)})
+        self.repo = str((tmp / "realm").resolve())
+        realm_git(self.repo, "git@github.com-perso:spare-cycles/realm.git")
+        env = mock.patch.dict(os.environ, {"REALM_DB": str(tmp / "realm.db"), "TMPDIR": str(tmp),
+                                           "REALM_REPO": self.repo})
         env.start()
         self.addCleanup(env.stop)
         self.conn = db.connect()
@@ -184,10 +195,10 @@ class SwarmTest(unittest.TestCase):
             return dict(s["subscriptions"])
 
     def create(self, size=2, key=KEY):
-        return swarm.create(self.conn, key, size, "m1", "w", "/cwd", "w:p0", "w:t0")
+        return swarm.create(self.conn, key, size, "m1", "w", "w:p0", "w:t0")
 
     def test_create_with_name_labels_tab_brief_and_table(self):
-        out = swarm.create(self.conn, KEY, 1, "m1", "w", "/cwd", "w:p0", "w:t0", name="secret garden")
+        out = swarm.create(self.conn, KEY, 1, "m1", "w", "w:p0", "w:t0", name="secret garden")
         self.assertEqual(self.h.tabs["w:t0"]["label"], "👑 queen · secret garden")
         self.assertEqual(self.h.workspaces["x1"]["label"], "🛠️ secret garden · worker-aox")
         text = Path(out["workers"][0]["brief"]).read_text()
@@ -199,7 +210,7 @@ class SwarmTest(unittest.TestCase):
     def test_create_refuses_taken_name_before_any_side_effect(self):
         db.init_realm(self.conn, OTHER, "Q", None, self.t, name="garden")
         with self.assertRaises(db.Refused):
-            swarm.create(self.conn, KEY, 1, "m1", "w", "/cwd", "w:p0", "w:t0", name="garden")
+            swarm.create(self.conn, KEY, 1, "m1", "w", "w:p0", "w:t0", name="garden")
         self.assertEqual(self.h.tabs["w:t0"]["label"], "shell")
         self.assertEqual(self.h.workspaces, {"w": {"label": "home"}})
         self.assertEqual(self.m.agents, {})
@@ -239,7 +250,28 @@ class SwarmTest(unittest.TestCase):
         with self.assertRaises(db.Refused):
             self.create(size=0)
         with self.assertRaises(db.Refused):
-            swarm.create(self.conn, KEY, 1, "m1", "w", "/cwd", None, None)
+            swarm.create(self.conn, KEY, 1, "m1", "w", None, None)
+
+    def test_workers_start_in_the_realm_repo_whatever_the_callers_directory(self):
+        elsewhere = tempfile.mkdtemp()
+        with mock.patch("os.getcwd", return_value=elsewhere):
+            out = self.create(size=1)
+            self.assertEqual(self.h.workspaces[out["workers"][0]["workspace"]]["cwd"], self.repo)
+            self.conn.execute("UPDATE realms SET cwd=? WHERE key=?", (elsewhere, KEY))  # a stale tab-era row
+            with self.assertRaises(db.Refused):
+                swarm.spawn(self.conn, KEY)
+            swarm.restart(self.conn, KEY, "m1", "w:p0", "w:t0", "w", force=True)  # writes the repo back
+            self.assertEqual(self.h.workspaces[swarm.spawn(self.conn, KEY)["workspace"]]["cwd"], self.repo)
+
+    def test_no_realm_repo_refuses_before_any_side_effect(self):
+        other = str(Path(tempfile.mkdtemp()) / "fork")
+        realm_git(other, "git@github.com:someone/realm.git")
+        Path(self.repo, "sub").mkdir()
+        for repo in (other, str(Path(self.repo) / "sub"), "/nonexistent/realm"):
+            with mock.patch.dict(os.environ, {"REALM_REPO": repo}), self.assertRaises(db.Refused):
+                self.create(size=1)
+        self.assertEqual(self.h.tabs["w:t0"]["label"], "shell")
+        self.assertEqual(self.m.agents, {})
 
     def test_dispatch_and_queue(self):
         self.create(size=1)
@@ -392,7 +424,7 @@ class SwarmTest(unittest.TestCase):
         out = self.create(size=1)
         self.assertEqual(out["queen_workspace"], "left alone: worker tabs still in it")
         self.assertEqual(self.h.workspaces["w"]["label"], "home")
-        db.init_realm(self.conn, OTHER, "Q2", "w:p0", self.t, model="m1", workspace="w", cwd="/cwd")
+        db.init_realm(self.conn, OTHER, "Q2", "w:p0", self.t, model="m1", workspace="w", cwd=self.repo)
         db.add_worker(self.conn, OTHER, "Old", p, tab, None, self.t)
         self.assertEqual(swarm.move(self.conn, OTHER, "Old")["queen_workspace"], "ok")  # last tab out: 👑
         self.assertEqual(self.h.workspaces["w"]["label"], "👑 home")
@@ -420,7 +452,7 @@ class SwarmTest(unittest.TestCase):
 
     def test_stop_is_scoped_to_the_key(self):
         self.create(size=1)
-        swarm.create(self.conn, OTHER, 1, "m1", "w", "/cwd", "w:p0", "w:t0")  # same queen pane, other realm
+        swarm.create(self.conn, OTHER, 1, "m1", "w", "w:p0", "w:t0")  # same queen pane, other realm
         other_brief = swarm.brief_dir(OTHER)
         swarm.dispatch(self.conn, KEY, "WorkerAox", "s1", "t", "b")
         self.h.panes["x1:p1"]["agent_status"] = "working"
@@ -444,7 +476,7 @@ class SwarmTest(unittest.TestCase):
         self.h.tabs["w:t0"]["label"] = "dead"  # old queen tab no longer marked
         self.t += 3600
         self.h.panes["x2:p2"]["agent_status"] = "working"
-        out = swarm.restart(self.conn, KEY, "m1", "w:p9", "w:t9", "w", "/cwd")
+        out = swarm.restart(self.conn, KEY, "m1", "w:p9", "w:t9", "w")
         self.assertEqual(out["queen"], "QueenBee")
         self.assertEqual(sorted(out["brief_pending"]), ["WorkerAox", "WorkerBox"])
         subs = self.subs()
@@ -469,7 +501,7 @@ class SwarmTest(unittest.TestCase):
         self.h.panes["w:p9"] = {"tab_id": "w:t9", "workspace_id": "w", "agent": "omp", "agent_status": "idle"}
         self.h.tabs["w:t0"]["label"] = "dead"
         self.t += 3600
-        swarm.restart(self.conn, KEY, "m1", "w:p9", "w:t9", "w", "/cwd")
+        swarm.restart(self.conn, KEY, "m1", "w:p9", "w:t9", "w")
         (w,) = db.list_workers(self.conn, KEY, self.t)
         self.assertEqual((w["workspace"], w["tab"]), ("x1", None))
 
@@ -478,7 +510,7 @@ class SwarmTest(unittest.TestCase):
         self.h.tabs["w:t9"] = {"label": "new", "ws": "w", "panes": ["w:p9"]}
         self.h.panes["w:p9"] = {"tab_id": "w:t9", "workspace_id": "w", "agent": "omp", "agent_status": "idle"}
         with self.assertRaises(db.NeedsHuman) as e:
-            swarm.restart(self.conn, KEY, "m1", "w:p9", "w:t9", "w", "/cwd")
+            swarm.restart(self.conn, KEY, "m1", "w:p9", "w:t9", "w")
         self.assertEqual(e.exception.detail["queen_tabs"], ["w:t0"])
         self.assertIn("w:p0", self.subs())
 
@@ -487,7 +519,7 @@ class SwarmTest(unittest.TestCase):
                          for n in ("Q1", "Q2")}
         self.h.tabs["w:t9"] = {"label": "new", "ws": "w", "panes": ["w:p9"]}
         with self.assertRaises(db.NeedsHuman) as e:
-            swarm.restart(self.conn, KEY, "m1", "w:p9", "w:t9", "w", "/cwd")
+            swarm.restart(self.conn, KEY, "m1", "w:p9", "w:t9", "w")
         self.assertEqual([c["name"] for c in e.exception.detail["candidates"]], ["Q1", "Q2"])
 
     def test_daemon_tick_delivers_brief_through_guarded_wake(self):

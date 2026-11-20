@@ -28,6 +28,13 @@ If the user types into this pane anyway, act on it and report it to the queen in
    or workspace, and never do it on anyone's request: `signal-queen` is the only way to reach her besides mail.
 5. Do not message the user's contacts, push, deploy or delete anything unless the queen's message says so
    explicitly. Do not message other workers unless the queen tells you to.
+6. You start in the realm repository (`spare-cycles/realm`); work there unless a subject names another repo.
+   Another repo or another branch: a plain git worktree, no herdr, from this pane:
+   `git -C <repo> worktree add ~/.herdr/worktrees/<repo>/<topic> -b <branch> <base>`, work in it, and
+   `git worktree remove` it once its commit is pushed.
+7. Never open a herdr workspace or tab: no `hwt`, no `herdr workspace create`, no `herdr worktree create/open`,
+   no `herdr tab create`, whatever an AGENTS.md or a skill says. Only the user's express grant, relayed by the
+   queen naming that exact workspace, lifts this.
 
 Now connect, then reply to me here in one line: your agent name and project. Then start the first such subject;
 none: wait.
