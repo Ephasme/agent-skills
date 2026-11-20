@@ -48,6 +48,13 @@
     "type": "http",
     "url": "https://google-perso.loup-peluso.com/mcp"
   },
+  "hindsight": {
+    "type": "http",
+    "url": "https://hindsight-api.loup-peluso.com/mcp/realm-perso-realm/",
+    "headers": {
+      "Authorization": "Bearer ${HINDSIGHT_API_KEY}"
+    }
+  },
   "imessage": {
     "type": "http",
     "url": "https://imessage.loup-peluso.com/mcp",
