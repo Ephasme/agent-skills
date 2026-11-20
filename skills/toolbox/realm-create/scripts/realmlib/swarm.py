@@ -229,6 +229,11 @@ def dispatch(conn, key, to, slug, title, body, after=None):
     """Send a subject to a worker with the [slug]/topic convention and record it. The daemon wakes the worker."""
     r = db.realm_row(conn, key)
     db.worker_row(conn, key, to, now())
+    # Refuse before sending: a mail out with no subject recorded is worse than no mail.
+    if conn.execute("SELECT 1 FROM subjects WHERE realm=? AND slug=?", (key, slug)).fetchone():
+        raise Refused(f"subject {slug!r} already exists in realm {key!r}: pick another slug")
+    if after:
+        db.subject_row(conn, key, after)
     if after:
         body = f"queued: start after {after}\n\n{body}"
     sent = call("send_message", {"project_key": key, "sender_name": r["queen"], "to": [to],

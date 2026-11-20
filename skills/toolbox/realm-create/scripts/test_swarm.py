@@ -174,6 +174,10 @@ class SwarmTest(unittest.TestCase):
         self.assertEqual(q["subject"]["state"], "queued")
         self.assertTrue(self.m.sent[1]["body_md"].startswith("queued: start after s1\n"))
         self.assertEqual(self.h.typed, [])  # dispatch never types: the daemon wakes
+        for slug, after in (("s1", None), ("s3", "missing")):
+            with self.assertRaises(db.Refused):
+                swarm.dispatch(self.conn, KEY, "WorkerAox", slug, "Again", "body", after=after)
+        self.assertEqual(len(self.m.sent), 2)  # refused before any mail went out
 
     def test_retire_scales_in(self):
         out = self.create(size=1)

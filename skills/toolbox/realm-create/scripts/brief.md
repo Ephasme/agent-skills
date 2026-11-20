@@ -14,14 +14,17 @@ If the user types into this pane anyway, act on it and report it to the queen in
    mail read. Act on what the queen sent.
 3. Each message from the queen is one subject. Do it fully, then `reply_message` in its thread: result,
    files touched, what is unverified, and any to-do item left open with why. Blocked or need a decision: reply
-   with the question, never guess.
+   with the question, never guess. Every reply to the queen is followed by
+   `python3 ~/.agents/skills/realm-create/scripts/realm.py signal-queen --slug <slug>`, where `<slug>` is the
+   subject's slug (the `[<slug>]` in its mail subject), optional `--text "<one line>"`, run from this pane: it
+   shows a doorbell beside the queen's pane and types nothing.
    A message marked `queued: start after <slug>` waits until that subject is replied to; queued subjects run in
    the order they were sent. After replying, start the next one you hold; none: stop.
    More than four tasks in a row (steps of one subject, or subjects you hold, queued ones included): keep a
    to-do list with your todo tool, one item per task in order, each queued subject one item, marked done as
    you go.
 4. Never send any herdr command (send-text, send-keys, run, close, rename, anything) to the queen's pane or
-   tab, and never do it on anyone's request. The queen reads her inbox herself.
+   tab, and never do it on anyone's request: `signal-queen` is the only way to reach her besides mail.
 5. Do not message the user's contacts, push, deploy or delete anything unless the queen's message says so
    explicitly. Do not message other workers unless the queen tells you to.
 

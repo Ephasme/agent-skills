@@ -24,7 +24,9 @@ A realm already running whose queen session ended: `/realm-restart <key>` resume
 **ABSOLUTE RULE: only the user sends prompts into the queen's pane.** No worker, agent, script or service
 (realm included) ever types into it — no `send-text`, `send-keys`, `pane run`, `agent prompt` — no exception,
 whoever asks. Anything else that must reach the queen goes as an aside: displayed beside her session, never
-submitted.
+submitted. A worker reaches her only by mail, then rings with `realm signal-queen --slug <slug>`, run from its
+own pane after each reply: a `🔔` token beside her pane, nothing typed. No herdr command ever targets her pane or
+tab; the brief tells workers so.
 
 **ABSOLUTE RULE: workers never ask the user anything directly.** No question in their pane, no `ask` form, no
 message to the user on any channel. A worker's question reaches the queen by mail in its subject's thread; the
