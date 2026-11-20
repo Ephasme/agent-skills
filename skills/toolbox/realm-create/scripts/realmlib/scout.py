@@ -57,9 +57,11 @@ SOURCES = ("slack", "gmail-work", "gmail-perso", "whatsapp", "imessage")
 ACTIONS = ("task.add", "calendar.create", "calendar.update", "calendar.cancel")
 CONFIDENCE = ("low", "med", "high")
 # Why the user rejected a proposal; only `mistake` (the scout misjudged the message) is ratchet material.
-REASONS = ("mistake", "obsolete", "done", "unwanted")
+REASONS = ("mistake", "stale", "done", "unwanted")
 PRIORITIES = ("urgent", "normal")
 DECIDED = ("approved", "rejected")
+# Awaiting the user's verdict: `unclear` = the user must dig before deciding, never a rejection.
+OPEN = ("proposed", "unclear")
 
 
 # ---------- schedule (the daemon's hook) ----------
@@ -269,36 +271,39 @@ def render(proposals):
         pl = p["payload"]
         when = " → ".join(x for x in (pl.get("start"), pl.get("end")) if x)
         extra = ", ".join(f"{k}: {pl[k]}" for k in ("calendar", "due", "attendees", "event_id") if pl.get(k))
-        head = f"**P{p['id']}** `{p['action']}` {pl.get('title', '')}" + (f" · {when}" if when else "")
+        head = (f"**P{p['id']}** `{p['action']}` {pl.get('title', '')}" + (f" · {when}" if when else "")
+                + (" · **unclear**" if p["state"] == "unclear" else ""))
         lines += [head,
                   f"- {p['source']} · {p['confidence']} · {p['why']}" + (f" · {extra}" if extra else ""),
                   f"- > {p['excerpt']}" + (f" ([link]({p['permalink']}))" if p["permalink"] else ""), ""]
     return "\n".join(lines).rstrip() or "no proposals"
 
 
-def decide(conn, key, approve, reject, now, reason=None, note=None):
-    """The user's verdict, per item. A `proposed` item can be decided; a `rejected` one can be rejected again to
-    record why (`reason`, `note`), keeping its first decision time. `reason` applies to every rejected item."""
-    both = set(approve) & set(reject)
-    if both:
-        raise Refused(f"approved and rejected at once: {sorted(both)}")
+def decide(conn, key, approve, reject, now, reason=None, note=None, unclear=()):
+    """The user's verdict, per item. An open item (`proposed`, or `unclear`: the user must dig before deciding)
+    can be approved, rejected or marked unclear; `unclear` stays open and undecided. A `rejected` one can be
+    rejected again to record why (`reason`, `note`), keeping its first decision time. `reason` applies to every
+    rejected item; `note` to every item."""
+    todo = [(i, "approved") for i in approve] + [(i, "rejected") for i in reject] + [(i, "unclear") for i in unclear]
+    twice = sorted({i for i, _ in todo if [j for j, _ in todo].count(i) > 1})
+    if twice:
+        raise Refused(f"more than one verdict for: {twice}")
     if reason is not None and reason not in REASONS:
         raise Refused(f"reason {reason!r}: one of {', '.join(REASONS)}")
     if reason and not reject:
         raise Refused("--reason explains a rejection: pass --reject")
-    todo = [(i, "approved") for i in approve] + [(i, "rejected") for i in reject]
     rows = {r["id"]: r for r in conn.execute(
         f"SELECT id, state FROM proposals WHERE realm=? AND id IN ({','.join('?' * len(todo))})",
         (key, *[i for i, _ in todo]))} if todo else {}
     bad = [i for i, s in todo if i not in rows
-           or rows[i]["state"] not in (("proposed", "rejected") if s == "rejected" else ("proposed",))]
+           or rows[i]["state"] not in (OPEN + ("rejected",) if s == "rejected" else OPEN)]
     if bad:
-        raise Refused(f"not proposed in {key}: {bad}")
+        raise Refused(f"not open (proposed or unclear) in {key}: {bad}")
     with tx(conn):
         for i, state in todo:
             conn.execute("UPDATE proposals SET state=?, decided_ts=COALESCE(decided_ts, ?), reason=COALESCE(?, reason),"
                          " note=COALESCE(?, note) WHERE id=?",
-                         (state, now, reason if state == "rejected" else None, note, i))
+                         (state, None if state == "unclear" else now, reason if state == "rejected" else None, note, i))
     out = list_proposals(conn, key, ids=[i for i, _ in todo])
     remember_approved(key, [p for p in out if p["state"] == "approved"])
     return out
@@ -887,8 +892,8 @@ def show(conn, key, now):
             "last_scan_start": db.iso(s["scan_start_ts"]),
             "last_scan_end": db.iso(s["scan_end_ts"]), "scan_due": scan_due(conn, key, now),
             "interval_s": interval(now),
-            "proposed": conn.execute("SELECT COUNT(*) FROM proposals WHERE realm=? AND state='proposed'",
-                                     (key,)).fetchone()[0],
+            **{s: conn.execute("SELECT COUNT(*) FROM proposals WHERE realm=? AND state=?", (key, s)).fetchone()[0]
+               for s in OPEN},
             "cursors": [dict(r) for r in conn.execute(
                 "SELECT source, scope, cursor, updated_ts FROM scout_cursors WHERE realm=? ORDER BY source, scope",
                 (key,))]}
@@ -978,22 +983,24 @@ def register(sub):
     p.set_defaults(fn=run(lambda c, a, now: adopt(c, db.resolve_key(a.src, conn=c), a.key)))
 
     pr = sub.add_parser("proposal", help="proposals awaiting the user").add_subparsers(dest="prcmd", required=True)
-    p = kp(pr, "list", "proposals (default: proposed)")
-    p.add_argument("--state", action="append", choices=("proposed", "approved", "rejected", "applied", "failed"))
+    p = kp(pr, "list", "proposals (default: the open ones, proposed and unclear)")
+    p.add_argument("--state", action="append", choices=("proposed", "unclear", "approved", "rejected", "applied", "failed"))
     p.add_argument("--reason", action="append", choices=REASONS, help="rejection reason (mistake: scout ratchet cases)")
     p.add_argument("--ids", help="P1,P2 or 1,2")
     p.add_argument("--md", action="store_true", help="markdown, as mailed and shown to the user")
     p.set_defaults(fn=run(lambda c, a, now: (render if a.md else (lambda x: x))(list_proposals(
-        c, a.key, None if a.ids else a.state or (None if a.reason else ["proposed"]), _ids(a.ids) or None,
+        c, a.key, None if a.ids else a.state or (None if a.reason else list(OPEN)), _ids(a.ids) or None,
         a.reason))))
-    p = kp(pr, "decide", "the user's verdict per item; --reject on a rejected item records its reason")
+    p = kp(pr, "decide", "the user's verdict per item; --reject on a rejected item records its reason; "
+                         "--unclear keeps an item open until the user has dug into it")
     p.add_argument("--approve", default="")
     p.add_argument("--reject", default="")
+    p.add_argument("--unclear", default="", help="P1,P2: needs a deep-dive before deciding; stays open")
     p.add_argument("--reason", choices=REASONS,
-                   help="why rejected: mistake (scout misjudged), obsolete, done (already done), unwanted")
+                   help="why rejected: mistake (scout misjudged), stale, done (already done), unwanted")
     p.add_argument("--note", help="the user's own words on the verdict")
     p.set_defaults(fn=run(lambda c, a, now: decide(c, a.key, _ids(a.approve), _ids(a.reject), now,
-                                                   a.reason, a.note)))
+                                                   a.reason, a.note, _ids(a.unclear))))
     p = kp(pr, "apply", "write approved task.add proposals into tasks")
     p.add_argument("--ids", required=True)
     p.set_defaults(fn=run(lambda c, a, now: apply_tasks(c, a.key, _ids(a.ids), now)))

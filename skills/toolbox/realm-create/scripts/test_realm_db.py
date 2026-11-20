@@ -1,5 +1,6 @@
 """Tests for realmlib.db: `python3 -m unittest test_realm_db` from this directory. No network, no sleeps."""
 
+import json
 import os
 import sqlite3
 import subprocess
@@ -50,6 +51,32 @@ class Schema(Base):
         db.add_subject(self.conn, KEY, "s", "", "Ann", None, None, None, T0)
         with self.assertRaises(sqlite3.IntegrityError):
             self.conn.execute("UPDATE subjects SET state='bogus'")
+
+    def test_migration_8_renames_obsolete_to_stale_and_allows_unclear(self):
+        with tempfile.TemporaryDirectory() as d:
+            conn = sqlite3.connect(Path(d) / "v7.db", isolation_level=None)
+            for n, sql in enumerate(db.MIGRATIONS[:7], start=1):
+                for stmt in sql.split(";"):
+                    if stmt.strip():
+                        conn.execute(stmt)
+                conn.execute(f"PRAGMA user_version={n}")
+            conn.execute("INSERT INTO realms (key, queen, created_ts, updated_ts) VALUES (?, 'Queen', ?, ?)", (KEY, T0, T0))
+            for ref, state, reason in (("a", "rejected", "obsolete"), ("b", "rejected", "mistake"), ("c", "proposed", None)):
+                conn.execute("INSERT INTO proposals (realm, source, ref, action, payload, confidence, state, created_ts,"
+                             " reason, note) VALUES (?, 'slack', ?, 'task.add', '{}', 'high', ?, ?, ?, 'n')",
+                             (KEY, ref, state, T0, reason))
+            conn.close()
+            conn = db.connect(Path(d) / "v7.db")
+            self.addCleanup(conn.close)
+            rows = conn.execute("SELECT ref, state, reason, note FROM proposals ORDER BY ref").fetchall()
+            self.assertEqual([tuple(r) for r in rows], [("a", "rejected", "stale", "n"), ("b", "rejected", "mistake", "n"),
+                                                        ("c", "proposed", None, "n")])
+            with self.assertRaises(sqlite3.IntegrityError):
+                conn.execute("UPDATE proposals SET reason='obsolete' WHERE ref='b'")
+            conn.execute("UPDATE proposals SET state='unclear' WHERE ref='c'")
+            with self.assertRaises(sqlite3.IntegrityError):
+                conn.execute("UPDATE proposals SET state='bogus' WHERE ref='c'")
+            self.assertIn("proposals_by_state", [r[1] for r in conn.execute("PRAGMA index_list(proposals)")])
 
 
 class Isolation(Base):
@@ -317,6 +344,35 @@ class Cli(unittest.TestCase):
             env.pop("HERDR_PANE_ID", None)
             self.assertIn("no realm key", run("table", ok=False))
             self.assertIn(KEY, run("realms"))
+
+    def test_proposal_reason_choices(self):
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / "realm.db"
+            env = {**os.environ, "REALM_DB": str(path), "HOME": d}
+            script = Path(__file__).with_name("realm.py")
+            conn = db.connect(path)
+            db.init_realm(conn, KEY, "Queen", None, T0)
+            conn.execute("INSERT INTO proposals (realm, source, ref, action, payload, confidence, state, created_ts)"
+                         " VALUES (?, 'slack', 'm1', 'task.add', '{}', 'high', 'proposed', ?)", (KEY, T0))
+            conn.close()
+
+            def run(*args, ok=True):
+                p = subprocess.run([sys.executable, str(script), *args], capture_output=True, text=True, env=env)
+                self.assertEqual(p.returncode == 0, ok, p.stdout + p.stderr)
+                return p.stdout
+
+            run("proposal", "decide", "--project", KEY, "--reject", "P1", "--reason", "obsolete", ok=False)
+            run("proposal", "decide", "--project", KEY, "--reject", "P1", "--reason", "stale")
+            self.assertEqual([p["id"] for p in json.loads(run("proposal", "list", "--project", KEY, "--reason", "stale"))],
+                             [1])
+            run("proposal", "decide", "--project", KEY, "--reject", "P1", "--unclear", "P1", ok=False)
+            conn = db.connect(path)
+            conn.execute("INSERT INTO proposals (realm, source, ref, action, payload, confidence, state, created_ts)"
+                         " VALUES (?, 'slack', 'm2', 'task.add', '{}', 'high', 'proposed', ?)", (KEY, T0))
+            conn.close()
+            run("proposal", "decide", "--project", KEY, "--unclear", "P2")
+            self.assertEqual([(p["id"], p["state"]) for p in json.loads(run("proposal", "list", "--project", KEY))],
+                             [(2, "unclear")])
 
 
 if __name__ == "__main__":

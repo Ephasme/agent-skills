@@ -342,12 +342,28 @@ class Proposals(Base):
             scout.decide(self.conn, KEY, [c], [], T0)
         self.assertEqual(scout.list_proposals(self.conn, KEY, ids=[c])[0]["state"], "approved")
 
+    def test_unclear_stays_open_and_decidable_later(self):
+        a, b, c = (scout.propose(self.conn, KEY, [self.prop(ref=r)], T0)[0]["id"] for r in "abc")
+        scout.decide(self.conn, KEY, [], [], T0, note="check with Ann", unclear=[a, b])
+        open_ = scout.list_proposals(self.conn, KEY, list(scout.OPEN))
+        self.assertEqual([(p["id"], p["state"], p["decided"]) for p in open_],
+                         [(a, "unclear", None), (b, "unclear", None), (c, "proposed", None)])
+        self.assertEqual([p["id"] for p in scout.list_proposals(self.conn, KEY, ["unclear"])], [a, b])
+        self.assertIn(f"**P{a}** `task.add` Send deck · **unclear**", scout.render(open_))
+        self.assertNotIn("unclear", scout.render(scout.list_proposals(self.conn, KEY, ids=[c])))
+        scout.decide(self.conn, KEY, [a], [b], T0 + 60, reason="stale")
+        self.assertEqual([(p["state"], p["reason"], p["decided"]) for p in scout.list_proposals(self.conn, KEY, ids=[a, b])],
+                         [("approved", None, db.iso(T0 + 60)), ("rejected", "stale", db.iso(T0 + 60))])
+        for bad in (dict(approve=[c], reject=[], unclear=[c]), dict(approve=[], reject=[], unclear=[a])):
+            with self.assertRaises(Refused):  # two verdicts at once; an approved item is no longer open
+                scout.decide(self.conn, KEY, now=T0, **bad)
+
     def test_reject_reason_kept_and_exported(self):
         a, b, c = (scout.propose(self.conn, KEY, [self.prop(ref=r)], T0)[0]["id"] for r in "abc")
         scout.decide(self.conn, KEY, [], [a, b], T0)
         # A rejection recorded before reasons existed gets its reason later; its decision time stays.
         scout.decide(self.conn, KEY, [], [a], T0 + 60, reason="mistake", note="misread the message")
-        scout.decide(self.conn, KEY, [], [c], T0, reason="obsolete")
+        scout.decide(self.conn, KEY, [], [c], T0, reason="stale")
         mistakes = scout.list_proposals(self.conn, KEY, ["rejected"], reasons=["mistake"])
         self.assertEqual([(p["id"], p["note"], p["decided"]) for p in mistakes],
                          [(a, "misread the message", db.iso(T0))])

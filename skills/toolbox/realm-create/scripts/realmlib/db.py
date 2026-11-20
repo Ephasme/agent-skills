@@ -162,6 +162,21 @@ MIGRATIONS = [
     """
     ALTER TABLE scouts ADD COLUMN model TEXT;
     """,
+    # 8: rejection reason `obsolete` renamed `stale`, and state `unclear` (open: the user must dig before deciding).
+    # A column's CHECK can't be altered in place: rebuild each column (its index first, for state).
+    """
+    ALTER TABLE proposals ADD COLUMN reason_v8 TEXT CHECK (reason_v8 IN ('mistake','stale','done','unwanted'));
+    UPDATE proposals SET reason_v8 = CASE reason WHEN 'obsolete' THEN 'stale' ELSE reason END;
+    ALTER TABLE proposals DROP COLUMN reason;
+    ALTER TABLE proposals RENAME COLUMN reason_v8 TO reason;
+    ALTER TABLE proposals ADD COLUMN state_v8 TEXT NOT NULL DEFAULT 'proposed'
+        CHECK (state_v8 IN ('proposed','unclear','approved','rejected','applied','failed'));
+    UPDATE proposals SET state_v8 = state;
+    DROP INDEX proposals_by_state;
+    ALTER TABLE proposals DROP COLUMN state;
+    ALTER TABLE proposals RENAME COLUMN state_v8 TO state;
+    CREATE INDEX proposals_by_state ON proposals(realm, state);
+    """,
 ]
 
 
