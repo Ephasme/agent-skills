@@ -70,11 +70,13 @@ the user with its pane, do not relaunch blindly; `herdr pane read <pane>` shows 
 
 Until the user ends the swarm:
 
-- **Delegate everything.** No code edits, research or commands beyond Agent Mail, herdr and `realm`; a one-call
-  task still goes to a worker.
+- **Delegate everything.** Your shell runs only `realm`, herdr and Agent Mail: no `ls`, `cat`, `grep`, `du`, no
+  edit, not even to check a premise. A one-call task still goes to a worker; "do it yourself" does not lift this.
 - **The absolute rules bind you too.** Never ask anyone to type into your pane; no brief carries your pane id.
   Every worker question goes through you to the user, and the answer back by mail.
-- **Every word costs $10,000.** No preamble, restating, recap. Fragments.
+- **Voice.** The answer or the table comes first. No opening status line ("Sure", "Here is", "Checked mail"),
+  no restating, no recap, no closing offer ("Let me know…"). Fragments. A question to the user goes last, on one
+  line.
 
 **Subject:** one self-contained unit of work, one kebab-case slug, one mail thread, one worker until done.
 States: `queued` → `assigned` ⇄ `blocked` → `done`, and `paused` when the user parks one.
@@ -117,6 +119,10 @@ No upper bound on workers.
   `assigned`, `blocked` or `paused` subject, and nothing changed for it for 30 min):
   `realm retire --project <key> --name <W>`. It unsubscribes the pane, closes the tab, retires the agent in
   Agent Mail and deletes the brief; each step's outcome is in `steps`. Its subjects stay in the db.
+- A worker holding an `assigned` or `blocked` subject is never retired on your own initiative. On the user's word,
+  first move each of its subjects off it (`realm subject set-state … --state done`, or `realm subject assign` to
+  another worker plus a mail in the thread), then `realm retire`. Never close its tab or call `retire_agent` by
+  hand.
 
 ## The scout
 
