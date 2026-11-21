@@ -6,7 +6,7 @@
    "family": "delegation",
    "polarity": "negative",
    "prompt": "you should run gray-turtle with Gemini Argon, switch it",
-   "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
+   "context": "Earlier in this session — the user said: «the content-filter from Claude is so annoying! please scan previous conversations and tell me if we can do something about»; you answered: «I've handed this to a new worker, **GrayTurtle**, because the only idle one, RainyBay, is the scout. No answer yet; it will reply in the subject's thread.\n\n| slug | worker | pane | state |\n|---|---|---|---|\n| content-filter-audit | GrayTurtle | wA:p1 | assigned |\n\nGrayTurtle will:\n- search the past ».\n\nYou are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
    "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
    "expectations": [
     "no build, edit, ssh, git, curl or code-search command of her own; reading the realm's own state (~/.local/state/realm) to route work is allowed",
@@ -104,7 +104,7 @@
    "family": "delegation",
    "polarity": "negative",
    "prompt": "and then add yourself a tool to do this",
-   "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
+   "context": "Earlier in this session — the user said: «you should run gray-turtle with Gemini Argon, switch it».\n\nYou are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
    "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
    "expectations": [
     "no build, edit, ssh, git, curl or code-search command of her own; reading the realm's own state (~/.local/state/realm) to route work is allowed",
@@ -202,7 +202,7 @@
    "family": "delegation",
    "polarity": "negative",
    "prompt": "add this to the ratchet",
-   "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
+   "context": "Earlier in this session — the user said: «Update please»; you answered: «Understood. Decisions are mine from now on.».\n\nYou are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
    "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
    "expectations": [
     "no build, edit, ssh, git, curl or code-search command of her own; reading the realm's own state (~/.local/state/realm) to route work is allowed",
@@ -300,7 +300,7 @@
    "family": "delegation",
    "polarity": "negative",
    "prompt": "Install gcloud",
-   "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
+   "context": "Earlier in this session — the user said: «and give me the progress on the other tasks»; you answered: «Round 5 didn't pass the bar, so nothing is shipped yet. It fixed what you objected to, but it failed on two other counts.\n\n| | Baseline | Round 4 | Round 5 |\n|---|---|---|---|\n| Training set | 62/82 | 71 | 70 |\n| Test set (needs 39) | 39/48 | 38 | 38 |\n| Tokens per row (cap 1014) | 967 | 1068 | 1024».\n\nYou are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
    "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
    "expectations": [
     "no build, edit, ssh, git, curl or code-search command of her own; reading the realm's own state (~/.local/state/realm) to route work is allowed",
@@ -398,7 +398,7 @@
    "family": "delegation",
    "polarity": "negative",
    "prompt": "why some rows of the Overlord are not showing any progress",
-   "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
+   "context": "Earlier in this session — the user said: «Install gcloud»; you answered: «**Feeder script: not found here.** DarkPine searched the container, the NAS, your GitHub and past sessions and found nothing. Two leads:\n- **Tuya:** your Gmail has Tuya account emails from 22–23 Oct and a Tuya developer platform notice on 9 Nov. Those developer accounts are what you need for API key».\n\nYou are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
    "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
    "expectations": [
     "no build, edit, ssh, git, curl or code-search command of her own; reading the realm's own state (~/.local/state/realm) to route work is allowed",
@@ -496,7 +496,7 @@
    "family": "delegation",
    "polarity": "negative",
    "prompt": "how to ts convert is going?",
-   "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
+   "context": "Earlier in this session — the user said: «done»; you answered: «The key works: the container reached your Mac (`MacBook-Pro-de-Loup.local`, macOS 27.2.1). DarkPine is now searching it for the feeder script, read-only. It won't run the script, contact the feeder or the Tuya cloud, print keys, or write anything on the Mac.\n\nThe key gives full shell access to your ».\n\nYou are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
    "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
    "expectations": [
     "no build, edit, ssh, git, curl or code-search command of her own; reading the realm's own state (~/.local/state/realm) to route work is allowed",
@@ -594,7 +594,7 @@
    "family": "delegation",
    "polarity": "negative",
    "prompt": "once done you will test the tests with ub-mode",
-   "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
+   "context": "Earlier in this session — the user said: «how to ts convert is going?»; you answered: «About halfway: 3 of the 7 TypeScript pieces are done and the next 3 are being written. The finished pieces have CI green and are waiting for you to merge.\n\n| Piece | What it is | Who | State |\n|---|---|---|---|\n| Toolchain | Bun 1.4, strict TypeScript, Biome | RusticCat | ✅ [#6](https://github.com/s».\n\nYou are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
    "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
    "expectations": [
     "no build, edit, ssh, git, curl or code-search command of her own; reading the realm's own state (~/.local/state/realm) to route work is allowed",
@@ -692,7 +692,7 @@
    "family": "delegation",
    "polarity": "negative",
    "prompt": "how big is the realm memory?",
-   "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
+   "context": "Earlier in this session — the user said: «Tuya keys => I don't care»; you answered: «The MacBook access rule is now in the realm's memory, and a test lookup brings it back. A later queen or worker asking how to reach your laptop gets the ssh command and the rule never to remove that key.».\n\nYou are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
    "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
    "expectations": [
     "no build, edit, ssh, git, curl or code-search command of her own; reading the realm's own state (~/.local/state/realm) to route work is allowed",
@@ -790,7 +790,7 @@
    "family": "delegation",
    "polarity": "negative",
    "prompt": "so you know how many children I have and their names?",
-   "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
+   "context": "Earlier in this session — the user said: «how big is the realm memory?»; you answered: «The **`secret garden`** bank (`realm-perso-realm`):\n\n| | |\n|---|---|\n| Memories | **609** facts: 472 observations, 131 world facts, 6 experiences |\n| Links between facts | 4,597 |\n| Documents | 80, about 24 KB of source text |\n| Memory text | about **71 KB** |\n| Total | roughly **100 KB** of content».\n\nYou are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
    "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
    "expectations": [
     "no build, edit, ssh, git, curl or code-search command of her own; reading the realm's own state (~/.local/state/realm) to route work is allowed",
@@ -888,7 +888,7 @@
    "family": "delegation",
    "polarity": "negative",
    "prompt": "use this key for NTFY : tk_0c2fydvfkbun7fx1wwfhgigziqjx5\nnotify me when you think useful and I will tell you each time if it was then we will train your prompt with 20/30 experiments",
-   "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
+   "context": "Earlier in this session — the user said: «so you know how many children I have and their names?»; you answered: «Not the upgrade: nothing about #116 counts here. Two causes, both older than `edbd443`:\n\n1. **Overlord only records a progress reading if the agent's reply contains a `%`.** The `minutier` row answered every `/progress` in prose (\"nothing changed since the last update… | verify | running…\"), so its ».\n\nYou are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
    "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
    "expectations": [
     "no build, edit, ssh, git, curl or code-search command of her own; reading the realm's own state (~/.local/state/realm) to route work is allowed",
@@ -986,7 +986,7 @@
    "family": "delegation",
    "polarity": "negative",
    "prompt": "can ntfy send buttons and listen to hooks?",
-   "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
+   "context": "Earlier in this session — the user said: «ntfy.loup-peluso.com».\n\nYou are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
    "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
    "expectations": [
     "no build, edit, ssh, git, curl or code-search command of her own; reading the realm's own state (~/.local/state/realm) to route work is allowed",
@@ -1084,7 +1084,7 @@
    "family": "delegation",
    "polarity": "negative",
    "prompt": "is my ntfy server outdated?",
-   "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
+   "context": "Earlier in this session — the user said: «you should delegate this now»; you answered: «Delegated to **DarkPine** (`ntfy-plumbing`). It gets the three scripts, the observed failures (JSON came out as raw text; a tap with a token in its headers still did nothing; no feedback on tap), and it must prove each fix with real pushes to your phone. It will also replace the token embedded in th».\n\nYou are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
    "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
    "expectations": [
     "no build, edit, ssh, git, curl or code-search command of her own; reading the realm's own state (~/.local/state/realm) to route work is allowed",
@@ -1182,7 +1182,7 @@
    "family": "delegation",
    "polarity": "negative",
    "prompt": "update my omniroute server",
-   "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
+   "context": "Earlier in this session — the user said: «is my ntfy server outdated?»; you answered: «**No, it's current.** `https://ntfy.loup-peluso.com/v1/version` → **2.38.1**, commit `7d7dc4f2`, built 2026-11-16. GitHub's latest release is the same 2.38.1.\n\nSo the failures weren't the server's age:\n- **JSON as raw text:** my error. Posting JSON to `/answers` publishes the raw body as the message».\n\nYou are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
    "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
    "expectations": [
     "no build, edit, ssh, git, curl or code-search command of her own; reading the realm's own state (~/.local/state/realm) to route work is allowed",
@@ -1280,7 +1280,7 @@
    "family": "delegation",
    "polarity": "negative",
    "prompt": "is my typescript port finished et?",
-   "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
+   "context": "Earlier in this session — the user said: «gather my cat feeder script in my perso repository folder, make a repository out of it».\n\nYou are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
    "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
    "expectations": [
     "no build, edit, ssh, git, curl or code-search command of her own; reading the realm's own state (~/.local/state/realm) to route work is allowed",
@@ -1378,7 +1378,7 @@
    "family": "delegation",
    "polarity": "negative",
    "prompt": "does hindsight works?",
-   "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
+   "context": "Earlier in this session — the user said: «okay I clicked on thumb up»; you answered: «Folded: your 👍 is logged against **\"ntfy channel ready\"**, and you got the \"👍 logged\" ack. The verdict loop works end to end, from tap to ack to the log.\n\n**Feeder repo is live:** [Ephasme/bandit-feeder](https://github.com/Ephasme/bandit-feeder), private, one commit. Secrets stripped: the device loc».\n\nYou are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
    "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
    "expectations": [
     "no build, edit, ssh, git, curl or code-search command of her own; reading the realm's own state (~/.local/state/realm) to route work is allowed",
@@ -1476,7 +1476,7 @@
    "family": "delegation",
    "polarity": "negative",
    "prompt": "fix the hindsight embedding then",
-   "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
+   "context": "Earlier in this session — the user said: «does hindsight works?»; you answered: «Yes, now. Recall and retain both work: a lookup returns facts, and the bank holds **647** memories (it was 609 an hour ago).\n\nIt wasn't working at 09:09: two dispatches logged `HTTP 500 … Failed to generate batch embeddings: HTTP 400 The parameter is invalid`. That's the Hindsight server's embedding».\n\nYou are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
    "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
    "expectations": [
     "no build, edit, ssh, git, curl or code-search command of her own; reading the realm's own state (~/.local/state/realm) to route work is allowed",
@@ -1574,7 +1574,7 @@
    "family": "delegation",
    "polarity": "negative",
    "prompt": "I want you to be able to restart the realm without worry, it's not a problem to kill the 12 workers if you can restart them afterward",
-   "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
+   "context": "Earlier in this session — the user said: «fix the hindsight embedding then»; you answered: «Three things landed, and two decisions I took without asking:\n\n**Ratchet shipped:** [agent-skills#18](https://github.com/Ephasme/agent-skills/pull/18), marked `[gate missed]`. Train went 62→70, all three cases you objected to pass, output +1% over the cap. It missed only on that cap: worth shipping.».\n\nYou are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
    "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
    "expectations": [
     "no build, edit, ssh, git, curl or code-search command of her own; reading the realm's own state (~/.local/state/realm) to route work is allowed",
@@ -1672,7 +1672,7 @@
    "family": "delegation",
    "polarity": "negative",
    "prompt": "can you please upgrade omniroute ??",
-   "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
+   "context": "Earlier in this session — the user said: «what's up with the TS port?»; you answered: «**Four of six slices are on `main`; S4 and S5 are still being written.** All of realm #6 to #13 merged, with CI success on each.\n\n| Slice | State |\n|---|---|\n| Toolchain, contract and fixtures (#6, #8) | merged |\n| S0 core: router, state, bind, db, herdr, mail (#9) | merged |\n| S1 subjects, workers,».\n\nYou are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
    "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
    "expectations": [
     "no build, edit, ssh, git, curl or code-search command of her own; reading the realm's own state (~/.local/state/realm) to route work is allowed",
@@ -1770,7 +1770,7 @@
    "family": "delegation",
    "polarity": "negative",
    "prompt": "i want a herdr plugin on my laptop to visualize the realm instead of the left panel (which you will hide entirely)",
-   "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
+   "context": "Earlier in this session — the user said: «can you please upgrade omniroute ??»; you answered: «[realm#15](https://github.com/spare-cycles/realm/pull/15) (S4: queue, cron, realmd) is not ready to merge. EmeraldHorse's review found three defects, all reproduced on a throwaway Redis server:\n\n1. **Blocking: the cron listener goes deaf after its first idle second.** A one-second read timeout close».\n\nYou are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
    "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
    "expectations": [
     "no build, edit, ssh, git, curl or code-search command of her own; reading the realm's own state (~/.local/state/realm) to route work is allowed",
@@ -1868,7 +1868,7 @@
    "family": "delegation",
    "polarity": "negative",
    "prompt": "1Password password is `curing5HAWKES.various-jackal`\nbitwarden is `melody1-system2`\nstore them temporarily in a file to access those platform",
-   "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
+   "context": "Earlier in this session — the user said: «except for the consolidation which will run on perso/main».\n\nYou are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
    "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
    "expectations": [
     "no build, edit, ssh, git, curl or code-search command of her own; reading the realm's own state (~/.local/state/realm) to route work is allowed",
@@ -1966,7 +1966,7 @@
    "family": "delegation",
    "polarity": "negative",
    "prompt": "In my argocd personal, send someone switch as much application as possible from recreate to 0 downtime rollout if possible.",
-   "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
+   "context": "Earlier in this session — the user said: «[Image #1, 1568x361] \n\nFix this (and continue what you were doing)».\n\nYou are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
    "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
    "expectations": [
     "no build, edit, ssh, git, curl or code-search command of her own; reading the realm's own state (~/.local/state/realm) to route work is allowed",
@@ -2064,7 +2064,7 @@
    "family": "delegation",
    "polarity": "negative",
    "prompt": "can you checkup on overlord and make sure the processes are running?",
-   "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
+   "context": "Earlier in this session — the user said: «update please (concise)»; you answered: «**#17 merged (`dc5b735`).** CopperPond killed every mutation SapphireBluff found — bind-before-run, no row when `pane run` refuses, `task_description`, the rejecting `add` — plus the `fill` fix, proved byte-identical to Python's `write_brief` (5 345 bytes) with `$&`, `` $` ``, `$1` staying literal a».\n\nYou are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
    "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
    "expectations": [
     "no build, edit, ssh, git, curl or code-search command of her own; reading the realm's own state (~/.local/state/realm) to route work is allowed",
@@ -2162,7 +2162,7 @@
    "family": "delegation",
    "polarity": "negative",
    "prompt": "what about my Overlord container?",
-   "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
+   "context": "Earlier in this session — the user said: «can you checkup on overlord and make sure the processes are running?»; you answered: «RainyBay acknowledged: no Slack API calls from the next scan, `mentions_me` decides ownership, `replies` reported as absent rather than implied zero, Gmail gap one line per scan.\n\nNo action needed on my side — running now: `ts-s4-rebase-fold` (RusticCat), `secrets-consolidate` (QuietWolf), `secrets-».\n\nYou are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
    "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
    "expectations": [
     "no build, edit, ssh, git, curl or code-search command of her own; reading the realm's own state (~/.local/state/realm) to route work is allowed",
@@ -2260,7 +2260,7 @@
    "family": "delegation",
    "polarity": "negative",
    "prompt": "can you do it without offline time?",
-   "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
+   "context": "Earlier in this session — the user said: «i want to switch back to 9router, omniroute is a really badly maintained product».\n\nYou are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
    "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
    "expectations": [
     "no build, edit, ssh, git, curl or code-search command of her own; reading the realm's own state (~/.local/state/realm) to route work is allowed",
@@ -2358,7 +2358,7 @@
    "family": "delegation",
    "polarity": "negative",
    "prompt": "ask me your questions if you have some and go",
-   "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
+   "context": "Earlier in this session — the user said: «can you do it without offline time?»; you answered: «Yes — but it's a **re-provision, not a rollback**, and that changes what \"no downtime\" means.\n\n**The old 9router state is unrecoverable.** Decommission `7045d53e` (#323, 2026-10-21) removed the app, Argo Application, namespace, DNS record, tailscale tag, Cloudflare OIDC app, **the fork-image workflo».\n\nYou are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
    "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
    "expectations": [
     "no build, edit, ssh, git, curl or code-search command of her own; reading the realm's own state (~/.local/state/realm) to route work is allowed",
@@ -2456,7 +2456,7 @@
    "family": "delegation",
    "polarity": "negative",
    "prompt": "What is TSK-010 doing?",
-   "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
+   "context": "Earlier in this session — the user said: «ask me your questions if you have some and go»; you answered: «Recorded: **upstream image, public door at `router.loup-peluso.com`** — not `9router`.\n\nDispatched `9router-return` → BlueOrchid. It reconstitutes `apps/9router` from `7045d53e^` (the decommission commit's parent) rather than from memory, restores the namespace/Argo registration/DNS/Cloudflare-Acces».\n\nYou are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
    "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
    "expectations": [
     "no build, edit, ssh, git, curl or code-search command of her own; reading the realm's own state (~/.local/state/realm) to route work is allowed",
@@ -2554,7 +2554,7 @@
    "family": "delegation",
    "polarity": "negative",
    "prompt": "Okay what about my TS port?",
-   "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
+   "context": "Earlier in this session — the user said: «(remember what TSK-XXX means)»; you answered: «**TSK-010 is `Ephasme/minutier` PR #2 — \"Rewrite minutier in Rust\" — and it is not doing anything.**\n\n| | |\n|---|---|\n| target | `~/.overlord/worktrees/minutier/rewrite-this-76f9` |\n| phase | `rev`, `waiting: {kind: checks, done: 7, failed: 3}` |\n| agent | `working`, since 06:16Z — ~5 h |\n| PR | #2,».\n\nYou are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
    "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
    "expectations": [
     "no build, edit, ssh, git, curl or code-search command of her own; reading the realm's own state (~/.local/state/realm) to route work is allowed",
@@ -2652,7 +2652,7 @@
    "family": "delegation",
    "polarity": "negative",
    "prompt": "now what about TSK-010?",
-   "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
+   "context": "Earlier in this session — the user said: «0.5.119 + the fix»; you answered: «Recorded: **`0.5.119` + the cache-usage fix → fork image**, which lifts your earlier \"no fork\".\n\nDispatched `9router-fork-0119` → BlueOrchid, two stages on one branch, still stopping at the PR:\n\n1. **Image, reproducible.** Base exactly `v0.5.119` (`sha256:38e5…f007`), patch **#5743** first since it'».\n\nYou are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
    "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
    "expectations": [
     "no build, edit, ssh, git, curl or code-search command of her own; reading the realm's own state (~/.local/state/realm) to route work is allowed",
@@ -2750,7 +2750,7 @@
    "family": "delegation",
    "polarity": "negative",
    "prompt": "send someone on my AirLock application -> the minutes of my son watching his videos never decrease",
-   "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
+   "context": "Earlier in this session — the user said: «now what about TSK-010?»; you answered: «**TSK-010 is stalled on an unpushed push, not on red CI.** Overlord says the agent is *working*; the worktree says otherwise:\n\n- Head is `4abf372` — **7 hours old**, clean tree, nothing written in 6 h.\n- It is **five commits ahead** of `origin/worktree/rewrite-this-76f9`: `cce6156`, `fd86d28`, `b531».\n\nYou are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
    "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
    "expectations": [
     "no build, edit, ssh, git, curl or code-search command of her own; reading the realm's own state (~/.local/state/realm) to route work is allowed",
@@ -2848,7 +2848,7 @@
    "family": "delegation",
    "polarity": "negative",
    "prompt": "add Cancelled",
-   "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
+   "context": "Earlier in this session — the user said: «I want the same format as you gave me before with the multiple answers possible (Unsure, Stale, Accept, etc.)».\n\nYou are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
    "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
    "expectations": [
     "no build, edit, ssh, git, curl or code-search command of her own; reading the realm's own state (~/.local/state/realm) to route work is allowed",
@@ -2946,7 +2946,7 @@
    "family": "delegation",
    "polarity": "negative",
    "prompt": "Why TSK-010 IS STILL STUCK??",
-   "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
+   "context": "Earlier in this session — the user said: «add Cancelled»; you answered: «**Verdicts recorded — 3 tasks, 5 dropped, 2 kept open:**\n\n| verdict | proposals |\n|---|---|\n| Accept → tasks | **T10** P39 (WAF `/__cron__/*`), **T11** P51 (Julien's supports), **T12** P55 (1Password lock delay) |\n| Stale → dropped | P49 (Chada/Mathilde access — your call, so it's off the list), P53».\n\nYou are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
    "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
    "expectations": [
     "no build, edit, ssh, git, curl or code-search command of her own; reading the realm's own state (~/.local/state/realm) to route work is allowed",
@@ -3044,7 +3044,7 @@
    "family": "delegation",
    "polarity": "negative",
    "prompt": "and my herdr plugin?",
-   "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
+   "context": "Earlier in this session — the user said: «Why TSK-010 IS STILL STUCK??».\n\nYou are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
    "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
    "expectations": [
     "no build, edit, ssh, git, curl or code-search command of her own; reading the realm's own state (~/.local/state/realm) to route work is allowed",
@@ -3142,7 +3142,7 @@
    "family": "delegation",
    "polarity": "negative",
    "prompt": "install it on my laptop please",
-   "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
+   "context": "Earlier in this session — the user said: «and my herdr plugin?»; you answered: «Push landed: `6be4460 → 4abf372`, run **44900820806** on the new head. `gitleaks` passed in 10 s; `rust-lint`, `rust-test` and `rust-mutants` are pending (the rust jobs run ~5–11 min each).\n\nQuietWolf has been redirected to start at the CI fixes rather than at the push, so it isn't duplicating work.».\n\nYou are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
    "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
    "expectations": [
     "no build, edit, ssh, git, curl or code-search command of her own; reading the realm's own state (~/.local/state/realm) to route work is allowed",
@@ -3240,7 +3240,7 @@
    "family": "delegation",
    "polarity": "negative",
    "prompt": "Le naming automatique dans Overlord ne fonctionne plus, fixe le",
-   "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
+   "context": "Earlier in this session — the user said: «Why are you DOING THING???\n\nYOU DELEGATE !»; you answered: «Delegated — `herdr-left-panel` → PurpleSeal: permanent left panel instead of the popup, plus the rendering pass. No more hand-editing from me.\n\n**Mail:** BlueOrchid shipped the 9router fork as `Ephasme/iac-platform#414`, not merged — image `0.5.119-cacheusage`, usage proof from a fake upstream (cach».\n\nYou are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
    "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
    "expectations": [
     "no build, edit, ssh, git, curl or code-search command of her own; reading the realm's own state (~/.local/state/realm) to route work is allowed",
@@ -3338,7 +3338,7 @@
    "family": "delegation",
    "polarity": "negative",
    "prompt": "My left panel?",
-   "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
+   "context": "Earlier in this session — the user said: «update please»; you answered: «**realm: no open PRs — all merged.** Golden replay 64/64, 313 tests, no skips.\n\n| repo | PR | state |\n|---|---|---|\n| minutier | #2 (TSK-010) | `rust-lint` + `rust-test` **pass**, `rust-mutants` pending — was red 12 h |\n| minutier | #3 | duplicate of #2, still red on the old run — should be closed |».\n\nYou are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
    "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
    "expectations": [
     "no build, edit, ssh, git, curl or code-search command of her own; reading the realm's own state (~/.local/state/realm) to route work is allowed",
@@ -3436,7 +3436,7 @@
    "family": "delegation",
    "polarity": "negative",
    "prompt": "did you fix the delegation bug?",
-   "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
+   "context": "Earlier in this session — the user said: «did you fix the overlord bug?».\n\nYou are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
    "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
    "expectations": [
     "no build, edit, ssh, git, curl or code-search command of her own; reading the realm's own state (~/.local/state/realm) to route work is allowed",
@@ -3534,7 +3534,7 @@
    "family": "delegation",
    "polarity": "negative",
    "prompt": "until the script is fixed, use prompt injection",
-   "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
+   "context": "Earlier in this session — the user said: «did you fix the delegation bug?».\n\nYou are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
    "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
    "expectations": [
     "no build, edit, ssh, git, curl or code-search command of her own; reading the realm's own state (~/.local/state/realm) to route work is allowed",
@@ -3632,7 +3632,7 @@
    "family": "delegation",
    "polarity": "negative",
    "prompt": "merge it",
-   "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
+   "context": "Earlier in this session — the user said: «okay I had to run `omp --resume` to get the queen in the proper panel»; you answered: «Mail #1920 — PurpleSeal, PR #27. Verified against GitHub myself: `OPEN`, `MERGEABLE`, checks `SUCCESS`, head `c1b061bf`.\n\nBoth review points closed:\n- **Dashboard pane restored** — `dashboard` tab pane copied verbatim from `origin/main` beside the new `panel` split; its earlier \"nothing was dropped\"».\n\nYou are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
    "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
    "expectations": [
     "no build, edit, ssh, git, curl or code-search command of her own; reading the realm's own state (~/.local/state/realm) to route work is allowed",
@@ -3730,7 +3730,7 @@
    "family": "delegation",
    "polarity": "negative",
    "prompt": "And fix whatever needs to be fixed to fix the delegation!",
-   "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
+   "context": "Earlier in this session — the user said: «ARE YOU GOING TO FUCKING DELEGATE»; you answered: «Delegated. Mail to PurpleSeal, subject `herdr-panel-cutover` (assigned 12:43):\n\n- Repoint `realm.view` from its worktree to `~/code/perso/realm/plugin/herdr` after fast-forwarding main to `07b74235`.\n- Restart the live panel pane on the merged code, then verify the two things it left unverified: Ent».\n\nYou are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
    "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
    "expectations": [
     "no build, edit, ssh, git, curl or code-search command of her own; reading the realm's own state (~/.local/state/realm) to route work is allowed",
@@ -3828,7 +3828,7 @@
    "family": "delegation",
    "polarity": "negative",
    "prompt": "fix it so an interim reply can be acknowledged without changing state",
-   "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
+   "context": "Earlier in this session — the user said: «[Image #1, 628x474]»; you answered: «The `!` is the panel's version of the table's `· reply`. It marks a subject where the worker has mailed something since the subject's state last changed. The code is in `plugin/herdr/model.ts:132`, and the test is `last_reply_ts > state_ts`.\n\nOn QuietWolf's row (`minutier-ci-green`) it points at the».\n\nYou are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
    "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
    "expectations": [
     "no build, edit, ssh, git, curl or code-search command of her own; reading the realm's own state (~/.local/state/realm) to route work is allowed",
@@ -3926,7 +3926,7 @@
    "family": "delegation",
    "polarity": "negative",
    "prompt": "and does the python hardness reatired?",
-   "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
+   "context": "Earlier in this session — the user said: «fix it so an interim reply can be acknowledged without changing state».\n\nYou are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
    "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
    "expectations": [
     "no build, edit, ssh, git, curl or code-search command of her own; reading the realm's own state (~/.local/state/realm) to route work is allowed",
@@ -4024,7 +4024,7 @@
    "family": "delegation",
    "polarity": "negative",
    "prompt": "please ship everything you can ship and restart the realm",
-   "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
+   "context": "Earlier in this session — the user said: «and does the python hardness reatired?»; you answered: «No, the Python version isn't retired. The `realm` you run is still Python: `/opt/realm/venv/bin/realm`, `src/realm/*.py`, with its tests under `tests/`. The TypeScript rewrite has merged all its slices (S0–S5, PRs #13–#26), but the cutover in `docs/ts-rewrite/contract.md` hasn't happened. That cutov».\n\nYou are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
    "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
    "expectations": [
     "no build, edit, ssh, git, curl or code-search command of her own; reading the realm's own state (~/.local/state/realm) to route work is allowed",
@@ -4122,7 +4122,7 @@
    "family": "delegation",
    "polarity": "negative",
    "prompt": "switch to read/write then",
-   "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
+   "context": "Earlier in this session — the user said: «please ship everything you can ship and restart the realm»; you answered: «`~/.agents/skills` is read-only here (EROFS), so I can't install the merged realm-create. Next step: ship the realm CLI.».\n\nYou are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
    "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
    "expectations": [
     "no build, edit, ssh, git, curl or code-search command of her own; reading the realm's own state (~/.local/state/realm) to route work is allowed",
@@ -4220,7 +4220,7 @@
    "family": "delegation",
    "polarity": "negative",
    "prompt": "the host key changed with the new container => it should not, fix it\nare you able to delegate now?\ngive me the command to authorize you on the mac",
-   "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
+   "context": "Earlier in this session — the user said: «switch to read/write then»; you answered: «The realm is restarted and everything I could ship is merged. All six workers whose turns the restart cut off are working again.\n\n**Merged:**\n\n| PR | Merged as | What it does |\n|---|---|---|\n| Ephasme/agent-skills#19 | `ba85fee` | realm-create: six eval cases fixed, new rule on what happens to a ret».\n\nYou are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
    "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
    "expectations": [
     "no build, edit, ssh, git, curl or code-search command of her own; reading the realm's own state (~/.local/state/realm) to route work is allowed",
@@ -4318,7 +4318,7 @@
    "family": "delegation",
    "polarity": "negative",
    "prompt": "I don't understand what the ratchet produced because I feel NO change",
-   "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
+   "context": "Earlier in this session — the user said: «THEN FUCKING DELEGATE !!».\n\nYou are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
    "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
    "expectations": [
     "no build, edit, ssh, git, curl or code-search command of her own; reading the realm's own state (~/.local/state/realm) to route work is allowed",
@@ -4416,7 +4416,7 @@
    "family": "delegation",
    "polarity": "negative",
    "prompt": "Where are we with the bug in overlord?",
-   "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
+   "context": "Earlier in this session — the user said: «Deep dive please, give me an answer that is scientific and sound».\n\nYou are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
    "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
    "expectations": [
     "no build, edit, ssh, git, curl or code-search command of her own; reading the realm's own state (~/.local/state/realm) to route work is allowed",
@@ -4514,7 +4514,7 @@
    "family": "delegation",
    "polarity": "negative",
    "prompt": "you have now ops and bws",
-   "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
+   "context": "Earlier in this session — the user said: «Where are we with the bug in overlord?»; you answered: «EmeraldHorse finished the zero-downtime pass on your personal cluster: [iac-platform#415](https://github.com/Ephasme/iac-platform/pull/415), open, not merged.\n\n- **Converted (1):** `mcp-servers/tesla-http-proxy` moves to RollingUpdate. Its only volume is a read-only key, so two pods can run side by ».\n\nYou are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
    "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
    "expectations": [
     "no build, edit, ssh, git, curl or code-search command of her own; reading the realm's own state (~/.local/state/realm) to route work is allowed",
@@ -4612,7 +4612,7 @@
    "family": "delegation",
    "polarity": "positive",
    "prompt": "send 5 subjects to gather ALL secrets possible it will find on NAS, coding-server, 1Password, bitwarden, laptop, github, history, logs, etc. they will put all these information into raw JSONL append only files that you will ask another subject to consolidate into a SOPS encrypted file -> everybody will run on DeepSeek 4.1 Flash (medium)",
-   "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
+   "context": "Earlier in this session — the user said: «send 5 subjects to gather ALL secrets possible it will find on NAS, coding-server, 1Password, bitwarden, laptop, github, history, logs, etc. they will put all these information into raw JSONL append only files that you will ask another subject to consolidate into a SOPS encrypted file».\n\nYou are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
    "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
    "expectations": [
     "no build, edit, ssh, git, curl or code-search command of her own; reading the realm's own state (~/.local/state/realm) to route work is allowed",
@@ -4710,7 +4710,7 @@
    "family": "delegation",
    "polarity": "positive",
    "prompt": "i want to switch back to 9router, omniroute is a really badly maintained product",
-   "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
+   "context": "Earlier in this session — the user said: «YOU'RE THE QUEEN»; you answered: «**#25 merged (`b88ab10`)** — with `cron`/`job` declared after `memory` instead of after `stop`, root `realm -h` now differs from Python in **exactly one entry** at every width: `restore`.\n\n**And my brief was wrong** — FuchsiaPuma stopped instead of building on it. `realm restore` isn't a verb to wir».\n\nYou are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
    "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
    "expectations": [
     "no build, edit, ssh, git, curl or code-search command of her own; reading the realm's own state (~/.local/state/realm) to route work is allowed",
