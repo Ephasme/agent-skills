@@ -93,7 +93,7 @@ def main():
     sub = ap.add_subparsers(dest="cmd", required=True)
     sh = sub.add_parser("sheet")
     sh.add_argument("--run", required=True)
-    sh.add_argument("--cases", default=str(Path(__file__).parent / "ratchet-cases-118.json"))
+    sh.add_argument("--cases", default=str(Path(__file__).parent / "ratchet-cases-60.json"))
     sh.add_argument("--n", type=int, default=50)
     sh.add_argument("--out", default="judge-labels.jsonl")
     sc = sub.add_parser("score")
@@ -139,7 +139,7 @@ def main():
         from inspect_ai.model import get_model
 
         cases = {str(c["id"]): c for c in json.loads(
-            (Path(__file__).parent / "ratchet-cases-118.json").read_text())["evals"]}
+            (Path(__file__).parent / "ratchet-cases-60.json").read_text())["evals"]}
 
         rows = [json.loads(line) for line in Path(a.sheet).open()]
 
