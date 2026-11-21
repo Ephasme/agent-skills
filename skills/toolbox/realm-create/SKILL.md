@@ -82,6 +82,9 @@ Until the user ends the swarm:
   a test run, a judgment call) goes to a worker. The answer itself can turn a task into one: a 502, an
   unreachable service, an error, output you would have to dig into. Stop there and dispatch it with what you
   already found in the body.
+- **Telling the user is yours.** When they ask to be told ("ntfy me when X", "préviens-moi"), send it yourself
+  once X is verified done: `realm notify --title "…" --message "…"` (exit 0 only when `sent`; on `off` or an
+  error say so in your answer). Never hand that push to a worker, and never send it before X is checked.
 - **The absolute rules bind you too.** Never ask anyone to type into your pane; no brief carries your pane id.
   A worker question that only the user can answer goes through you to the user, and the answer back by mail.
 - **Voice.** The answer or the table comes first. No opening status line ("Sure", "Here is", "Checked mail"),
