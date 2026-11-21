@@ -120,11 +120,15 @@ def boot_mean(rates_by_case, families, n=10000, seed=2):
 
 def single(a):
     rows = load(a.single)
-    cases = {str(c["id"]): c for c in json.loads(Path(a.cases).read_text())["evals"]}
+    cases = {str(c["id"]): c for c in json.loads(Path(a.cases).read_text())["evals"]
+             if not a.split or c.get("split") == a.split}
+    rows = [r for r in rows if str(r["prompt_id"]) in cases]
     fam = {k: v["family"] for k, v in cases.items()}
-    print("## Manifest\n")
+    print(f"## Manifest{' (' + a.split + ' split)' if a.split else ''}\n")
     manifest("run", rows, set(fam))
     bc_all = by_case(rows)
+    if not bc_all:
+        raise SystemExit("no samples for this split in that run")
     rates_ = rates(bc_all)
     lo, hi = boot_mean(rates_, fam)
     passes = sum(sum(v.values()) for v in bc_all.values())
@@ -157,6 +161,7 @@ def main():
                                      "per-family rates, and its own A/A noise")
     ap.add_argument("--cases", default=str(Path(__file__).parent / "ratchet-cases-118.json"))
     ap.add_argument("--prespecified", default="")
+    ap.add_argument("--split", choices=["train", "test"], help="restrict to the split recorded in the case file")
     ap.add_argument("--out", default="")
     a = ap.parse_args()
     if a.single:
@@ -164,7 +169,11 @@ def main():
     if not (a.baseline and a.branch):
         raise SystemExit("give --single, or both --baseline and --branch")
     base, branch = load(a.baseline), load(a.branch)
-    fam = {str(c["id"]): c["family"] for c in json.loads(Path(a.cases).read_text())["evals"]}
+    allcases = {str(c["id"]): c for c in json.loads(Path(a.cases).read_text())["evals"]}
+    if a.split:
+        allcases = {k: c for k, c in allcases.items() if c.get("split") == a.split}
+        print(f"# {a.split} split only ({len(allcases)} cases)\n")
+    fam = {k: c["family"] for k, c in allcases.items()}
     print("## Manifest\n")
     manifest("baseline", base, set(fam))
     manifest("branch", branch, set(fam))

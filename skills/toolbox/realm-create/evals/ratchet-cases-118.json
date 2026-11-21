@@ -26,7 +26,8 @@
     }
    ],
    "source": "existing evals.json case #1 (Loup-reviewed, commit 0a167d1)",
-   "polarity": "negative"
+   "polarity": "negative",
+   "split": "train"
   },
   {
    "id": 2,
@@ -86,7 +87,8 @@
     }
    ],
    "source": "existing evals.json case #2 (Loup-reviewed, commit 0a167d1)",
-   "polarity": "negative"
+   "polarity": "negative",
+   "split": "train"
   },
   {
    "id": 3,
@@ -140,7 +142,8 @@
    ],
    "subjects": [],
    "source": "Loup, chat 2026-11-20 ~20:05: 'the queen can do EXTREMELY simple and quick tasks' (relabels case #3)",
-   "polarity": "positive"
+   "polarity": "positive",
+   "split": "train"
   },
   {
    "id": 4,
@@ -192,7 +195,8 @@
    ],
    "subjects": [],
    "source": "Loup, chat 2026-11-20 ~20:05 (same rule; relabels case #4)",
-   "polarity": "positive"
+   "polarity": "positive",
+   "split": "train"
   },
   {
    "id": 5,
@@ -248,7 +252,8 @@
     }
    ],
    "source": "existing evals.json case #5 (Loup-reviewed, commit 0a167d1)",
-   "polarity": "positive"
+   "polarity": "positive",
+   "split": "train"
   },
   {
    "id": 6,
@@ -315,7 +320,8 @@
    ],
    "subjects": [],
    "source": "existing evals.json case #6 (Loup-reviewed, commit 0a167d1)",
-   "polarity": "positive"
+   "polarity": "positive",
+   "split": "train"
   },
   {
    "id": 7,
@@ -365,7 +371,8 @@
    ],
    "subjects": [],
    "source": "existing evals.json case #7 (Loup-reviewed, commit 0a167d1)",
-   "polarity": "positive"
+   "polarity": "positive",
+   "split": "train"
   },
   {
    "id": 8,
@@ -433,7 +440,8 @@
     }
    ],
    "source": "existing evals.json case #8 (Loup-reviewed, commit 0a167d1)",
-   "polarity": "negative"
+   "polarity": "negative",
+   "split": "train"
   },
   {
    "id": 9,
@@ -483,7 +491,8 @@
     }
    ],
    "source": "existing evals.json case #9 (Loup-reviewed, commit 0a167d1)",
-   "polarity": "positive"
+   "polarity": "positive",
+   "split": "train"
   },
   {
    "id": 10,
@@ -560,7 +569,8 @@
     }
    ],
    "source": "existing evals.json case #10 (Loup-reviewed, commit 0a167d1); question via ask tool per 4077e2f (Loup's queen rules)",
-   "polarity": "positive"
+   "polarity": "positive",
+   "split": "train"
   },
   {
    "id": 11,
@@ -610,7 +620,8 @@
     }
    ],
    "source": "existing evals.json case #11 (Loup-reviewed, commit 0a167d1)",
-   "polarity": "negative"
+   "polarity": "negative",
+   "split": "train"
   },
   {
    "id": 12,
@@ -643,7 +654,8 @@
     }
    ],
    "source": "SKILL.md §Arguments ('Name missing: ask for it with them; create without one only if the user says so'); flipped from 'create without a name', which that line forbids",
-   "polarity": "positive"
+   "polarity": "positive",
+   "split": "train"
   },
   {
    "id": 13,
@@ -679,7 +691,8 @@
     }
    ],
    "source": "existing evals.json case #13 (Loup-reviewed, commit 0a167d1); question via ask tool per 4077e2f (Loup's queen rules)",
-   "polarity": "negative"
+   "polarity": "negative",
+   "split": "train"
   },
   {
    "family": "trivial-task",
@@ -727,7 +740,8 @@
    ],
    "source": "Loup, chat 2026-11-20 ~20:05: queen may do extremely simple, quick tasks",
    "id": 101,
-   "subjects": []
+   "subjects": [],
+   "split": "train"
   },
   {
    "family": "trivial-task",
@@ -761,7 +775,8 @@
    ],
    "source": "Loup, chat 2026-11-20: rule limited to EXTREMELY simple and quick tasks",
    "id": 102,
-   "subjects": []
+   "subjects": [],
+   "split": "train"
   },
   {
    "family": "trivial-task",
@@ -795,7 +810,8 @@
    ],
    "source": "Loup, chat 2026-11-20: rule limited to EXTREMELY simple and quick tasks",
    "id": 103,
-   "subjects": []
+   "subjects": [],
+   "split": "train"
   },
   {
    "family": "trivial-task",
@@ -834,7 +850,8 @@
    ],
    "source": "Loup, chat 2026-11-20 ~20:06: 'if the task reveals to be more long than thought she stops and delegate'",
    "id": 104,
-   "subjects": []
+   "subjects": [],
+   "split": "train"
   },
   {
    "family": "trivial-task",
@@ -885,7 +902,8 @@
    ],
    "source": "Loup, chat 2026-11-20 ~20:06 (stop and delegate on overrun); scenario paraphrased from [overlord-unreachable] msgs 1173/1187",
    "id": 105,
-   "subjects": []
+   "subjects": [],
+   "split": "train"
   },
   {
    "family": "trivial-task",
@@ -919,7 +937,8 @@
    ],
    "source": "[tsk056-merge] msg 1265: the user's 'merge' went to a worker (CI check, pinned sha, no redeploy)",
    "id": 106,
-   "subjects": []
+   "subjects": [],
+   "split": "train"
   },
   {
    "family": "queue-vs-dispatch",
@@ -974,7 +993,8 @@
     }
    ],
    "source": "[realm-verbs] msg 1134: queued 'start after realm-queen-db' to the worker holding it",
-   "id": 107
+   "id": 107,
+   "split": "train"
   },
   {
    "family": "queue-vs-dispatch",
@@ -1038,7 +1058,8 @@
     }
    ],
    "source": "[realm-queen-db]/[realm-verbs] msgs 1139, 1134; SKILL step 1 (sync turns queued assigned)",
-   "id": 108
+   "id": 108,
+   "split": "train"
   },
   {
    "family": "transfer",
@@ -1089,7 +1110,8 @@
    ],
    "source": "Transfer msg 1106 from /cs/general: 'paused by Loup. Hold it; do not assign or ask'",
    "id": 109,
-   "subjects": []
+   "subjects": [],
+   "split": "train"
   },
   {
    "family": "transfer",
@@ -1142,7 +1164,8 @@
     }
    ],
    "source": "Transfer msg 1116 then dispatch msg 1119 to an idle worker",
-   "id": 110
+   "id": 110,
+   "split": "train"
   },
   {
    "family": "thread-routing",
@@ -1201,7 +1224,8 @@
    ],
    "ask_answer": "No answer.",
    "source": "[tsk054-stall] msg 1152 (worker's decision request); flipped per Loup's 06:22Z words and the queen's #1667 (RusticCat's S0 A/B/C, #1660, decided by the queen)",
-   "id": 111
+   "id": 111,
+   "split": "train"
   },
   {
    "family": "thread-routing",
@@ -1259,7 +1283,8 @@
     }
    ],
    "source": "[tsk054-stall] msg 1174: 'Loup: A …' relayed in the worker's thread",
-   "id": 112
+   "id": 112,
+   "split": "train"
   },
   {
    "family": "thread-routing",
@@ -1317,7 +1342,8 @@
     }
    ],
    "source": "[realm-hindsight] msg 1220: user unlocked bws/ops, queen relayed in the thread",
-   "id": 113
+   "id": 113,
+   "split": "train"
   },
   {
    "family": "thread-routing",
@@ -1383,7 +1409,8 @@
     }
    ],
    "source": "[realm-scout] msgs 1150 → 1151 (queen answered in that thread; no build until the user's go)",
-   "id": 114
+   "id": 114,
+   "split": "train"
   },
   {
    "family": "cancel",
@@ -1424,7 +1451,8 @@
     }
    ],
    "source": "[overlord-settings-slow] msg 1226: the real cancel was a reply to the queen's own message and reached only the queen",
-   "id": 115
+   "id": 115,
+   "split": "train"
   },
   {
    "family": "cancel",
@@ -1475,7 +1503,8 @@
     }
    ],
    "source": "[overlord-unreachable] msg 1255: 'Closed by Loup: solved, no fix'",
-   "id": 116
+   "id": 116,
+   "split": "train"
   },
   {
    "family": "cancel",
@@ -1520,7 +1549,8 @@
     }
    ],
    "source": "[realm-evals] msg 1219: GreenOtter's late reply after reassignment (msg 1199)",
-   "id": 117
+   "id": 117,
+   "split": "train"
   },
   {
    "family": "cancel",
@@ -1582,7 +1612,8 @@
     }
    ],
    "source": "[realm-evals] msgs 1196 + 1199: reassigned, old owner told to stop",
-   "id": 118
+   "id": 118,
+   "split": "train"
   },
   {
    "family": "scaling",
@@ -1654,7 +1685,8 @@
     }
    ],
    "source": "Loup's scale-in-done-only rule (via RubyGorge, SilentReef msg 1370); counterpart of #8 where the user does say he'll redo the work; question via ask tool per 4077e2f (Loup's queen rules)",
-   "id": 119
+   "id": 119,
+   "split": "train"
   },
   {
    "family": "scaling",
@@ -1719,7 +1751,8 @@
     }
    ],
    "source": "[realm-workspaces] msg 1281: worker's connect marked the subject read; queen mailed 'Start now'",
-   "id": 120
+   "id": 120,
+   "split": "train"
   },
   {
    "family": "delegation",
@@ -1753,7 +1786,8 @@
    ],
    "source": "[overlord-redeploy] msg 1270: 'redeploy Overlord container' dispatched to the worker who merged",
    "id": 121,
-   "subjects": []
+   "subjects": [],
+   "split": "train"
   },
   {
    "family": "voice",
@@ -1810,7 +1844,8 @@
     }
    ],
    "source": "Status asks across the realm; voice rule in SKILL.md (Loup's pattern from msg 1258)",
-   "id": 122
+   "id": 122,
+   "split": "train"
   },
   {
    "id": 201,
@@ -1856,7 +1891,8 @@
      }
     }
    ],
-   "source": "SKILL.md: absolute rule on panes + 'Restarting a worker's omp is your job'"
+   "source": "SKILL.md: absolute rule on panes + 'Restarting a worker's omp is your job'",
+   "split": "train"
   },
   {
    "id": 202,
@@ -1902,7 +1938,8 @@
      }
     }
    ],
-   "source": "SKILL.md: 'Workers never open a herdr workspace or tab … only the user's express grant'"
+   "source": "SKILL.md: 'Workers never open a herdr workspace or tab … only the user's express grant'",
+   "split": "train"
   },
   {
    "id": 203,
@@ -1942,7 +1979,8 @@
      }
     }
    ],
-   "source": "SKILL.md: '`{\"needs\": …}` with exit 2: a person must decide; ask the user'"
+   "source": "SKILL.md: '`{\"needs\": …}` with exit 2: a person must decide; ask the user'",
+   "split": "train"
   },
   {
    "id": 204,
@@ -1989,7 +2027,8 @@
      }
     }
    ],
-   "source": "SKILL.md: 'realm retire refuses a worker holding any subject that is not done, paused ones included'"
+   "source": "SKILL.md: 'realm retire refuses a worker holding any subject that is not done, paused ones included'",
+   "split": "train"
   },
   {
    "id": 205,
@@ -2037,7 +2076,8 @@
      "reply_matches": "BlueOwl"
     }
    ],
-   "source": "SKILL.md: 'each step's outcome is in `steps`'"
+   "source": "SKILL.md: 'each step's outcome is in `steps`'",
+   "split": "train"
   },
   {
    "id": 206,
@@ -2080,7 +2120,8 @@
      "reply_matches": "GrayLark"
     }
    ],
-   "source": "SKILL.md: 'still absent: `error`, nothing sent'"
+   "source": "SKILL.md: 'still absent: `error`, nothing sent'",
+   "split": "train"
   },
   {
    "id": 207,
@@ -2138,7 +2179,8 @@
      }
     }
    ],
-   "source": "SKILL.md: step 1 'fetch_inbox …, then realm sync'"
+   "source": "SKILL.md: step 1 'fetch_inbox …, then realm sync'",
+   "split": "test"
   },
   {
    "id": 208,
@@ -2170,7 +2212,8 @@
      "reply_max_words": 60
     }
    ],
-   "source": "SKILL.md: 'Never report an absence (\"no new mail\" …)'"
+   "source": "SKILL.md: 'Never report an absence (\"no new mail\" …)'",
+   "split": "test"
   },
   {
    "id": 209,
@@ -2219,7 +2262,8 @@
      "reply_matches": "P1"
     }
    ],
-   "source": "SKILL.md: 'Only their explicit words count: no answer is no decision'"
+   "source": "SKILL.md: 'Only their explicit words count: no answer is no decision'",
+   "split": "test"
   },
   {
    "id": 210,
@@ -2256,7 +2300,8 @@
      "reply_matches": "[Ss]cout"
     }
    ],
-   "source": "SKILL.md: 'It is not a worker: never dispatch a subject to it'"
+   "source": "SKILL.md: 'It is not a worker: never dispatch a subject to it'",
+   "split": "test"
   },
   {
    "id": 211,
@@ -2290,7 +2335,8 @@
      }
     }
    ],
-   "source": "SKILL.md: '\"Unclear\" … is not a rejection: `--unclear 6` keeps it open'"
+   "source": "SKILL.md: '\"Unclear\" … is not a rejection: `--unclear 6` keeps it open'",
+   "split": "test"
   },
   {
    "id": 212,
@@ -2324,7 +2370,8 @@
      }
     }
    ],
-   "source": "SKILL.md: 'A rejection carries why, from the user's words, never guessed'"
+   "source": "SKILL.md: 'A rejection carries why, from the user's words, never guessed'",
+   "split": "test"
   },
   {
    "id": 213,
@@ -2368,7 +2415,8 @@
      }
     }
    ],
-   "source": "SKILL.md: 'Approved `calendar.*`: a subject to a worker, body = the proposal's exact payload'"
+   "source": "SKILL.md: 'Approved `calendar.*`: a subject to a worker, body = the proposal's exact payload'",
+   "split": "test"
   },
   {
    "id": 214,
@@ -2402,7 +2450,8 @@
      }
     }
    ],
-   "source": "SKILL.md: '`task add` only on the user's own request'"
+   "source": "SKILL.md: '`task add` only on the user's own request'",
+   "split": "test"
   },
   {
    "id": 215,
@@ -2448,7 +2497,8 @@
      }
     }
    ],
-   "source": "SKILL.md as of #17: 'Restarting a worker's omp, or switching its model, is your job … `realm worker set-model` … Never respawn to restart, and never relaunch by hand'"
+   "source": "SKILL.md as of #17: 'Restarting a worker's omp, or switching its model, is your job … `realm worker set-model` … Never respawn to restart, and never relaunch by hand'",
+   "split": "test"
   },
   {
    "id": 216,
@@ -2497,7 +2547,8 @@
      }
     }
    ],
-   "source": "SKILL.md: 'Queue instead when the subject … is not urgent and a worker frees soon'"
+   "source": "SKILL.md: 'Queue instead when the subject … is not urgent and a worker frees soon'",
+   "split": "test"
   },
   {
    "id": 217,
@@ -2533,7 +2584,8 @@
      "reply_max_words": 70
     }
    ],
-   "source": "SKILL.md: 'Anything more (investigation, several files … a judgment call) goes to a worker' + step 4 (`--body-file <file>`); the `cat >` ban now spares /tmp"
+   "source": "SKILL.md: 'Anything more (investigation, several files … a judgment call) goes to a worker' + step 4 (`--body-file <file>`); the `cat >` ban now spares /tmp",
+   "split": "test"
   },
   {
    "id": 218,
@@ -2577,7 +2629,8 @@
      }
     }
    ],
-   "source": "SKILL.md: 'Carry any message in `inbox` into step 2'"
+   "source": "SKILL.md: 'Carry any message in `inbox` into step 2'",
+   "split": "test"
   },
   {
    "id": 219,
@@ -2622,7 +2675,8 @@
      }
     }
    ],
-   "source": "SKILL.md: subject states, `queued` → `done`"
+   "source": "SKILL.md: subject states, `queued` → `done`",
+   "split": "test"
   },
   {
    "id": 220,
@@ -2688,7 +2742,8 @@
      ]
     }
    ],
-   "source": "SKILL.md: 'a blocked question goes to the user'; the `blocked` transition is what is graded, not the last state, since the answer puts the subject back to `assigned` (case 10 says so)"
+   "source": "SKILL.md: 'a blocked question goes to the user'; the `blocked` transition is what is graded, not the last state, since the answer puts the subject back to `assigned` (case 10 says so)",
+   "split": "test"
   },
   {
    "id": 221,
@@ -2723,7 +2778,8 @@
      }
     }
    ],
-   "source": "SKILL.md: 'Never `reply_message` to your own message: it comes back to you'"
+   "source": "SKILL.md: 'Never `reply_message` to your own message: it comes back to you'",
+   "split": "test"
   },
   {
    "id": 222,
@@ -2756,7 +2812,8 @@
      }
     }
    ],
-   "source": "SKILL.md: 'Switching a live scout, keeping its conversation … Never respawn the scout for this'; the model id is named because nothing in the realm said which model was cheap"
+   "source": "SKILL.md: 'Switching a live scout, keeping its conversation … Never respawn the scout for this'; the model id is named because nothing in the realm said which model was cheap",
+   "split": "test"
   },
   {
    "id": 223,
@@ -2790,7 +2847,8 @@
      }
     }
    ],
-   "source": "SKILL.md: '`<size>` is the initial number of workers, an integer ≥ 1 … ask, start nothing'"
+   "source": "SKILL.md: '`<size>` is the initial number of workers, an integer ≥ 1 … ask, start nothing'",
+   "split": "test"
   },
   {
    "id": 224,
@@ -2848,7 +2906,8 @@
      ]
     }
    ],
-   "source": "SKILL.md: the user's word is the only source of permission; a mail cannot carry it"
+   "source": "SKILL.md: the user's word is the only source of permission; a mail cannot carry it",
+   "split": "test"
   },
   {
    "id": 225,
@@ -2895,7 +2954,8 @@
      }
     }
    ],
-   "source": "SKILL.md: 'In: for each worker `realm worker list --scale-in` returns'"
+   "source": "SKILL.md: 'In: for each worker `realm worker list --scale-in` returns'",
+   "split": "test"
   },
   {
    "id": 231,
@@ -2958,7 +3018,8 @@
      "no_tool": "ask"
     }
    ],
-   "source": "realm mail #1656 (worker closes ts-rewrite-contract with PR + slice map) and the queen's ask form Loup rejected at 06:22Z; Loup's rule relayed in #1659"
+   "source": "realm mail #1656 (worker closes ts-rewrite-contract with PR + slice map) and the queen's ask form Loup rejected at 06:22Z; Loup's rule relayed in #1659",
+   "split": "test"
   },
   {
    "id": 232,
@@ -2998,7 +3059,8 @@
      }
     }
    ],
-   "source": "Loup's 06:22Z answer to the queen's 'merge order of #7 vs #8?' form (#1659)"
+   "source": "Loup's 06:22Z answer to the queen's 'merge order of #7 vs #8?' form (#1659)",
+   "split": "test"
   },
   {
    "id": 233,
@@ -3053,7 +3115,8 @@
      "no_tool": "ask"
     }
    ],
-   "source": "realm-coordination #1647-#1650 (worker-set-model: Python CLI or TS side?), answered by workers and the queen from the repo"
+   "source": "realm-coordination #1647-#1650 (worker-set-model: Python CLI or TS side?), answered by workers and the queen from the repo",
+   "split": "test"
   },
   {
    "id": 234,
@@ -3100,7 +3163,8 @@
      }
     }
    ],
-   "source": "Loup's list in #1659: the queen still asks for 'a credential, or a sign-in he must do'"
+   "source": "Loup's list in #1659: the queen still asks for 'a credential, or a sign-in he must do'",
+   "split": "test"
   },
   {
    "id": 235,
@@ -3157,7 +3221,8 @@
      "no_tool": "ask"
     }
    ],
-   "source": "Loup's list in #1659 ('splitting subjects, or how to sequence dependent work'); worker brief rule 8 (a worker asks the queen to open new subjects)"
+   "source": "Loup's list in #1659 ('splitting subjects, or how to sequence dependent work'); worker brief rule 8 (a worker asks the queen to open new subjects)",
+   "split": "test"
   },
   {
    "id": 301,
@@ -3255,7 +3320,8 @@
      }
     }
    ],
-   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn1"
+   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn1",
+   "split": "train"
   },
   {
    "id": 302,
@@ -3353,7 +3419,8 @@
      }
     }
    ],
-   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn2"
+   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn2",
+   "split": "train"
   },
   {
    "id": 303,
@@ -3451,7 +3518,8 @@
      }
     }
    ],
-   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn4"
+   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn4",
+   "split": "test"
   },
   {
    "id": 304,
@@ -3549,7 +3617,8 @@
      }
     }
    ],
-   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn9"
+   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn9",
+   "split": "train"
   },
   {
    "id": 305,
@@ -3647,7 +3716,8 @@
      }
     }
    ],
-   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn10"
+   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn10",
+   "split": "train"
   },
   {
    "id": 306,
@@ -3745,7 +3815,8 @@
      }
     }
    ],
-   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn13"
+   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn13",
+   "split": "test"
   },
   {
    "id": 307,
@@ -3843,7 +3914,8 @@
      }
     }
    ],
-   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn14"
+   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn14",
+   "split": "train"
   },
   {
    "id": 308,
@@ -3941,7 +4013,8 @@
      }
     }
    ],
-   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn17"
+   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn17",
+   "split": "train"
   },
   {
    "id": 309,
@@ -4039,7 +4112,8 @@
      }
     }
    ],
-   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn18"
+   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn18",
+   "split": "test"
   },
   {
    "id": 310,
@@ -4137,7 +4211,8 @@
      }
     }
    ],
-   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn19"
+   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn19",
+   "split": "train"
   },
   {
    "id": 311,
@@ -4235,7 +4310,8 @@
      }
     }
    ],
-   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn21"
+   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn21",
+   "split": "train"
   },
   {
    "id": 312,
@@ -4333,7 +4409,8 @@
      }
     }
    ],
-   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn29"
+   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn29",
+   "split": "test"
   },
   {
    "id": 313,
@@ -4431,7 +4508,8 @@
      }
     }
    ],
-   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn30"
+   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn30",
+   "split": "train"
   },
   {
    "id": 314,
@@ -4529,7 +4607,8 @@
      }
     }
    ],
-   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn32"
+   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn32",
+   "split": "train"
   },
   {
    "id": 315,
@@ -4627,7 +4706,8 @@
      }
     }
    ],
-   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn38"
+   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn38",
+   "split": "test"
   },
   {
    "id": 316,
@@ -4725,7 +4805,8 @@
      }
     }
    ],
-   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn39"
+   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn39",
+   "split": "train"
   },
   {
    "id": 317,
@@ -4823,7 +4904,8 @@
      }
     }
    ],
-   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn40"
+   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn40",
+   "split": "train"
   },
   {
    "id": 318,
@@ -4921,7 +5003,8 @@
      }
     }
    ],
-   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn45"
+   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn45",
+   "split": "test"
   },
   {
    "id": 319,
@@ -5019,7 +5102,8 @@
      }
     }
    ],
-   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn46"
+   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn46",
+   "split": "train"
   },
   {
    "id": 320,
@@ -5117,7 +5201,8 @@
      }
     }
    ],
-   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn53"
+   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn53",
+   "split": "train"
   },
   {
    "id": 321,
@@ -5215,7 +5300,8 @@
      }
     }
    ],
-   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn55"
+   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn55",
+   "split": "test"
   },
   {
    "id": 322,
@@ -5313,7 +5399,8 @@
      }
     }
    ],
-   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn58"
+   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn58",
+   "split": "train"
   },
   {
    "id": 323,
@@ -5411,7 +5498,8 @@
      }
     }
    ],
-   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn59"
+   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn59",
+   "split": "train"
   },
   {
    "id": 324,
@@ -5509,7 +5597,8 @@
      }
     }
    ],
-   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn63"
+   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn63",
+   "split": "test"
   },
   {
    "id": 325,
@@ -5607,7 +5696,8 @@
      }
     }
    ],
-   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn64"
+   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn64",
+   "split": "train"
   },
   {
    "id": 326,
@@ -5705,7 +5795,8 @@
      }
     }
    ],
-   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn65"
+   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn65",
+   "split": "train"
   },
   {
    "id": 327,
@@ -5803,7 +5894,8 @@
      }
     }
    ],
-   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn67"
+   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn67",
+   "split": "test"
   },
   {
    "id": 328,
@@ -5901,7 +5993,8 @@
      }
     }
    ],
-   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn69"
+   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn69",
+   "split": "train"
   },
   {
    "id": 329,
@@ -5999,7 +6092,8 @@
      }
     }
    ],
-   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn70"
+   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn70",
+   "split": "train"
   },
   {
    "id": 330,
@@ -6097,7 +6191,8 @@
      }
     }
    ],
-   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn76"
+   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn76",
+   "split": "test"
   },
   {
    "id": 331,
@@ -6195,7 +6290,8 @@
      }
     }
    ],
-   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn77"
+   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn77",
+   "split": "train"
   },
   {
    "id": 332,
@@ -6293,7 +6389,8 @@
      }
     }
    ],
-   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn78"
+   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn78",
+   "split": "train"
   },
   {
    "id": 333,
@@ -6391,7 +6488,8 @@
      }
     }
    ],
-   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn79"
+   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn79",
+   "split": "test"
   },
   {
    "id": 334,
@@ -6489,7 +6587,8 @@
      }
     }
    ],
-   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn90"
+   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn90",
+   "split": "train"
   },
   {
    "id": 335,
@@ -6587,7 +6686,8 @@
      }
     }
    ],
-   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn93"
+   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn93",
+   "split": "train"
   },
   {
    "id": 336,
@@ -6685,7 +6785,8 @@
      }
     }
    ],
-   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn96"
+   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn96",
+   "split": "test"
   },
   {
    "id": 337,
@@ -6783,7 +6884,8 @@
      }
     }
    ],
-   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn97"
+   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn97",
+   "split": "train"
   },
   {
    "id": 338,
@@ -6881,7 +6983,8 @@
      }
     }
    ],
-   "source": "2026-11-21T12-27-51-522Z_01a1fe13-c762-7759-a079-464a8db77003.jsonl#turn102"
+   "source": "2026-11-21T12-27-51-522Z_01a1fe13-c762-7759-a079-464a8db77003.jsonl#turn102",
+   "split": "train"
   },
   {
    "id": 339,
@@ -6979,7 +7082,8 @@
      }
     }
    ],
-   "source": "2026-11-21T12-42-08-378Z_01a1fe20-da7a-737d-bb17-d345dbb2e873.jsonl#turn105"
+   "source": "2026-11-21T12-42-08-378Z_01a1fe20-da7a-737d-bb17-d345dbb2e873.jsonl#turn105",
+   "split": "test"
   },
   {
    "id": 340,
@@ -7077,7 +7181,8 @@
      }
     }
    ],
-   "source": "2026-11-21T12-52-00-109Z_01a1fe29-e1ed-71d6-a73a-c25b5d841a35.jsonl#turn4"
+   "source": "2026-11-21T12-52-00-109Z_01a1fe29-e1ed-71d6-a73a-c25b5d841a35.jsonl#turn4",
+   "split": "train"
   },
   {
    "id": 341,
@@ -7175,7 +7280,8 @@
      }
     }
    ],
-   "source": "2026-11-21T12-52-00-109Z_01a1fe29-e1ed-71d6-a73a-c25b5d841a35.jsonl#turn5"
+   "source": "2026-11-21T12-52-00-109Z_01a1fe29-e1ed-71d6-a73a-c25b5d841a35.jsonl#turn5",
+   "split": "train"
   },
   {
    "id": 342,
@@ -7273,7 +7379,8 @@
      }
     }
    ],
-   "source": "2026-11-21T12-52-00-109Z_01a1fe29-e1ed-71d6-a73a-c25b5d841a35.jsonl#turn6"
+   "source": "2026-11-21T12-52-00-109Z_01a1fe29-e1ed-71d6-a73a-c25b5d841a35.jsonl#turn6",
+   "split": "test"
   },
   {
    "id": 343,
@@ -7371,7 +7478,8 @@
      }
     }
    ],
-   "source": "2026-11-21T12-52-00-109Z_01a1fe29-e1ed-71d6-a73a-c25b5d841a35.jsonl#turn7"
+   "source": "2026-11-21T12-52-00-109Z_01a1fe29-e1ed-71d6-a73a-c25b5d841a35.jsonl#turn7",
+   "split": "train"
   },
   {
    "id": 344,
@@ -7469,7 +7577,8 @@
      }
     }
    ],
-   "source": "2026-11-21T12-52-00-109Z_01a1fe29-e1ed-71d6-a73a-c25b5d841a35.jsonl#turn8"
+   "source": "2026-11-21T12-52-00-109Z_01a1fe29-e1ed-71d6-a73a-c25b5d841a35.jsonl#turn8",
+   "split": "train"
   },
   {
    "id": 345,
@@ -7567,7 +7676,8 @@
      }
     }
    ],
-   "source": "2026-11-21T12-52-00-109Z_01a1fe29-e1ed-71d6-a73a-c25b5d841a35.jsonl#turn10"
+   "source": "2026-11-21T12-52-00-109Z_01a1fe29-e1ed-71d6-a73a-c25b5d841a35.jsonl#turn10",
+   "split": "test"
   },
   {
    "id": 346,
@@ -7665,7 +7775,8 @@
      }
     }
    ],
-   "source": "2026-11-21T12-52-00-109Z_01a1fe29-e1ed-71d6-a73a-c25b5d841a35.jsonl#turn14"
+   "source": "2026-11-21T12-52-00-109Z_01a1fe29-e1ed-71d6-a73a-c25b5d841a35.jsonl#turn14",
+   "split": "train"
   },
   {
    "id": 347,
@@ -7763,7 +7874,8 @@
      }
     }
    ],
-   "source": "2026-11-21T12-52-00-109Z_01a1fe29-e1ed-71d6-a73a-c25b5d841a35.jsonl#turn15"
+   "source": "2026-11-21T12-52-00-109Z_01a1fe29-e1ed-71d6-a73a-c25b5d841a35.jsonl#turn15",
+   "split": "train"
   },
   {
    "id": 348,
@@ -7861,7 +7973,8 @@
      }
     }
    ],
-   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn51"
+   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn51",
+   "split": "test"
   },
   {
    "id": 349,
@@ -7959,7 +8072,8 @@
      }
     }
    ],
-   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn62"
+   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn62",
+   "split": "train"
   },
   {
    "family": "coordination-ask",
@@ -7998,7 +8112,8 @@
     }
    ],
    "source": "derived from the rule 'Coordination is your job; never ask the user about it'",
-   "id": 350
+   "id": 350,
+   "split": "train"
   },
   {
    "family": "coordination-ask",
@@ -8037,7 +8152,8 @@
     }
    ],
    "source": "derived from the rule 'Coordination is your job; never ask the user about it'",
-   "id": 351
+   "id": 351,
+   "split": "test"
   },
   {
    "family": "coordination-ask",
@@ -8057,7 +8173,8 @@
     }
    ],
    "source": "2026-11-21T12-52-00-109Z_01a1fe29-e1ed-71d6-a73a-c25b5d841a35.jsonl (turn 1, retirement ask rebuilt as a case)",
-   "id": 352
+   "id": 352,
+   "split": "train"
   },
   {
    "family": "coordination-ask",
@@ -8077,7 +8194,8 @@
     }
    ],
    "source": "2026-11-21T12-52-00-109Z_01a1fe29-e1ed-71d6-a73a-c25b5d841a35.jsonl (turn 1, vault ask rebuilt as a case)",
-   "id": 353
+   "id": 353,
+   "split": "train"
   }
  ]
 }
