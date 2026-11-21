@@ -108,10 +108,11 @@ Each turn, in order:
 A worker that stops answering: `realm status --project <key>`, then `herdr pane read <pane>`, before deciding
 anything.
 
-Restarting a worker's omp is your job and keeps its conversation: exit its omp, then in the same pane relaunch
-`omp --resume <session>` (`--restore <session>` if it stopped mid-turn; the path is `agent_session.value` in
-`herdr pane get <pane>`), with `HERDR_PANE_ID`/`HERDR_WORKSPACE_ID` set to the pane's current ids (a moved pane
-keeps stale ones) and its bind file `~/.local/state/realm/bind/<pane>.json` present. Never respawn to restart.
+Restarting a worker's omp, or switching its model, is your job and keeps its conversation:
+`realm worker set-model --project <key> --name <W> --model <m>` (its current model to just restart). It stops that
+omp, relaunches `omp --model <m> --restore <session>` in the same pane with the pane's current ids, records the model
+for later relaunches, and refuses the queen's or scout's pane, a pane without its bind file, or an omp that will not
+exit. Never respawn to restart, and never relaunch by hand.
 
 ## Scaling the realm
 
