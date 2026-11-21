@@ -1,7 +1,8 @@
 """Thin runner: the realm_create Inspect harness over ratchet-cases.json, written in the ratchet layout.
 
 Usage: ratchet_run.py --out <dir> --reps N [--train-ids 1,2,…] [--ids …]
-Writes <out>/results.jsonl, <out>/errors.jsonl, <out>/traces/<id>_rep<k>.json (train ids only); resumes on
+Writes <out>/results.jsonl, <out>/errors.jsonl, <out>/traces/<id>_rep<k>.json (every case, unless
+--no-traces); resumes on
 (case, rep). The grade is the deterministic `rules` scorer only.
 """
 
@@ -56,10 +57,12 @@ def main():
     ap.add_argument("--train-ids", default="")
     ap.add_argument("--ids", default="")
     ap.add_argument("--cases", default=str(HERE / "ratchet-cases.json"))
+    ap.add_argument("--no-traces", action="store_true",
+                    help="skip traces/<id>_rep<k>.json; by default every graded case gets one, so the "
+                         "judge label sheet can be built from the run")
     a = ap.parse_args()
     out = Path(a.out)
     (out / "traces").mkdir(parents=True, exist_ok=True)
-    train = {s for s in a.train_ids.split(",") if s}
     cases = json.loads(Path(a.cases).read_text())["evals"]
     if a.ids:
         keep = set(a.ids.split(","))
@@ -101,7 +104,7 @@ def main():
                        "latency_s": round(s.total_time or (time.time() - t0), 2)}
                 with open(out / "results.jsonl", "a") as f:
                     f.write(json.dumps(row, ensure_ascii=False) + "\n")
-                if cid in train:
+                if not a.no_traces:
                     (out / "traces" / f"{cid}_rep{rep}.json").write_text(json.dumps(trace(s), ensure_ascii=False, indent=1))
 
 

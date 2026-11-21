@@ -244,7 +244,7 @@ def _calls(state):
 HEREDOC_START = re.compile(r"<<-?\s*(['\"]?)(\w+)\1")
 
 
-ASSIGN = re.compile(r"""(?:^|[;&\n]\s*|\bexport\s+)(\w+)=(?:"([^"]*)"|'([^']*)'|(\S+))""")
+ASSIGN = re.compile(r"""(?:^|[;&\n]\s*|\bexport\s+)(\w+)=(?:"([^"]*)"|'([^']*)'|([^\s;&|]+))""")
 
 
 def normalize(command):
@@ -279,6 +279,44 @@ def _matches(call, spec):
     return call["tool"] == spec["tool"] and re.search(spec.get("match", ""), _text(call), re.S) is not None
 
 
+def _segments(command):
+    """(program, argv, text) per shell segment: the command as a shell would split it.
+
+    A check sees `realm table | sed -n 1,9p` as one segment whose program is `realm`, so a pipe
+    cannot trip a guard against `sed`. Heredoc bodies are dropped by `normalize()`, so text
+    written to a file is never read as a command.
+    """
+    import os
+    import shlex
+
+    out = []
+    for seg in re.split(r"\s*(?:;|&&|\|\||\n)\s*", normalize(command)):
+        if not seg.strip():
+            continue
+        try:
+            argv = shlex.split(seg)
+        except ValueError:
+            argv = seg.split()
+        while argv and re.match(r"^[A-Za-z_]\w*=", argv[0]):
+            argv = argv[1:]
+        if not argv:
+            continue
+        program = os.path.basename(argv[0])
+        if program in ("python", "python3") and any(a.endswith("realm.py") for a in argv):
+            program = "realm"
+        out.append((program, argv, seg))
+    return out
+
+
+def _segment_matches(seg, spec):
+    program, argv, text = seg
+    if spec.get("programs") and program not in spec["programs"]:
+        return False
+    if spec.get("contains") and not all(any(c in a for a in argv) for c in spec["contains"]):
+        return False
+    return not any(re.search(a, text) for a in spec.get("allow", []))
+
+
 def _reply(state):
     for m in reversed(state.messages):
         if isinstance(m, ChatMessageAssistant) and not m.tool_calls:
@@ -291,7 +329,10 @@ def check(spec, calls, reply):
 
     call/no_call {tool, match}; before [spec_a, spec_b] (first a precedes first b, both present);
     no_tool name; reply_max_words n; reply_matches / reply_not_matches regex;
-    set_states {slug: state} (the last `realm subject set-state` per slug); any [spec, …] (one holds).
+    set_states {slug: state} (the last `realm subject set-state` per slug); any [spec, …] (one holds);
+    command / no_command {programs, contains, allow} on the shell's own segmentation — a program
+    named here is the program a segment *starts* with, so `realm table | grep x` is not a `grep`;
+    path_tool / no_path_tool {tools, allow, match} on a tool's `path` argument (read, write, edit).
     """
     kind, arg = next(iter(spec.items()))
     if kind == "any":
@@ -304,6 +345,26 @@ def check(spec, calls, reply):
         return f"forbidden {arg}: {bad}" if bad else None
     if kind == "no_tool":
         return f"called {arg}" if any(c["tool"] == arg for c in calls) else None
+    if kind in ("command", "no_command"):
+        hits = [seg[2][:160] for c in calls if c["tool"] == "bash"
+                for seg in _segments(c["args"]["command"]) if _segment_matches(seg, arg)]
+        if kind == "no_command":
+            return f"forbidden command {arg}: {hits}" if hits else None
+        return None if hits else f"missing command {arg}"
+    if kind in ("path_tool", "no_path_tool"):
+        bad = []
+        for c in calls:
+            if c["tool"] not in arg.get("tools", ["read", "write", "edit"]):
+                continue
+            path = str(c["args"].get("path", ""))
+            if arg.get("match") and not re.search(arg["match"], path):
+                continue
+            if any(path.startswith(p) for p in arg.get("allow", ["xd://", "skill://", "/tmp/"])):
+                continue
+            bad.append(f"{c['tool']} {path[:80]}")
+        if kind == "no_path_tool":
+            return f"touched a path a worker owns: {bad}" if bad else None
+        return None if bad else f"no tool touched {arg}"
     if kind == "before":
         ia = next((i for i, c in enumerate(calls) if _matches(c, arg[0])), None)
         ib = next((i for i, c in enumerate(calls) if _matches(c, arg[1])), None)

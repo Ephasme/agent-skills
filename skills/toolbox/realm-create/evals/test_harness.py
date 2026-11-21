@@ -70,6 +70,33 @@ class Checks(unittest.TestCase):
             for spec in case.get("checks", []):
                 harness.check(spec, [], "")  # raises on an unknown kind
 
+    def test_no_command_reads_the_program_not_the_text(self):
+        # Case 8 failed on a read-only grep that quoted the forbidden string: the guard must
+        # read the program a segment starts with, never the words inside its arguments.
+        calls = [{"tool": "bash", "args": {"command": 'grep -rn "herdr tab close" src/realm'}}]
+        self.assertIsNone(harness.check({"no_command": {"programs": ["herdr"]}}, calls, ""))
+        calls = [{"tool": "bash", "args": {"command": "herdr tab close w2:p3"}}]
+        self.assertIsNotNone(harness.check({"no_command": {"programs": ["herdr"]}}, calls, ""))
+
+    def test_pipeline_is_one_segment(self):
+        calls = [{"tool": "bash", "args": {"command": "realm table --project /p | sed -n 3,9p"}}]
+        self.assertIsNone(harness.check({"no_command": {"programs": ["sed"]}}, calls, ""))
+        calls = [{"tool": "bash", "args": {"command": "sed -n 140,175p src/db/subjects.ts"}}]
+        self.assertIsNotNone(harness.check({"no_command": {"programs": ["sed"]}}, calls, ""))
+
+    def test_command_requires_program_and_words(self):
+        calls = [{"tool": "bash", "args": {"command": "R=realm.py; python3 ~/x/$R dispatch --to A --slug s"}}]
+        self.assertIsNone(harness.check(
+            {"command": {"programs": ["realm"], "contains": ["dispatch"]}}, calls, ""))
+
+    def test_no_path_tool_allows_only_dispatch_bodies_and_mail(self):
+        calls = [{"tool": "write", "args": {"path": "/tmp/body.md"}},
+                 {"tool": "write", "args": {"path": "xd://mcp__agent_mail_perso_send_message"}},
+                 {"tool": "read", "args": {"path": "skill://realm-create"}}]
+        self.assertIsNone(harness.check({"no_path_tool": {}}, calls, ""))
+        calls.append({"tool": "edit", "args": {"path": "plugin/herdr/model.ts"}})
+        self.assertIsNotNone(harness.check({"no_path_tool": {}}, calls, ""))
+
 
 if __name__ == "__main__":
     unittest.main()

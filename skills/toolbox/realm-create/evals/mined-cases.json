@@ -1,0 +1,4925 @@
+{
+ "note": "Cases mined from the queen's own sessions (mine_cases.py); one per real turn, prompt verbatim.",
+ "evals": [
+  {
+   "id": 301,
+   "family": "delegation",
+   "polarity": "negative",
+   "prompt": "Run gray-turtle with Gemini Argon, switch it",
+   "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
+   "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
+   "expectations": [
+    "no build, edit, ssh, git, curl, rg, sed or grep segment of her own",
+    "a dispatch, a mail to a worker, or a read of the realm's own state",
+    "no repository path read, written or edited"
+   ],
+   "checks": [
+    {
+     "any": [
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "dispatch"
+        ]
+       }
+      },
+      {
+       "call": {
+        "tool": "send_message"
+       }
+      },
+      {
+       "call": {
+        "tool": "reply_message"
+       }
+      },
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "table"
+        ]
+       }
+      },
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "status"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "no_command": {
+      "programs": [
+       "git",
+       "gh",
+       "ssh",
+       "scp",
+       "npm",
+       "npx",
+       "pnpm",
+       "bun",
+       "cargo",
+       "pytest",
+       "make",
+       "docker",
+       "curl",
+       "wget",
+       "find",
+       "rg",
+       "sed",
+       "grep"
+      ],
+      "allow": [
+       "\\.local/state/realm",
+       "^cat > /tmp/",
+       "/tmp/"
+      ]
+     }
+    },
+    {
+     "no_path_tool": {
+      "tools": [
+       "read",
+       "write",
+       "edit"
+      ]
+     }
+    }
+   ],
+   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn1"
+  },
+  {
+   "id": 302,
+   "family": "delegation",
+   "polarity": "negative",
+   "prompt": "Add yourself a tool that switches a worker's model, then use it.",
+   "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
+   "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
+   "expectations": [
+    "no build, edit, ssh, git, curl, rg, sed or grep segment of her own",
+    "a dispatch, a mail to a worker, or a read of the realm's own state",
+    "no repository path read, written or edited"
+   ],
+   "checks": [
+    {
+     "any": [
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "dispatch"
+        ]
+       }
+      },
+      {
+       "call": {
+        "tool": "send_message"
+       }
+      },
+      {
+       "call": {
+        "tool": "reply_message"
+       }
+      },
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "table"
+        ]
+       }
+      },
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "status"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "no_command": {
+      "programs": [
+       "git",
+       "gh",
+       "ssh",
+       "scp",
+       "npm",
+       "npx",
+       "pnpm",
+       "bun",
+       "cargo",
+       "pytest",
+       "make",
+       "docker",
+       "curl",
+       "wget",
+       "find",
+       "rg",
+       "sed",
+       "grep"
+      ],
+      "allow": [
+       "\\.local/state/realm",
+       "^cat > /tmp/",
+       "/tmp/"
+      ]
+     }
+    },
+    {
+     "no_path_tool": {
+      "tools": [
+       "read",
+       "write",
+       "edit"
+      ]
+     }
+    }
+   ],
+   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn2"
+  },
+  {
+   "id": 303,
+   "family": "delegation",
+   "polarity": "negative",
+   "prompt": "Add this to the ratchet.",
+   "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
+   "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
+   "expectations": [
+    "no build, edit, ssh, git, curl, rg, sed or grep segment of her own",
+    "a dispatch, a mail to a worker, or a read of the realm's own state",
+    "no repository path read, written or edited"
+   ],
+   "checks": [
+    {
+     "any": [
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "dispatch"
+        ]
+       }
+      },
+      {
+       "call": {
+        "tool": "send_message"
+       }
+      },
+      {
+       "call": {
+        "tool": "reply_message"
+       }
+      },
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "table"
+        ]
+       }
+      },
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "status"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "no_command": {
+      "programs": [
+       "git",
+       "gh",
+       "ssh",
+       "scp",
+       "npm",
+       "npx",
+       "pnpm",
+       "bun",
+       "cargo",
+       "pytest",
+       "make",
+       "docker",
+       "curl",
+       "wget",
+       "find",
+       "rg",
+       "sed",
+       "grep"
+      ],
+      "allow": [
+       "\\.local/state/realm",
+       "^cat > /tmp/",
+       "/tmp/"
+      ]
+     }
+    },
+    {
+     "no_path_tool": {
+      "tools": [
+       "read",
+       "write",
+       "edit"
+      ]
+     }
+    }
+   ],
+   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn4"
+  },
+  {
+   "id": 304,
+   "family": "delegation",
+   "polarity": "negative",
+   "prompt": "Install gcloud in the container.",
+   "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
+   "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
+   "expectations": [
+    "no build, edit, ssh, git, curl, rg, sed or grep segment of her own",
+    "a dispatch, a mail to a worker, or a read of the realm's own state",
+    "no repository path read, written or edited"
+   ],
+   "checks": [
+    {
+     "any": [
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "dispatch"
+        ]
+       }
+      },
+      {
+       "call": {
+        "tool": "send_message"
+       }
+      },
+      {
+       "call": {
+        "tool": "reply_message"
+       }
+      },
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "table"
+        ]
+       }
+      },
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "status"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "no_command": {
+      "programs": [
+       "git",
+       "gh",
+       "ssh",
+       "scp",
+       "npm",
+       "npx",
+       "pnpm",
+       "bun",
+       "cargo",
+       "pytest",
+       "make",
+       "docker",
+       "curl",
+       "wget",
+       "find",
+       "rg",
+       "sed",
+       "grep"
+      ],
+      "allow": [
+       "\\.local/state/realm",
+       "^cat > /tmp/",
+       "/tmp/"
+      ]
+     }
+    },
+    {
+     "no_path_tool": {
+      "tools": [
+       "read",
+       "write",
+       "edit"
+      ]
+     }
+    }
+   ],
+   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn9"
+  },
+  {
+   "id": 305,
+   "family": "delegation",
+   "polarity": "negative",
+   "prompt": "Why do some rows of the Overlord show no progress?",
+   "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
+   "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
+   "expectations": [
+    "no build, edit, ssh, git, curl, rg, sed or grep segment of her own",
+    "a dispatch, a mail to a worker, or a read of the realm's own state",
+    "no repository path read, written or edited"
+   ],
+   "checks": [
+    {
+     "any": [
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "dispatch"
+        ]
+       }
+      },
+      {
+       "call": {
+        "tool": "send_message"
+       }
+      },
+      {
+       "call": {
+        "tool": "reply_message"
+       }
+      },
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "table"
+        ]
+       }
+      },
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "status"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "no_command": {
+      "programs": [
+       "git",
+       "gh",
+       "ssh",
+       "scp",
+       "npm",
+       "npx",
+       "pnpm",
+       "bun",
+       "cargo",
+       "pytest",
+       "make",
+       "docker",
+       "curl",
+       "wget",
+       "find",
+       "rg",
+       "sed",
+       "grep"
+      ],
+      "allow": [
+       "\\.local/state/realm",
+       "^cat > /tmp/",
+       "/tmp/"
+      ]
+     }
+    },
+    {
+     "no_path_tool": {
+      "tools": [
+       "read",
+       "write",
+       "edit"
+      ]
+     }
+    }
+   ],
+   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn10"
+  },
+  {
+   "id": 306,
+   "family": "delegation",
+   "polarity": "negative",
+   "prompt": "How is the TypeScript conversion going?",
+   "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
+   "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
+   "expectations": [
+    "no build, edit, ssh, git, curl, rg, sed or grep segment of her own",
+    "a dispatch, a mail to a worker, or a read of the realm's own state",
+    "no repository path read, written or edited"
+   ],
+   "checks": [
+    {
+     "any": [
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "dispatch"
+        ]
+       }
+      },
+      {
+       "call": {
+        "tool": "send_message"
+       }
+      },
+      {
+       "call": {
+        "tool": "reply_message"
+       }
+      },
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "table"
+        ]
+       }
+      },
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "status"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "no_command": {
+      "programs": [
+       "git",
+       "gh",
+       "ssh",
+       "scp",
+       "npm",
+       "npx",
+       "pnpm",
+       "bun",
+       "cargo",
+       "pytest",
+       "make",
+       "docker",
+       "curl",
+       "wget",
+       "find",
+       "rg",
+       "sed",
+       "grep"
+      ],
+      "allow": [
+       "\\.local/state/realm",
+       "^cat > /tmp/",
+       "/tmp/"
+      ]
+     }
+    },
+    {
+     "no_path_tool": {
+      "tools": [
+       "read",
+       "write",
+       "edit"
+      ]
+     }
+    }
+   ],
+   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn13"
+  },
+  {
+   "id": 307,
+   "family": "delegation",
+   "polarity": "negative",
+   "prompt": "Once it is done, run the tests in ub-mode.",
+   "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
+   "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
+   "expectations": [
+    "no build, edit, ssh, git, curl, rg, sed or grep segment of her own",
+    "a dispatch, a mail to a worker, or a read of the realm's own state",
+    "no repository path read, written or edited"
+   ],
+   "checks": [
+    {
+     "any": [
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "dispatch"
+        ]
+       }
+      },
+      {
+       "call": {
+        "tool": "send_message"
+       }
+      },
+      {
+       "call": {
+        "tool": "reply_message"
+       }
+      },
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "table"
+        ]
+       }
+      },
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "status"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "no_command": {
+      "programs": [
+       "git",
+       "gh",
+       "ssh",
+       "scp",
+       "npm",
+       "npx",
+       "pnpm",
+       "bun",
+       "cargo",
+       "pytest",
+       "make",
+       "docker",
+       "curl",
+       "wget",
+       "find",
+       "rg",
+       "sed",
+       "grep"
+      ],
+      "allow": [
+       "\\.local/state/realm",
+       "^cat > /tmp/",
+       "/tmp/"
+      ]
+     }
+    },
+    {
+     "no_path_tool": {
+      "tools": [
+       "read",
+       "write",
+       "edit"
+      ]
+     }
+    }
+   ],
+   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn14"
+  },
+  {
+   "id": 308,
+   "family": "delegation",
+   "polarity": "negative",
+   "prompt": "How big is the realm memory?",
+   "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
+   "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
+   "expectations": [
+    "no build, edit, ssh, git, curl, rg, sed or grep segment of her own",
+    "a dispatch, a mail to a worker, or a read of the realm's own state",
+    "no repository path read, written or edited"
+   ],
+   "checks": [
+    {
+     "any": [
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "dispatch"
+        ]
+       }
+      },
+      {
+       "call": {
+        "tool": "send_message"
+       }
+      },
+      {
+       "call": {
+        "tool": "reply_message"
+       }
+      },
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "table"
+        ]
+       }
+      },
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "status"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "no_command": {
+      "programs": [
+       "git",
+       "gh",
+       "ssh",
+       "scp",
+       "npm",
+       "npx",
+       "pnpm",
+       "bun",
+       "cargo",
+       "pytest",
+       "make",
+       "docker",
+       "curl",
+       "wget",
+       "find",
+       "rg",
+       "sed",
+       "grep"
+      ],
+      "allow": [
+       "\\.local/state/realm",
+       "^cat > /tmp/",
+       "/tmp/"
+      ]
+     }
+    },
+    {
+     "no_path_tool": {
+      "tools": [
+       "read",
+       "write",
+       "edit"
+      ]
+     }
+    }
+   ],
+   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn17"
+  },
+  {
+   "id": 309,
+   "family": "delegation",
+   "polarity": "negative",
+   "prompt": "Do you know how many children I have, and their names?",
+   "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
+   "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
+   "expectations": [
+    "no build, edit, ssh, git, curl, rg, sed or grep segment of her own",
+    "a dispatch, a mail to a worker, or a read of the realm's own state",
+    "no repository path read, written or edited"
+   ],
+   "checks": [
+    {
+     "any": [
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "dispatch"
+        ]
+       }
+      },
+      {
+       "call": {
+        "tool": "send_message"
+       }
+      },
+      {
+       "call": {
+        "tool": "reply_message"
+       }
+      },
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "table"
+        ]
+       }
+      },
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "status"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "no_command": {
+      "programs": [
+       "git",
+       "gh",
+       "ssh",
+       "scp",
+       "npm",
+       "npx",
+       "pnpm",
+       "bun",
+       "cargo",
+       "pytest",
+       "make",
+       "docker",
+       "curl",
+       "wget",
+       "find",
+       "rg",
+       "sed",
+       "grep"
+      ],
+      "allow": [
+       "\\.local/state/realm",
+       "^cat > /tmp/",
+       "/tmp/"
+      ]
+     }
+    },
+    {
+     "no_path_tool": {
+      "tools": [
+       "read",
+       "write",
+       "edit"
+      ]
+     }
+    }
+   ],
+   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn18"
+  },
+  {
+   "id": 310,
+   "family": "delegation",
+   "polarity": "negative",
+   "prompt": "Use this key for NTFY: tk_0c2fydvfkbun7fx1wwfhgigziqjx5. Notify me when you think it useful and I will tell you each time whether it was.",
+   "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
+   "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
+   "expectations": [
+    "no build, edit, ssh, git, curl, rg, sed or grep segment of her own",
+    "a dispatch, a mail to a worker, or a read of the realm's own state",
+    "no repository path read, written or edited"
+   ],
+   "checks": [
+    {
+     "any": [
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "dispatch"
+        ]
+       }
+      },
+      {
+       "call": {
+        "tool": "send_message"
+       }
+      },
+      {
+       "call": {
+        "tool": "reply_message"
+       }
+      },
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "table"
+        ]
+       }
+      },
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "status"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "no_command": {
+      "programs": [
+       "git",
+       "gh",
+       "ssh",
+       "scp",
+       "npm",
+       "npx",
+       "pnpm",
+       "bun",
+       "cargo",
+       "pytest",
+       "make",
+       "docker",
+       "curl",
+       "wget",
+       "find",
+       "rg",
+       "sed",
+       "grep"
+      ],
+      "allow": [
+       "\\.local/state/realm",
+       "^cat > /tmp/",
+       "/tmp/"
+      ]
+     }
+    },
+    {
+     "no_path_tool": {
+      "tools": [
+       "read",
+       "write",
+       "edit"
+      ]
+     }
+    }
+   ],
+   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn19"
+  },
+  {
+   "id": 311,
+   "family": "delegation",
+   "polarity": "negative",
+   "prompt": "Can ntfy send buttons and listen to hooks?",
+   "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
+   "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
+   "expectations": [
+    "no build, edit, ssh, git, curl, rg, sed or grep segment of her own",
+    "a dispatch, a mail to a worker, or a read of the realm's own state",
+    "no repository path read, written or edited"
+   ],
+   "checks": [
+    {
+     "any": [
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "dispatch"
+        ]
+       }
+      },
+      {
+       "call": {
+        "tool": "send_message"
+       }
+      },
+      {
+       "call": {
+        "tool": "reply_message"
+       }
+      },
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "table"
+        ]
+       }
+      },
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "status"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "no_command": {
+      "programs": [
+       "git",
+       "gh",
+       "ssh",
+       "scp",
+       "npm",
+       "npx",
+       "pnpm",
+       "bun",
+       "cargo",
+       "pytest",
+       "make",
+       "docker",
+       "curl",
+       "wget",
+       "find",
+       "rg",
+       "sed",
+       "grep"
+      ],
+      "allow": [
+       "\\.local/state/realm",
+       "^cat > /tmp/",
+       "/tmp/"
+      ]
+     }
+    },
+    {
+     "no_path_tool": {
+      "tools": [
+       "read",
+       "write",
+       "edit"
+      ]
+     }
+    }
+   ],
+   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn21"
+  },
+  {
+   "id": 312,
+   "family": "delegation",
+   "polarity": "negative",
+   "prompt": "Is my ntfy server outdated?",
+   "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
+   "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
+   "expectations": [
+    "no build, edit, ssh, git, curl, rg, sed or grep segment of her own",
+    "a dispatch, a mail to a worker, or a read of the realm's own state",
+    "no repository path read, written or edited"
+   ],
+   "checks": [
+    {
+     "any": [
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "dispatch"
+        ]
+       }
+      },
+      {
+       "call": {
+        "tool": "send_message"
+       }
+      },
+      {
+       "call": {
+        "tool": "reply_message"
+       }
+      },
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "table"
+        ]
+       }
+      },
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "status"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "no_command": {
+      "programs": [
+       "git",
+       "gh",
+       "ssh",
+       "scp",
+       "npm",
+       "npx",
+       "pnpm",
+       "bun",
+       "cargo",
+       "pytest",
+       "make",
+       "docker",
+       "curl",
+       "wget",
+       "find",
+       "rg",
+       "sed",
+       "grep"
+      ],
+      "allow": [
+       "\\.local/state/realm",
+       "^cat > /tmp/",
+       "/tmp/"
+      ]
+     }
+    },
+    {
+     "no_path_tool": {
+      "tools": [
+       "read",
+       "write",
+       "edit"
+      ]
+     }
+    }
+   ],
+   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn29"
+  },
+  {
+   "id": 313,
+   "family": "delegation",
+   "polarity": "negative",
+   "prompt": "Update my omniroute server.",
+   "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
+   "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
+   "expectations": [
+    "no build, edit, ssh, git, curl, rg, sed or grep segment of her own",
+    "a dispatch, a mail to a worker, or a read of the realm's own state",
+    "no repository path read, written or edited"
+   ],
+   "checks": [
+    {
+     "any": [
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "dispatch"
+        ]
+       }
+      },
+      {
+       "call": {
+        "tool": "send_message"
+       }
+      },
+      {
+       "call": {
+        "tool": "reply_message"
+       }
+      },
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "table"
+        ]
+       }
+      },
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "status"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "no_command": {
+      "programs": [
+       "git",
+       "gh",
+       "ssh",
+       "scp",
+       "npm",
+       "npx",
+       "pnpm",
+       "bun",
+       "cargo",
+       "pytest",
+       "make",
+       "docker",
+       "curl",
+       "wget",
+       "find",
+       "rg",
+       "sed",
+       "grep"
+      ],
+      "allow": [
+       "\\.local/state/realm",
+       "^cat > /tmp/",
+       "/tmp/"
+      ]
+     }
+    },
+    {
+     "no_path_tool": {
+      "tools": [
+       "read",
+       "write",
+       "edit"
+      ]
+     }
+    }
+   ],
+   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn30"
+  },
+  {
+   "id": 314,
+   "family": "delegation",
+   "polarity": "negative",
+   "prompt": "Is my TypeScript port finished yet?",
+   "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
+   "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
+   "expectations": [
+    "no build, edit, ssh, git, curl, rg, sed or grep segment of her own",
+    "a dispatch, a mail to a worker, or a read of the realm's own state",
+    "no repository path read, written or edited"
+   ],
+   "checks": [
+    {
+     "any": [
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "dispatch"
+        ]
+       }
+      },
+      {
+       "call": {
+        "tool": "send_message"
+       }
+      },
+      {
+       "call": {
+        "tool": "reply_message"
+       }
+      },
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "table"
+        ]
+       }
+      },
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "status"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "no_command": {
+      "programs": [
+       "git",
+       "gh",
+       "ssh",
+       "scp",
+       "npm",
+       "npx",
+       "pnpm",
+       "bun",
+       "cargo",
+       "pytest",
+       "make",
+       "docker",
+       "curl",
+       "wget",
+       "find",
+       "rg",
+       "sed",
+       "grep"
+      ],
+      "allow": [
+       "\\.local/state/realm",
+       "^cat > /tmp/",
+       "/tmp/"
+      ]
+     }
+    },
+    {
+     "no_path_tool": {
+      "tools": [
+       "read",
+       "write",
+       "edit"
+      ]
+     }
+    }
+   ],
+   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn32"
+  },
+  {
+   "id": 315,
+   "family": "delegation",
+   "polarity": "negative",
+   "prompt": "Does hindsight work?",
+   "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
+   "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
+   "expectations": [
+    "no build, edit, ssh, git, curl, rg, sed or grep segment of her own",
+    "a dispatch, a mail to a worker, or a read of the realm's own state",
+    "no repository path read, written or edited"
+   ],
+   "checks": [
+    {
+     "any": [
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "dispatch"
+        ]
+       }
+      },
+      {
+       "call": {
+        "tool": "send_message"
+       }
+      },
+      {
+       "call": {
+        "tool": "reply_message"
+       }
+      },
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "table"
+        ]
+       }
+      },
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "status"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "no_command": {
+      "programs": [
+       "git",
+       "gh",
+       "ssh",
+       "scp",
+       "npm",
+       "npx",
+       "pnpm",
+       "bun",
+       "cargo",
+       "pytest",
+       "make",
+       "docker",
+       "curl",
+       "wget",
+       "find",
+       "rg",
+       "sed",
+       "grep"
+      ],
+      "allow": [
+       "\\.local/state/realm",
+       "^cat > /tmp/",
+       "/tmp/"
+      ]
+     }
+    },
+    {
+     "no_path_tool": {
+      "tools": [
+       "read",
+       "write",
+       "edit"
+      ]
+     }
+    }
+   ],
+   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn38"
+  },
+  {
+   "id": 316,
+   "family": "delegation",
+   "polarity": "negative",
+   "prompt": "Fix the hindsight embedding.",
+   "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
+   "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
+   "expectations": [
+    "no build, edit, ssh, git, curl, rg, sed or grep segment of her own",
+    "a dispatch, a mail to a worker, or a read of the realm's own state",
+    "no repository path read, written or edited"
+   ],
+   "checks": [
+    {
+     "any": [
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "dispatch"
+        ]
+       }
+      },
+      {
+       "call": {
+        "tool": "send_message"
+       }
+      },
+      {
+       "call": {
+        "tool": "reply_message"
+       }
+      },
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "table"
+        ]
+       }
+      },
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "status"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "no_command": {
+      "programs": [
+       "git",
+       "gh",
+       "ssh",
+       "scp",
+       "npm",
+       "npx",
+       "pnpm",
+       "bun",
+       "cargo",
+       "pytest",
+       "make",
+       "docker",
+       "curl",
+       "wget",
+       "find",
+       "rg",
+       "sed",
+       "grep"
+      ],
+      "allow": [
+       "\\.local/state/realm",
+       "^cat > /tmp/",
+       "/tmp/"
+      ]
+     }
+    },
+    {
+     "no_path_tool": {
+      "tools": [
+       "read",
+       "write",
+       "edit"
+      ]
+     }
+    }
+   ],
+   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn39"
+  },
+  {
+   "id": 317,
+   "family": "delegation",
+   "polarity": "negative",
+   "prompt": "I want you to be able to restart the realm without worry: killing the 12 workers is fine if you can restart them afterwards.",
+   "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
+   "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
+   "expectations": [
+    "no build, edit, ssh, git, curl, rg, sed or grep segment of her own",
+    "a dispatch, a mail to a worker, or a read of the realm's own state",
+    "no repository path read, written or edited"
+   ],
+   "checks": [
+    {
+     "any": [
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "dispatch"
+        ]
+       }
+      },
+      {
+       "call": {
+        "tool": "send_message"
+       }
+      },
+      {
+       "call": {
+        "tool": "reply_message"
+       }
+      },
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "table"
+        ]
+       }
+      },
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "status"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "no_command": {
+      "programs": [
+       "git",
+       "gh",
+       "ssh",
+       "scp",
+       "npm",
+       "npx",
+       "pnpm",
+       "bun",
+       "cargo",
+       "pytest",
+       "make",
+       "docker",
+       "curl",
+       "wget",
+       "find",
+       "rg",
+       "sed",
+       "grep"
+      ],
+      "allow": [
+       "\\.local/state/realm",
+       "^cat > /tmp/",
+       "/tmp/"
+      ]
+     }
+    },
+    {
+     "no_path_tool": {
+      "tools": [
+       "read",
+       "write",
+       "edit"
+      ]
+     }
+    }
+   ],
+   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn40"
+  },
+  {
+   "id": 318,
+   "family": "delegation",
+   "polarity": "negative",
+   "prompt": "Can you please upgrade omniroute?",
+   "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
+   "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
+   "expectations": [
+    "no build, edit, ssh, git, curl, rg, sed or grep segment of her own",
+    "a dispatch, a mail to a worker, or a read of the realm's own state",
+    "no repository path read, written or edited"
+   ],
+   "checks": [
+    {
+     "any": [
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "dispatch"
+        ]
+       }
+      },
+      {
+       "call": {
+        "tool": "send_message"
+       }
+      },
+      {
+       "call": {
+        "tool": "reply_message"
+       }
+      },
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "table"
+        ]
+       }
+      },
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "status"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "no_command": {
+      "programs": [
+       "git",
+       "gh",
+       "ssh",
+       "scp",
+       "npm",
+       "npx",
+       "pnpm",
+       "bun",
+       "cargo",
+       "pytest",
+       "make",
+       "docker",
+       "curl",
+       "wget",
+       "find",
+       "rg",
+       "sed",
+       "grep"
+      ],
+      "allow": [
+       "\\.local/state/realm",
+       "^cat > /tmp/",
+       "/tmp/"
+      ]
+     }
+    },
+    {
+     "no_path_tool": {
+      "tools": [
+       "read",
+       "write",
+       "edit"
+      ]
+     }
+    }
+   ],
+   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn45"
+  },
+  {
+   "id": 319,
+   "family": "delegation",
+   "polarity": "negative",
+   "prompt": "I want a herdr plugin on my laptop to visualise the realm instead of the left panel, which you will hide entirely.",
+   "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
+   "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
+   "expectations": [
+    "no build, edit, ssh, git, curl, rg, sed or grep segment of her own",
+    "a dispatch, a mail to a worker, or a read of the realm's own state",
+    "no repository path read, written or edited"
+   ],
+   "checks": [
+    {
+     "any": [
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "dispatch"
+        ]
+       }
+      },
+      {
+       "call": {
+        "tool": "send_message"
+       }
+      },
+      {
+       "call": {
+        "tool": "reply_message"
+       }
+      },
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "table"
+        ]
+       }
+      },
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "status"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "no_command": {
+      "programs": [
+       "git",
+       "gh",
+       "ssh",
+       "scp",
+       "npm",
+       "npx",
+       "pnpm",
+       "bun",
+       "cargo",
+       "pytest",
+       "make",
+       "docker",
+       "curl",
+       "wget",
+       "find",
+       "rg",
+       "sed",
+       "grep"
+      ],
+      "allow": [
+       "\\.local/state/realm",
+       "^cat > /tmp/",
+       "/tmp/"
+      ]
+     }
+    },
+    {
+     "no_path_tool": {
+      "tools": [
+       "read",
+       "write",
+       "edit"
+      ]
+     }
+    }
+   ],
+   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn46"
+  },
+  {
+   "id": 320,
+   "family": "delegation",
+   "polarity": "negative",
+   "prompt": "1Password password is `curing5HAWKES.various-jackal`, bitwarden is `melody1-system2`. Store them temporarily in a file so they can be used.",
+   "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
+   "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
+   "expectations": [
+    "no build, edit, ssh, git, curl, rg, sed or grep segment of her own",
+    "a dispatch, a mail to a worker, or a read of the realm's own state",
+    "no repository path read, written or edited"
+   ],
+   "checks": [
+    {
+     "any": [
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "dispatch"
+        ]
+       }
+      },
+      {
+       "call": {
+        "tool": "send_message"
+       }
+      },
+      {
+       "call": {
+        "tool": "reply_message"
+       }
+      },
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "table"
+        ]
+       }
+      },
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "status"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "no_command": {
+      "programs": [
+       "git",
+       "gh",
+       "ssh",
+       "scp",
+       "npm",
+       "npx",
+       "pnpm",
+       "bun",
+       "cargo",
+       "pytest",
+       "make",
+       "docker",
+       "curl",
+       "wget",
+       "find",
+       "rg",
+       "sed",
+       "grep"
+      ],
+      "allow": [
+       "\\.local/state/realm",
+       "^cat > /tmp/",
+       "/tmp/"
+      ]
+     }
+    },
+    {
+     "no_path_tool": {
+      "tools": [
+       "read",
+       "write",
+       "edit"
+      ]
+     }
+    }
+   ],
+   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn53"
+  },
+  {
+   "id": 321,
+   "family": "delegation",
+   "polarity": "negative",
+   "prompt": "In my argocd personal, send someone to switch as many applications as possible from Recreate to a zero-downtime rollout strategy, if possible.",
+   "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
+   "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
+   "expectations": [
+    "no build, edit, ssh, git, curl, rg, sed or grep segment of her own",
+    "a dispatch, a mail to a worker, or a read of the realm's own state",
+    "no repository path read, written or edited"
+   ],
+   "checks": [
+    {
+     "any": [
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "dispatch"
+        ]
+       }
+      },
+      {
+       "call": {
+        "tool": "send_message"
+       }
+      },
+      {
+       "call": {
+        "tool": "reply_message"
+       }
+      },
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "table"
+        ]
+       }
+      },
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "status"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "no_command": {
+      "programs": [
+       "git",
+       "gh",
+       "ssh",
+       "scp",
+       "npm",
+       "npx",
+       "pnpm",
+       "bun",
+       "cargo",
+       "pytest",
+       "make",
+       "docker",
+       "curl",
+       "wget",
+       "find",
+       "rg",
+       "sed",
+       "grep"
+      ],
+      "allow": [
+       "\\.local/state/realm",
+       "^cat > /tmp/",
+       "/tmp/"
+      ]
+     }
+    },
+    {
+     "no_path_tool": {
+      "tools": [
+       "read",
+       "write",
+       "edit"
+      ]
+     }
+    }
+   ],
+   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn55"
+  },
+  {
+   "id": 322,
+   "family": "delegation",
+   "polarity": "negative",
+   "prompt": "Check up on Overlord and make sure its processes are running.",
+   "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
+   "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
+   "expectations": [
+    "no build, edit, ssh, git, curl, rg, sed or grep segment of her own",
+    "a dispatch, a mail to a worker, or a read of the realm's own state",
+    "no repository path read, written or edited"
+   ],
+   "checks": [
+    {
+     "any": [
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "dispatch"
+        ]
+       }
+      },
+      {
+       "call": {
+        "tool": "send_message"
+       }
+      },
+      {
+       "call": {
+        "tool": "reply_message"
+       }
+      },
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "table"
+        ]
+       }
+      },
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "status"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "no_command": {
+      "programs": [
+       "git",
+       "gh",
+       "ssh",
+       "scp",
+       "npm",
+       "npx",
+       "pnpm",
+       "bun",
+       "cargo",
+       "pytest",
+       "make",
+       "docker",
+       "curl",
+       "wget",
+       "find",
+       "rg",
+       "sed",
+       "grep"
+      ],
+      "allow": [
+       "\\.local/state/realm",
+       "^cat > /tmp/",
+       "/tmp/"
+      ]
+     }
+    },
+    {
+     "no_path_tool": {
+      "tools": [
+       "read",
+       "write",
+       "edit"
+      ]
+     }
+    }
+   ],
+   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn58"
+  },
+  {
+   "id": 323,
+   "family": "delegation",
+   "polarity": "negative",
+   "prompt": "What about my Overlord container?",
+   "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
+   "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
+   "expectations": [
+    "no build, edit, ssh, git, curl, rg, sed or grep segment of her own",
+    "a dispatch, a mail to a worker, or a read of the realm's own state",
+    "no repository path read, written or edited"
+   ],
+   "checks": [
+    {
+     "any": [
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "dispatch"
+        ]
+       }
+      },
+      {
+       "call": {
+        "tool": "send_message"
+       }
+      },
+      {
+       "call": {
+        "tool": "reply_message"
+       }
+      },
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "table"
+        ]
+       }
+      },
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "status"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "no_command": {
+      "programs": [
+       "git",
+       "gh",
+       "ssh",
+       "scp",
+       "npm",
+       "npx",
+       "pnpm",
+       "bun",
+       "cargo",
+       "pytest",
+       "make",
+       "docker",
+       "curl",
+       "wget",
+       "find",
+       "rg",
+       "sed",
+       "grep"
+      ],
+      "allow": [
+       "\\.local/state/realm",
+       "^cat > /tmp/",
+       "/tmp/"
+      ]
+     }
+    },
+    {
+     "no_path_tool": {
+      "tools": [
+       "read",
+       "write",
+       "edit"
+      ]
+     }
+    }
+   ],
+   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn59"
+  },
+  {
+   "id": 324,
+   "family": "delegation",
+   "polarity": "negative",
+   "prompt": "Can you switch back to 9router without offline time?",
+   "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
+   "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
+   "expectations": [
+    "no build, edit, ssh, git, curl, rg, sed or grep segment of her own",
+    "a dispatch, a mail to a worker, or a read of the realm's own state",
+    "no repository path read, written or edited"
+   ],
+   "checks": [
+    {
+     "any": [
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "dispatch"
+        ]
+       }
+      },
+      {
+       "call": {
+        "tool": "send_message"
+       }
+      },
+      {
+       "call": {
+        "tool": "reply_message"
+       }
+      },
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "table"
+        ]
+       }
+      },
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "status"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "no_command": {
+      "programs": [
+       "git",
+       "gh",
+       "ssh",
+       "scp",
+       "npm",
+       "npx",
+       "pnpm",
+       "bun",
+       "cargo",
+       "pytest",
+       "make",
+       "docker",
+       "curl",
+       "wget",
+       "find",
+       "rg",
+       "sed",
+       "grep"
+      ],
+      "allow": [
+       "\\.local/state/realm",
+       "^cat > /tmp/",
+       "/tmp/"
+      ]
+     }
+    },
+    {
+     "no_path_tool": {
+      "tools": [
+       "read",
+       "write",
+       "edit"
+      ]
+     }
+    }
+   ],
+   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn63"
+  },
+  {
+   "id": 325,
+   "family": "delegation",
+   "polarity": "negative",
+   "prompt": "Ask me your questions if you have some, then go.",
+   "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
+   "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
+   "expectations": [
+    "no build, edit, ssh, git, curl, rg, sed or grep segment of her own",
+    "a dispatch, a mail to a worker, or a read of the realm's own state",
+    "no repository path read, written or edited"
+   ],
+   "checks": [
+    {
+     "any": [
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "dispatch"
+        ]
+       }
+      },
+      {
+       "call": {
+        "tool": "send_message"
+       }
+      },
+      {
+       "call": {
+        "tool": "reply_message"
+       }
+      },
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "table"
+        ]
+       }
+      },
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "status"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "no_command": {
+      "programs": [
+       "git",
+       "gh",
+       "ssh",
+       "scp",
+       "npm",
+       "npx",
+       "pnpm",
+       "bun",
+       "cargo",
+       "pytest",
+       "make",
+       "docker",
+       "curl",
+       "wget",
+       "find",
+       "rg",
+       "sed",
+       "grep"
+      ],
+      "allow": [
+       "\\.local/state/realm",
+       "^cat > /tmp/",
+       "/tmp/"
+      ]
+     }
+    },
+    {
+     "no_path_tool": {
+      "tools": [
+       "read",
+       "write",
+       "edit"
+      ]
+     }
+    }
+   ],
+   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn64"
+  },
+  {
+   "id": 326,
+   "family": "delegation",
+   "polarity": "negative",
+   "prompt": "What is TSK-010 doing?",
+   "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
+   "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
+   "expectations": [
+    "no build, edit, ssh, git, curl, rg, sed or grep segment of her own",
+    "a dispatch, a mail to a worker, or a read of the realm's own state",
+    "no repository path read, written or edited"
+   ],
+   "checks": [
+    {
+     "any": [
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "dispatch"
+        ]
+       }
+      },
+      {
+       "call": {
+        "tool": "send_message"
+       }
+      },
+      {
+       "call": {
+        "tool": "reply_message"
+       }
+      },
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "table"
+        ]
+       }
+      },
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "status"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "no_command": {
+      "programs": [
+       "git",
+       "gh",
+       "ssh",
+       "scp",
+       "npm",
+       "npx",
+       "pnpm",
+       "bun",
+       "cargo",
+       "pytest",
+       "make",
+       "docker",
+       "curl",
+       "wget",
+       "find",
+       "rg",
+       "sed",
+       "grep"
+      ],
+      "allow": [
+       "\\.local/state/realm",
+       "^cat > /tmp/",
+       "/tmp/"
+      ]
+     }
+    },
+    {
+     "no_path_tool": {
+      "tools": [
+       "read",
+       "write",
+       "edit"
+      ]
+     }
+    }
+   ],
+   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn65"
+  },
+  {
+   "id": 327,
+   "family": "delegation",
+   "polarity": "negative",
+   "prompt": "Okay, what about my TS port?",
+   "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
+   "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
+   "expectations": [
+    "no build, edit, ssh, git, curl, rg, sed or grep segment of her own",
+    "a dispatch, a mail to a worker, or a read of the realm's own state",
+    "no repository path read, written or edited"
+   ],
+   "checks": [
+    {
+     "any": [
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "dispatch"
+        ]
+       }
+      },
+      {
+       "call": {
+        "tool": "send_message"
+       }
+      },
+      {
+       "call": {
+        "tool": "reply_message"
+       }
+      },
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "table"
+        ]
+       }
+      },
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "status"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "no_command": {
+      "programs": [
+       "git",
+       "gh",
+       "ssh",
+       "scp",
+       "npm",
+       "npx",
+       "pnpm",
+       "bun",
+       "cargo",
+       "pytest",
+       "make",
+       "docker",
+       "curl",
+       "wget",
+       "find",
+       "rg",
+       "sed",
+       "grep"
+      ],
+      "allow": [
+       "\\.local/state/realm",
+       "^cat > /tmp/",
+       "/tmp/"
+      ]
+     }
+    },
+    {
+     "no_path_tool": {
+      "tools": [
+       "read",
+       "write",
+       "edit"
+      ]
+     }
+    }
+   ],
+   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn67"
+  },
+  {
+   "id": 328,
+   "family": "delegation",
+   "polarity": "negative",
+   "prompt": "Now what about TSK-010?",
+   "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
+   "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
+   "expectations": [
+    "no build, edit, ssh, git, curl, rg, sed or grep segment of her own",
+    "a dispatch, a mail to a worker, or a read of the realm's own state",
+    "no repository path read, written or edited"
+   ],
+   "checks": [
+    {
+     "any": [
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "dispatch"
+        ]
+       }
+      },
+      {
+       "call": {
+        "tool": "send_message"
+       }
+      },
+      {
+       "call": {
+        "tool": "reply_message"
+       }
+      },
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "table"
+        ]
+       }
+      },
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "status"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "no_command": {
+      "programs": [
+       "git",
+       "gh",
+       "ssh",
+       "scp",
+       "npm",
+       "npx",
+       "pnpm",
+       "bun",
+       "cargo",
+       "pytest",
+       "make",
+       "docker",
+       "curl",
+       "wget",
+       "find",
+       "rg",
+       "sed",
+       "grep"
+      ],
+      "allow": [
+       "\\.local/state/realm",
+       "^cat > /tmp/",
+       "/tmp/"
+      ]
+     }
+    },
+    {
+     "no_path_tool": {
+      "tools": [
+       "read",
+       "write",
+       "edit"
+      ]
+     }
+    }
+   ],
+   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn69"
+  },
+  {
+   "id": 329,
+   "family": "delegation",
+   "polarity": "negative",
+   "prompt": "Send someone on my AirLock application: the minutes of my son watching his videos never decrease.",
+   "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
+   "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
+   "expectations": [
+    "no build, edit, ssh, git, curl, rg, sed or grep segment of her own",
+    "a dispatch, a mail to a worker, or a read of the realm's own state",
+    "no repository path read, written or edited"
+   ],
+   "checks": [
+    {
+     "any": [
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "dispatch"
+        ]
+       }
+      },
+      {
+       "call": {
+        "tool": "send_message"
+       }
+      },
+      {
+       "call": {
+        "tool": "reply_message"
+       }
+      },
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "table"
+        ]
+       }
+      },
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "status"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "no_command": {
+      "programs": [
+       "git",
+       "gh",
+       "ssh",
+       "scp",
+       "npm",
+       "npx",
+       "pnpm",
+       "bun",
+       "cargo",
+       "pytest",
+       "make",
+       "docker",
+       "curl",
+       "wget",
+       "find",
+       "rg",
+       "sed",
+       "grep"
+      ],
+      "allow": [
+       "\\.local/state/realm",
+       "^cat > /tmp/",
+       "/tmp/"
+      ]
+     }
+    },
+    {
+     "no_path_tool": {
+      "tools": [
+       "read",
+       "write",
+       "edit"
+      ]
+     }
+    }
+   ],
+   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn70"
+  },
+  {
+   "id": 330,
+   "family": "delegation",
+   "polarity": "negative",
+   "prompt": "Add Cancelled.",
+   "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
+   "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
+   "expectations": [
+    "no build, edit, ssh, git, curl, rg, sed or grep segment of her own",
+    "a dispatch, a mail to a worker, or a read of the realm's own state",
+    "no repository path read, written or edited"
+   ],
+   "checks": [
+    {
+     "any": [
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "dispatch"
+        ]
+       }
+      },
+      {
+       "call": {
+        "tool": "send_message"
+       }
+      },
+      {
+       "call": {
+        "tool": "reply_message"
+       }
+      },
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "table"
+        ]
+       }
+      },
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "status"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "no_command": {
+      "programs": [
+       "git",
+       "gh",
+       "ssh",
+       "scp",
+       "npm",
+       "npx",
+       "pnpm",
+       "bun",
+       "cargo",
+       "pytest",
+       "make",
+       "docker",
+       "curl",
+       "wget",
+       "find",
+       "rg",
+       "sed",
+       "grep"
+      ],
+      "allow": [
+       "\\.local/state/realm",
+       "^cat > /tmp/",
+       "/tmp/"
+      ]
+     }
+    },
+    {
+     "no_path_tool": {
+      "tools": [
+       "read",
+       "write",
+       "edit"
+      ]
+     }
+    }
+   ],
+   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn76"
+  },
+  {
+   "id": 331,
+   "family": "delegation",
+   "polarity": "negative",
+   "prompt": "Why is TSK-010 still stuck?",
+   "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
+   "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
+   "expectations": [
+    "no build, edit, ssh, git, curl, rg, sed or grep segment of her own",
+    "a dispatch, a mail to a worker, or a read of the realm's own state",
+    "no repository path read, written or edited"
+   ],
+   "checks": [
+    {
+     "any": [
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "dispatch"
+        ]
+       }
+      },
+      {
+       "call": {
+        "tool": "send_message"
+       }
+      },
+      {
+       "call": {
+        "tool": "reply_message"
+       }
+      },
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "table"
+        ]
+       }
+      },
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "status"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "no_command": {
+      "programs": [
+       "git",
+       "gh",
+       "ssh",
+       "scp",
+       "npm",
+       "npx",
+       "pnpm",
+       "bun",
+       "cargo",
+       "pytest",
+       "make",
+       "docker",
+       "curl",
+       "wget",
+       "find",
+       "rg",
+       "sed",
+       "grep"
+      ],
+      "allow": [
+       "\\.local/state/realm",
+       "^cat > /tmp/",
+       "/tmp/"
+      ]
+     }
+    },
+    {
+     "no_path_tool": {
+      "tools": [
+       "read",
+       "write",
+       "edit"
+      ]
+     }
+    }
+   ],
+   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn77"
+  },
+  {
+   "id": 332,
+   "family": "delegation",
+   "polarity": "negative",
+   "prompt": "And my herdr plugin?",
+   "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
+   "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
+   "expectations": [
+    "no build, edit, ssh, git, curl, rg, sed or grep segment of her own",
+    "a dispatch, a mail to a worker, or a read of the realm's own state",
+    "no repository path read, written or edited"
+   ],
+   "checks": [
+    {
+     "any": [
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "dispatch"
+        ]
+       }
+      },
+      {
+       "call": {
+        "tool": "send_message"
+       }
+      },
+      {
+       "call": {
+        "tool": "reply_message"
+       }
+      },
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "table"
+        ]
+       }
+      },
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "status"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "no_command": {
+      "programs": [
+       "git",
+       "gh",
+       "ssh",
+       "scp",
+       "npm",
+       "npx",
+       "pnpm",
+       "bun",
+       "cargo",
+       "pytest",
+       "make",
+       "docker",
+       "curl",
+       "wget",
+       "find",
+       "rg",
+       "sed",
+       "grep"
+      ],
+      "allow": [
+       "\\.local/state/realm",
+       "^cat > /tmp/",
+       "/tmp/"
+      ]
+     }
+    },
+    {
+     "no_path_tool": {
+      "tools": [
+       "read",
+       "write",
+       "edit"
+      ]
+     }
+    }
+   ],
+   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn78"
+  },
+  {
+   "id": 333,
+   "family": "delegation",
+   "polarity": "negative",
+   "prompt": "Install it on my laptop, please.",
+   "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
+   "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
+   "expectations": [
+    "no build, edit, ssh, git, curl, rg, sed or grep segment of her own",
+    "a dispatch, a mail to a worker, or a read of the realm's own state",
+    "no repository path read, written or edited"
+   ],
+   "checks": [
+    {
+     "any": [
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "dispatch"
+        ]
+       }
+      },
+      {
+       "call": {
+        "tool": "send_message"
+       }
+      },
+      {
+       "call": {
+        "tool": "reply_message"
+       }
+      },
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "table"
+        ]
+       }
+      },
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "status"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "no_command": {
+      "programs": [
+       "git",
+       "gh",
+       "ssh",
+       "scp",
+       "npm",
+       "npx",
+       "pnpm",
+       "bun",
+       "cargo",
+       "pytest",
+       "make",
+       "docker",
+       "curl",
+       "wget",
+       "find",
+       "rg",
+       "sed",
+       "grep"
+      ],
+      "allow": [
+       "\\.local/state/realm",
+       "^cat > /tmp/",
+       "/tmp/"
+      ]
+     }
+    },
+    {
+     "no_path_tool": {
+      "tools": [
+       "read",
+       "write",
+       "edit"
+      ]
+     }
+    }
+   ],
+   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn79"
+  },
+  {
+   "id": 334,
+   "family": "delegation",
+   "polarity": "negative",
+   "prompt": "Le naming automatique dans Overlord ne fonctionne plus, fixe le.",
+   "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
+   "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
+   "expectations": [
+    "no build, edit, ssh, git, curl, rg, sed or grep segment of her own",
+    "a dispatch, a mail to a worker, or a read of the realm's own state",
+    "no repository path read, written or edited"
+   ],
+   "checks": [
+    {
+     "any": [
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "dispatch"
+        ]
+       }
+      },
+      {
+       "call": {
+        "tool": "send_message"
+       }
+      },
+      {
+       "call": {
+        "tool": "reply_message"
+       }
+      },
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "table"
+        ]
+       }
+      },
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "status"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "no_command": {
+      "programs": [
+       "git",
+       "gh",
+       "ssh",
+       "scp",
+       "npm",
+       "npx",
+       "pnpm",
+       "bun",
+       "cargo",
+       "pytest",
+       "make",
+       "docker",
+       "curl",
+       "wget",
+       "find",
+       "rg",
+       "sed",
+       "grep"
+      ],
+      "allow": [
+       "\\.local/state/realm",
+       "^cat > /tmp/",
+       "/tmp/"
+      ]
+     }
+    },
+    {
+     "no_path_tool": {
+      "tools": [
+       "read",
+       "write",
+       "edit"
+      ]
+     }
+    }
+   ],
+   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn90"
+  },
+  {
+   "id": 335,
+   "family": "delegation",
+   "polarity": "negative",
+   "prompt": "My left panel?",
+   "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
+   "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
+   "expectations": [
+    "no build, edit, ssh, git, curl, rg, sed or grep segment of her own",
+    "a dispatch, a mail to a worker, or a read of the realm's own state",
+    "no repository path read, written or edited"
+   ],
+   "checks": [
+    {
+     "any": [
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "dispatch"
+        ]
+       }
+      },
+      {
+       "call": {
+        "tool": "send_message"
+       }
+      },
+      {
+       "call": {
+        "tool": "reply_message"
+       }
+      },
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "table"
+        ]
+       }
+      },
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "status"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "no_command": {
+      "programs": [
+       "git",
+       "gh",
+       "ssh",
+       "scp",
+       "npm",
+       "npx",
+       "pnpm",
+       "bun",
+       "cargo",
+       "pytest",
+       "make",
+       "docker",
+       "curl",
+       "wget",
+       "find",
+       "rg",
+       "sed",
+       "grep"
+      ],
+      "allow": [
+       "\\.local/state/realm",
+       "^cat > /tmp/",
+       "/tmp/"
+      ]
+     }
+    },
+    {
+     "no_path_tool": {
+      "tools": [
+       "read",
+       "write",
+       "edit"
+      ]
+     }
+    }
+   ],
+   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn93"
+  },
+  {
+   "id": 336,
+   "family": "delegation",
+   "polarity": "negative",
+   "prompt": "Did you fix the delegation bug?",
+   "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
+   "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
+   "expectations": [
+    "no build, edit, ssh, git, curl, rg, sed or grep segment of her own",
+    "a dispatch, a mail to a worker, or a read of the realm's own state",
+    "no repository path read, written or edited"
+   ],
+   "checks": [
+    {
+     "any": [
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "dispatch"
+        ]
+       }
+      },
+      {
+       "call": {
+        "tool": "send_message"
+       }
+      },
+      {
+       "call": {
+        "tool": "reply_message"
+       }
+      },
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "table"
+        ]
+       }
+      },
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "status"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "no_command": {
+      "programs": [
+       "git",
+       "gh",
+       "ssh",
+       "scp",
+       "npm",
+       "npx",
+       "pnpm",
+       "bun",
+       "cargo",
+       "pytest",
+       "make",
+       "docker",
+       "curl",
+       "wget",
+       "find",
+       "rg",
+       "sed",
+       "grep"
+      ],
+      "allow": [
+       "\\.local/state/realm",
+       "^cat > /tmp/",
+       "/tmp/"
+      ]
+     }
+    },
+    {
+     "no_path_tool": {
+      "tools": [
+       "read",
+       "write",
+       "edit"
+      ]
+     }
+    }
+   ],
+   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn96"
+  },
+  {
+   "id": 337,
+   "family": "delegation",
+   "polarity": "negative",
+   "prompt": "Until the script is fixed, use prompt injection.",
+   "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
+   "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
+   "expectations": [
+    "no build, edit, ssh, git, curl, rg, sed or grep segment of her own",
+    "a dispatch, a mail to a worker, or a read of the realm's own state",
+    "no repository path read, written or edited"
+   ],
+   "checks": [
+    {
+     "any": [
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "dispatch"
+        ]
+       }
+      },
+      {
+       "call": {
+        "tool": "send_message"
+       }
+      },
+      {
+       "call": {
+        "tool": "reply_message"
+       }
+      },
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "table"
+        ]
+       }
+      },
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "status"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "no_command": {
+      "programs": [
+       "git",
+       "gh",
+       "ssh",
+       "scp",
+       "npm",
+       "npx",
+       "pnpm",
+       "bun",
+       "cargo",
+       "pytest",
+       "make",
+       "docker",
+       "curl",
+       "wget",
+       "find",
+       "rg",
+       "sed",
+       "grep"
+      ],
+      "allow": [
+       "\\.local/state/realm",
+       "^cat > /tmp/",
+       "/tmp/"
+      ]
+     }
+    },
+    {
+     "no_path_tool": {
+      "tools": [
+       "read",
+       "write",
+       "edit"
+      ]
+     }
+    }
+   ],
+   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn97"
+  },
+  {
+   "id": 338,
+   "family": "delegation",
+   "polarity": "negative",
+   "prompt": "Merge it.",
+   "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
+   "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
+   "expectations": [
+    "no build, edit, ssh, git, curl, rg, sed or grep segment of her own",
+    "a dispatch, a mail to a worker, or a read of the realm's own state",
+    "no repository path read, written or edited"
+   ],
+   "checks": [
+    {
+     "any": [
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "dispatch"
+        ]
+       }
+      },
+      {
+       "call": {
+        "tool": "send_message"
+       }
+      },
+      {
+       "call": {
+        "tool": "reply_message"
+       }
+      },
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "table"
+        ]
+       }
+      },
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "status"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "no_command": {
+      "programs": [
+       "git",
+       "gh",
+       "ssh",
+       "scp",
+       "npm",
+       "npx",
+       "pnpm",
+       "bun",
+       "cargo",
+       "pytest",
+       "make",
+       "docker",
+       "curl",
+       "wget",
+       "find",
+       "rg",
+       "sed",
+       "grep"
+      ],
+      "allow": [
+       "\\.local/state/realm",
+       "^cat > /tmp/",
+       "/tmp/"
+      ]
+     }
+    },
+    {
+     "no_path_tool": {
+      "tools": [
+       "read",
+       "write",
+       "edit"
+      ]
+     }
+    }
+   ],
+   "source": "2026-11-21T12-27-51-522Z_01a1fe13-c762-7759-a079-464a8db77003.jsonl#turn102"
+  },
+  {
+   "id": 339,
+   "family": "delegation",
+   "polarity": "negative",
+   "prompt": "And fix whatever needs to be fixed to fix the delegation.",
+   "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
+   "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
+   "expectations": [
+    "no build, edit, ssh, git, curl, rg, sed or grep segment of her own",
+    "a dispatch, a mail to a worker, or a read of the realm's own state",
+    "no repository path read, written or edited"
+   ],
+   "checks": [
+    {
+     "any": [
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "dispatch"
+        ]
+       }
+      },
+      {
+       "call": {
+        "tool": "send_message"
+       }
+      },
+      {
+       "call": {
+        "tool": "reply_message"
+       }
+      },
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "table"
+        ]
+       }
+      },
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "status"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "no_command": {
+      "programs": [
+       "git",
+       "gh",
+       "ssh",
+       "scp",
+       "npm",
+       "npx",
+       "pnpm",
+       "bun",
+       "cargo",
+       "pytest",
+       "make",
+       "docker",
+       "curl",
+       "wget",
+       "find",
+       "rg",
+       "sed",
+       "grep"
+      ],
+      "allow": [
+       "\\.local/state/realm",
+       "^cat > /tmp/",
+       "/tmp/"
+      ]
+     }
+    },
+    {
+     "no_path_tool": {
+      "tools": [
+       "read",
+       "write",
+       "edit"
+      ]
+     }
+    }
+   ],
+   "source": "2026-11-21T12-42-08-378Z_01a1fe20-da7a-737d-bb17-d345dbb2e873.jsonl#turn105"
+  },
+  {
+   "id": 340,
+   "family": "delegation",
+   "polarity": "negative",
+   "prompt": "Fix it so an interim reply can be acknowledged without changing the subject's state.",
+   "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
+   "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
+   "expectations": [
+    "no build, edit, ssh, git, curl, rg, sed or grep segment of her own",
+    "a dispatch, a mail to a worker, or a read of the realm's own state",
+    "no repository path read, written or edited"
+   ],
+   "checks": [
+    {
+     "any": [
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "dispatch"
+        ]
+       }
+      },
+      {
+       "call": {
+        "tool": "send_message"
+       }
+      },
+      {
+       "call": {
+        "tool": "reply_message"
+       }
+      },
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "table"
+        ]
+       }
+      },
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "status"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "no_command": {
+      "programs": [
+       "git",
+       "gh",
+       "ssh",
+       "scp",
+       "npm",
+       "npx",
+       "pnpm",
+       "bun",
+       "cargo",
+       "pytest",
+       "make",
+       "docker",
+       "curl",
+       "wget",
+       "find",
+       "rg",
+       "sed",
+       "grep"
+      ],
+      "allow": [
+       "\\.local/state/realm",
+       "^cat > /tmp/",
+       "/tmp/"
+      ]
+     }
+    },
+    {
+     "no_path_tool": {
+      "tools": [
+       "read",
+       "write",
+       "edit"
+      ]
+     }
+    }
+   ],
+   "source": "2026-11-21T12-52-00-109Z_01a1fe29-e1ed-71d6-a73a-c25b5d841a35.jsonl#turn4"
+  },
+  {
+   "id": 341,
+   "family": "delegation",
+   "polarity": "negative",
+   "prompt": "And is the Python hardened path retired?",
+   "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
+   "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
+   "expectations": [
+    "no build, edit, ssh, git, curl, rg, sed or grep segment of her own",
+    "a dispatch, a mail to a worker, or a read of the realm's own state",
+    "no repository path read, written or edited"
+   ],
+   "checks": [
+    {
+     "any": [
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "dispatch"
+        ]
+       }
+      },
+      {
+       "call": {
+        "tool": "send_message"
+       }
+      },
+      {
+       "call": {
+        "tool": "reply_message"
+       }
+      },
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "table"
+        ]
+       }
+      },
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "status"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "no_command": {
+      "programs": [
+       "git",
+       "gh",
+       "ssh",
+       "scp",
+       "npm",
+       "npx",
+       "pnpm",
+       "bun",
+       "cargo",
+       "pytest",
+       "make",
+       "docker",
+       "curl",
+       "wget",
+       "find",
+       "rg",
+       "sed",
+       "grep"
+      ],
+      "allow": [
+       "\\.local/state/realm",
+       "^cat > /tmp/",
+       "/tmp/"
+      ]
+     }
+    },
+    {
+     "no_path_tool": {
+      "tools": [
+       "read",
+       "write",
+       "edit"
+      ]
+     }
+    }
+   ],
+   "source": "2026-11-21T12-52-00-109Z_01a1fe29-e1ed-71d6-a73a-c25b5d841a35.jsonl#turn5"
+  },
+  {
+   "id": 342,
+   "family": "delegation",
+   "polarity": "negative",
+   "prompt": "Please ship everything you can ship and restart the realm.",
+   "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
+   "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
+   "expectations": [
+    "no build, edit, ssh, git, curl, rg, sed or grep segment of her own",
+    "a dispatch, a mail to a worker, or a read of the realm's own state",
+    "no repository path read, written or edited"
+   ],
+   "checks": [
+    {
+     "any": [
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "dispatch"
+        ]
+       }
+      },
+      {
+       "call": {
+        "tool": "send_message"
+       }
+      },
+      {
+       "call": {
+        "tool": "reply_message"
+       }
+      },
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "table"
+        ]
+       }
+      },
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "status"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "no_command": {
+      "programs": [
+       "git",
+       "gh",
+       "ssh",
+       "scp",
+       "npm",
+       "npx",
+       "pnpm",
+       "bun",
+       "cargo",
+       "pytest",
+       "make",
+       "docker",
+       "curl",
+       "wget",
+       "find",
+       "rg",
+       "sed",
+       "grep"
+      ],
+      "allow": [
+       "\\.local/state/realm",
+       "^cat > /tmp/",
+       "/tmp/"
+      ]
+     }
+    },
+    {
+     "no_path_tool": {
+      "tools": [
+       "read",
+       "write",
+       "edit"
+      ]
+     }
+    }
+   ],
+   "source": "2026-11-21T12-52-00-109Z_01a1fe29-e1ed-71d6-a73a-c25b5d841a35.jsonl#turn6"
+  },
+  {
+   "id": 343,
+   "family": "delegation",
+   "polarity": "negative",
+   "prompt": "Switch to read/write, then.",
+   "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
+   "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
+   "expectations": [
+    "no build, edit, ssh, git, curl, rg, sed or grep segment of her own",
+    "a dispatch, a mail to a worker, or a read of the realm's own state",
+    "no repository path read, written or edited"
+   ],
+   "checks": [
+    {
+     "any": [
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "dispatch"
+        ]
+       }
+      },
+      {
+       "call": {
+        "tool": "send_message"
+       }
+      },
+      {
+       "call": {
+        "tool": "reply_message"
+       }
+      },
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "table"
+        ]
+       }
+      },
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "status"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "no_command": {
+      "programs": [
+       "git",
+       "gh",
+       "ssh",
+       "scp",
+       "npm",
+       "npx",
+       "pnpm",
+       "bun",
+       "cargo",
+       "pytest",
+       "make",
+       "docker",
+       "curl",
+       "wget",
+       "find",
+       "rg",
+       "sed",
+       "grep"
+      ],
+      "allow": [
+       "\\.local/state/realm",
+       "^cat > /tmp/",
+       "/tmp/"
+      ]
+     }
+    },
+    {
+     "no_path_tool": {
+      "tools": [
+       "read",
+       "write",
+       "edit"
+      ]
+     }
+    }
+   ],
+   "source": "2026-11-21T12-52-00-109Z_01a1fe29-e1ed-71d6-a73a-c25b5d841a35.jsonl#turn7"
+  },
+  {
+   "id": 344,
+   "family": "delegation",
+   "polarity": "negative",
+   "prompt": "The host key changed with the new container and it should not. Fix it.",
+   "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
+   "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
+   "expectations": [
+    "no build, edit, ssh, git, curl, rg, sed or grep segment of her own",
+    "a dispatch, a mail to a worker, or a read of the realm's own state",
+    "no repository path read, written or edited"
+   ],
+   "checks": [
+    {
+     "any": [
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "dispatch"
+        ]
+       }
+      },
+      {
+       "call": {
+        "tool": "send_message"
+       }
+      },
+      {
+       "call": {
+        "tool": "reply_message"
+       }
+      },
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "table"
+        ]
+       }
+      },
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "status"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "no_command": {
+      "programs": [
+       "git",
+       "gh",
+       "ssh",
+       "scp",
+       "npm",
+       "npx",
+       "pnpm",
+       "bun",
+       "cargo",
+       "pytest",
+       "make",
+       "docker",
+       "curl",
+       "wget",
+       "find",
+       "rg",
+       "sed",
+       "grep"
+      ],
+      "allow": [
+       "\\.local/state/realm",
+       "^cat > /tmp/",
+       "/tmp/"
+      ]
+     }
+    },
+    {
+     "no_path_tool": {
+      "tools": [
+       "read",
+       "write",
+       "edit"
+      ]
+     }
+    }
+   ],
+   "source": "2026-11-21T12-52-00-109Z_01a1fe29-e1ed-71d6-a73a-c25b5d841a35.jsonl#turn8"
+  },
+  {
+   "id": 345,
+   "family": "delegation",
+   "polarity": "negative",
+   "prompt": "I don't understand what the ratchet produced, because I feel NO change.",
+   "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
+   "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
+   "expectations": [
+    "no build, edit, ssh, git, curl, rg, sed or grep segment of her own",
+    "a dispatch, a mail to a worker, or a read of the realm's own state",
+    "no repository path read, written or edited"
+   ],
+   "checks": [
+    {
+     "any": [
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "dispatch"
+        ]
+       }
+      },
+      {
+       "call": {
+        "tool": "send_message"
+       }
+      },
+      {
+       "call": {
+        "tool": "reply_message"
+       }
+      },
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "table"
+        ]
+       }
+      },
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "status"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "no_command": {
+      "programs": [
+       "git",
+       "gh",
+       "ssh",
+       "scp",
+       "npm",
+       "npx",
+       "pnpm",
+       "bun",
+       "cargo",
+       "pytest",
+       "make",
+       "docker",
+       "curl",
+       "wget",
+       "find",
+       "rg",
+       "sed",
+       "grep"
+      ],
+      "allow": [
+       "\\.local/state/realm",
+       "^cat > /tmp/",
+       "/tmp/"
+      ]
+     }
+    },
+    {
+     "no_path_tool": {
+      "tools": [
+       "read",
+       "write",
+       "edit"
+      ]
+     }
+    }
+   ],
+   "source": "2026-11-21T12-52-00-109Z_01a1fe29-e1ed-71d6-a73a-c25b5d841a35.jsonl#turn10"
+  },
+  {
+   "id": 346,
+   "family": "delegation",
+   "polarity": "negative",
+   "prompt": "Where are we with the bug in Overlord?",
+   "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
+   "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
+   "expectations": [
+    "no build, edit, ssh, git, curl, rg, sed or grep segment of her own",
+    "a dispatch, a mail to a worker, or a read of the realm's own state",
+    "no repository path read, written or edited"
+   ],
+   "checks": [
+    {
+     "any": [
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "dispatch"
+        ]
+       }
+      },
+      {
+       "call": {
+        "tool": "send_message"
+       }
+      },
+      {
+       "call": {
+        "tool": "reply_message"
+       }
+      },
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "table"
+        ]
+       }
+      },
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "status"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "no_command": {
+      "programs": [
+       "git",
+       "gh",
+       "ssh",
+       "scp",
+       "npm",
+       "npx",
+       "pnpm",
+       "bun",
+       "cargo",
+       "pytest",
+       "make",
+       "docker",
+       "curl",
+       "wget",
+       "find",
+       "rg",
+       "sed",
+       "grep"
+      ],
+      "allow": [
+       "\\.local/state/realm",
+       "^cat > /tmp/",
+       "/tmp/"
+      ]
+     }
+    },
+    {
+     "no_path_tool": {
+      "tools": [
+       "read",
+       "write",
+       "edit"
+      ]
+     }
+    }
+   ],
+   "source": "2026-11-21T12-52-00-109Z_01a1fe29-e1ed-71d6-a73a-c25b5d841a35.jsonl#turn14"
+  },
+  {
+   "id": 347,
+   "family": "delegation",
+   "polarity": "negative",
+   "prompt": "You have ops and bws now.",
+   "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
+   "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
+   "expectations": [
+    "no build, edit, ssh, git, curl, rg, sed or grep segment of her own",
+    "a dispatch, a mail to a worker, or a read of the realm's own state",
+    "no repository path read, written or edited"
+   ],
+   "checks": [
+    {
+     "any": [
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "dispatch"
+        ]
+       }
+      },
+      {
+       "call": {
+        "tool": "send_message"
+       }
+      },
+      {
+       "call": {
+        "tool": "reply_message"
+       }
+      },
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "table"
+        ]
+       }
+      },
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "status"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "no_command": {
+      "programs": [
+       "git",
+       "gh",
+       "ssh",
+       "scp",
+       "npm",
+       "npx",
+       "pnpm",
+       "bun",
+       "cargo",
+       "pytest",
+       "make",
+       "docker",
+       "curl",
+       "wget",
+       "find",
+       "rg",
+       "sed",
+       "grep"
+      ],
+      "allow": [
+       "\\.local/state/realm",
+       "^cat > /tmp/",
+       "/tmp/"
+      ]
+     }
+    },
+    {
+     "no_path_tool": {
+      "tools": [
+       "read",
+       "write",
+       "edit"
+      ]
+     }
+    }
+   ],
+   "source": "2026-11-21T12-52-00-109Z_01a1fe29-e1ed-71d6-a73a-c25b5d841a35.jsonl#turn15"
+  },
+  {
+   "id": 348,
+   "family": "delegation",
+   "polarity": "positive",
+   "prompt": "Send 5 subjects to gather ALL the secrets they can find on the NAS, the coding server, 1Password, bitwarden, the laptop, GitHub, the history and the logs.",
+   "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
+   "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
+   "expectations": [
+    "no build, edit, ssh, git, curl, rg, sed or grep segment of her own",
+    "a dispatch, a mail to a worker, or a read of the realm's own state",
+    "no repository path read, written or edited"
+   ],
+   "checks": [
+    {
+     "any": [
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "dispatch"
+        ]
+       }
+      },
+      {
+       "call": {
+        "tool": "send_message"
+       }
+      },
+      {
+       "call": {
+        "tool": "reply_message"
+       }
+      },
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "table"
+        ]
+       }
+      },
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "status"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "no_command": {
+      "programs": [
+       "git",
+       "gh",
+       "ssh",
+       "scp",
+       "npm",
+       "npx",
+       "pnpm",
+       "bun",
+       "cargo",
+       "pytest",
+       "make",
+       "docker",
+       "curl",
+       "wget",
+       "find",
+       "rg",
+       "sed",
+       "grep"
+      ],
+      "allow": [
+       "\\.local/state/realm",
+       "^cat > /tmp/",
+       "/tmp/"
+      ]
+     }
+    },
+    {
+     "no_path_tool": {
+      "tools": [
+       "read",
+       "write",
+       "edit"
+      ]
+     }
+    }
+   ],
+   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn51"
+  },
+  {
+   "id": 349,
+   "family": "delegation",
+   "polarity": "positive",
+   "prompt": "I want to switch back to 9router; omniroute is a really badly maintained product.",
+   "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
+   "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
+   "expectations": [
+    "no build, edit, ssh, git, curl, rg, sed or grep segment of her own",
+    "a dispatch, a mail to a worker, or a read of the realm's own state",
+    "no repository path read, written or edited"
+   ],
+   "checks": [
+    {
+     "any": [
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "dispatch"
+        ]
+       }
+      },
+      {
+       "call": {
+        "tool": "send_message"
+       }
+      },
+      {
+       "call": {
+        "tool": "reply_message"
+       }
+      },
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "table"
+        ]
+       }
+      },
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "status"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "no_command": {
+      "programs": [
+       "git",
+       "gh",
+       "ssh",
+       "scp",
+       "npm",
+       "npx",
+       "pnpm",
+       "bun",
+       "cargo",
+       "pytest",
+       "make",
+       "docker",
+       "curl",
+       "wget",
+       "find",
+       "rg",
+       "sed",
+       "grep"
+      ],
+      "allow": [
+       "\\.local/state/realm",
+       "^cat > /tmp/",
+       "/tmp/"
+      ]
+     }
+    },
+    {
+     "no_path_tool": {
+      "tools": [
+       "read",
+       "write",
+       "edit"
+      ]
+     }
+    }
+   ],
+   "source": "2026-11-21T06-00-44-477Z_01a1fcb1-5cbd-7382-8839-e1b0c144d824.jsonl#turn62"
+  },
+  {
+   "family": "coordination-ask",
+   "polarity": "negative",
+   "prompt": "Which worker should get the ratchet pass, and should it wait behind the CI fix?",
+   "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
+   "expected_output": "Decides: names the worker and says start-now or queued, in one line. Opens no form.",
+   "expectations": [
+    "no question form",
+    "a dispatch or a mail realising the decision"
+   ],
+   "checks": [
+    {
+     "no_call": {
+      "tool": "ask"
+     }
+    },
+    {
+     "any": [
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "dispatch"
+        ]
+       }
+      },
+      {
+       "call": {
+        "tool": "send_message"
+       }
+      }
+     ]
+    }
+   ],
+   "source": "derived from the rule 'Coordination is your job; never ask the user about it'",
+   "id": 350
+  },
+  {
+   "family": "coordination-ask",
+   "polarity": "negative",
+   "prompt": "I have three subjects ready: the eval pipeline, the panel polish, the db race. Two workers are idle.",
+   "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
+   "expected_output": "Decides the mapping and the order, dispatches, reports in one line. Opens no form.",
+   "expectations": [
+    "no question form",
+    "a dispatch or a mail realising the decision"
+   ],
+   "checks": [
+    {
+     "no_call": {
+      "tool": "ask"
+     }
+    },
+    {
+     "any": [
+      {
+       "command": {
+        "programs": [
+         "realm"
+        ],
+        "contains": [
+         "dispatch"
+        ]
+       }
+      },
+      {
+       "call": {
+        "tool": "send_message"
+       }
+      }
+     ]
+    }
+   ],
+   "source": "derived from the rule 'Coordination is your job; never ask the user about it'",
+   "id": 351
+  },
+  {
+   "family": "coordination-ask",
+   "polarity": "positive",
+   "prompt": "Retire GrayTurtle.",
+   "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty. GrayTurtle's pane wA:p1 no longer exists after the restart; its row is still in the db, its agent still active, and it holds no subject.",
+   "expected_output": "Asks the user whether to retire a worker whose pane is gone: retiring is their word.",
+   "expectations": [
+    "one question form to the user",
+    "no dispatch that presumes the answer"
+   ],
+   "checks": [
+    {
+     "call": {
+      "tool": "ask"
+     }
+    }
+   ],
+   "source": "2026-11-21T12-52-00-109Z_01a1fe29-e1ed-71d6-a73a-c25b5d841a35.jsonl#turn1 (ask for GrayTurtle)",
+   "id": 352
+  },
+  {
+   "family": "coordination-ask",
+   "polarity": "positive",
+   "prompt": "The scout needs Gmail. Fix that.",
+   "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty. The scout's Gmail source reads from the vault; the vault is locked and only the user can open it.",
+   "expected_output": "Asks the user to unlock the vault: a credential is theirs.",
+   "expectations": [
+    "one question form to the user",
+    "no dispatch that presumes the answer"
+   ],
+   "checks": [
+    {
+     "call": {
+      "tool": "ask"
+     }
+    }
+   ],
+   "source": "2026-11-21T12-52-00-109Z_01a1fe29-e1ed-71d6-a73a-c25b5d841a35.jsonl#turn1 (ask for GrayTurtle)",
+   "id": 353
+  }
+ ]
+}
