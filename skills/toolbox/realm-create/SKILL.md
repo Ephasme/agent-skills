@@ -47,7 +47,7 @@ then rerun with the flag it names. Every verb acts on one realm: always pass `--
 too once the realm exists); the db is shared by every realm on the machine and a verb never reads or writes
 another key's rows.
 
-Every pane of a realm (queen, workers, scout) has a bind file, `~/.local/state/realm/bind/<pane>.json`, naming
+Every pane of a realm (queen, workers, scout, scryer) has a bind file, `~/.local/state/realm/bind/<pane>.json`, naming
 its agent. The realm-wake omp extension in that pane follows the agent's Agent Mail deliveries and starts its
 session's turn on each new mail, as an aside: nothing is typed. Re-briefs and the scout's scans are mails too.
 
@@ -172,7 +172,7 @@ No upper bound on workers.
 ## The scout
 
 Optional, one per realm, only when the user asks for it: `realm scout spawn --project <key>`. It registers an
-agent, writes its brief (`src/realm/briefs/scout-brief.md` of the realm repository, filled), opens its own
+agent, writes its brief (`src/scout/scout-brief.md` of the realm repository, filled), opens its own
 `🔭 <name> · scout` workspace and binds its pane. A queue job mails it `[scan]` every hour from 08:00 to 22:00
 and every three hours otherwise (Europe/Paris); its realm-wake wakes it on that mail as on any other. It is not
 a worker: never dispatch a subject to it, it never shows in `worker list`. `realm scout show --project <key>`
@@ -219,6 +219,30 @@ On a `scout-proposals` mail, or when the user asks:
 The user's to-do list: `realm task list|add|done|drop|reopen|priority --project <key>`. `task add` only on the
 user's own request; `--priority urgent` (or `task priority --id N --priority urgent`) when the user says so.
 `task list` shows urgent first.
+
+## The scryer
+
+Permanent, one per realm, spawned with the scout: `realm scryer spawn --project <key>`. It registers an agent,
+writes its brief (`src/scryer/scryer-brief.md` of the realm repository, filled), opens its own
+`🔮 <name> · scryer` workspace and binds its pane; realmd mails it `[pass]` every minute. It is not a worker:
+never dispatch a subject to it, it never shows in `worker list`.
+
+What it keeps, per subject: `summary` (4-5 sentences on what the subject is and what done means, written once),
+`progress` (0-100), `progress_note` (one sentence) and `progress_ts`, all on `realm table --json`. It writes them
+with `realm scryer report --project <key> --subject <slug> --progress N --note "<sentence>"` (`--summary-file -`
+for the summary); `realm scryer pending` lists the subjects that need it, and
+`realm scryer show` gives its last pass and the live incident. `realm dispatch` and `subject add` mail it
+`[scryer-new] <slug>` so a new subject's summary is written without being asked.
+
+Its second mission: when an agent is stuck on the model provider (HTTP 4xx/5xx, 429, quota, empty completion, an
+omp that exited mid-turn), realmd's pass detects it from the session tail and mails you once, verbatim, with the
+worker, the pane, the model, the retries and since when — `[scryer] provider incident: <agent> (<model>)`, and
+`[scryer] provider recovered: <agent>` on recovery. The scryer never acts on it; what to do (switch the model with
+`realm worker set-model`, restart, leave it) is yours.
+
+Cost: no model call while no subject moves. Every subject moving every minute: one omp turn a minute, ~15-20k
+input tokens and ~600 output each. An idle realm costs nothing. If it has to stop: `realm stop` disables its
+cron row with the scout's.
 
 ## Ending the swarm
 
