@@ -6,14 +6,14 @@ this pipeline exists to make impossible.
 
 ## Cases
 
-`ratchet-cases-118.json` = the 65 hand-written cases (`ratchet-cases-60.json`) + the mined ones
-(`mined-cases.json`), built by `merge_cases.py`, which refuses a duplicate id.
+`ratchet-cases-60.json` is the corpus: the hand-written cases, each carrying the rule it enforces in
+`expectations`.
 
-`mined-cases.json` comes from `mine_cases.py`, which reads the queen's own omp sessions and keeps
-turns where she did the work herself or asked the user about coordination. Each case carries the
-user's words verbatim, the session file and turn index in `source`, and the rule it enforces in
-`expectations`. A candidate is a *proposal*: it lands in `mined-cases.json` only after its checks
-pass a correct transcript and fail a violating one (`test_mined_cases.py`), with no model call.
+`mine_cases.py` reads the queen's own omp sessions and keeps turns where she did the work herself or
+asked the user about coordination, writing them to `mined-candidates.json`: the user's words verbatim,
+the session file and turn index in `source`. A candidate is a *proposal* until it passes a correct
+transcript and fails a violating one, with no model call; `merge_cases.py` folds a mined file into a
+base, refusing a duplicate id.
 
 ## Checks
 
@@ -55,8 +55,8 @@ instrument: fix the rubric, not the prompt under test.
 
 ```sh
 # The evals go straight to OpenRouter: OPENROUTER_API_KEY must be exported.
-.venv/bin/python -B ratchet_run.py --out ~/.omp/ratchet/realm-queen/r<N> --reps 2 --cases ratchet-cases-118.json
-.venv/bin/python analysis.py --baseline <baseline dir> --branch <round dir> --cases ratchet-cases-118.json \
+.venv/bin/python -B ratchet_run.py --out ~/.omp/ratchet/realm-queen/r<N> --reps 2 --cases ratchet-cases-60.json
+.venv/bin/python analysis.py --baseline <baseline dir> --branch <round dir> --cases ratchet-cases-60.json \
     --prespecified <ids named before the round>
 ```
 

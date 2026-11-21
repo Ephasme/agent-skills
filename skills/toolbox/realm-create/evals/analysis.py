@@ -1,7 +1,7 @@
 """Paired analysis of one ratchet round: what the numbers can and cannot support.
 
     python3 analysis.py --baseline /path/op-main --branch /path/op-r2 \
-        [--cases ratchet-cases-118.json] [--prespecified 105,206,215,218] [--out report.md]
+        [--cases ratchet-cases-60.json] [--prespecified 105,206,215,218] [--out report.md]
 
 Reads the ratchet's own `results.jsonl` (one row per case x rep) and reports:
 
@@ -159,7 +159,7 @@ def main():
     ap.add_argument("--branch")
     ap.add_argument("--single", help="one run to describe: mean pass rate with a clustered CI, "
                                      "per-family rates, and its own A/A noise")
-    ap.add_argument("--cases", default=str(Path(__file__).parent / "ratchet-cases-118.json"))
+    ap.add_argument("--cases", default=str(Path(__file__).parent / "ratchet-cases-60.json"))
     ap.add_argument("--prespecified", default="")
     ap.add_argument("--split", choices=["train", "test"], help="restrict to the split recorded in the case file")
     ap.add_argument("--out", default="")
