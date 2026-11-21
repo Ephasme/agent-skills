@@ -5,7 +5,7 @@
    "id": 301,
    "family": "delegation",
    "polarity": "negative",
-   "prompt": "Run gray-turtle with Gemini Argon, switch it",
+   "prompt": "you should run gray-turtle with Gemini Argon, switch it",
    "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
    "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
    "expectations": [
@@ -103,7 +103,7 @@
    "id": 302,
    "family": "delegation",
    "polarity": "negative",
-   "prompt": "Add yourself a tool that switches a worker's model, then use it.",
+   "prompt": "and then add yourself a tool to do this",
    "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
    "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
    "expectations": [
@@ -201,7 +201,7 @@
    "id": 303,
    "family": "delegation",
    "polarity": "negative",
-   "prompt": "Add this to the ratchet.",
+   "prompt": "add this to the ratchet",
    "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
    "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
    "expectations": [
@@ -299,7 +299,7 @@
    "id": 304,
    "family": "delegation",
    "polarity": "negative",
-   "prompt": "Install gcloud in the container.",
+   "prompt": "Install gcloud",
    "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
    "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
    "expectations": [
@@ -397,7 +397,7 @@
    "id": 305,
    "family": "delegation",
    "polarity": "negative",
-   "prompt": "Why do some rows of the Overlord show no progress?",
+   "prompt": "why some rows of the Overlord are not showing any progress",
    "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
    "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
    "expectations": [
@@ -495,7 +495,7 @@
    "id": 306,
    "family": "delegation",
    "polarity": "negative",
-   "prompt": "How is the TypeScript conversion going?",
+   "prompt": "how to ts convert is going?",
    "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
    "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
    "expectations": [
@@ -593,7 +593,7 @@
    "id": 307,
    "family": "delegation",
    "polarity": "negative",
-   "prompt": "Once it is done, run the tests in ub-mode.",
+   "prompt": "once done you will test the tests with ub-mode",
    "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
    "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
    "expectations": [
@@ -691,7 +691,7 @@
    "id": 308,
    "family": "delegation",
    "polarity": "negative",
-   "prompt": "How big is the realm memory?",
+   "prompt": "how big is the realm memory?",
    "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
    "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
    "expectations": [
@@ -789,7 +789,7 @@
    "id": 309,
    "family": "delegation",
    "polarity": "negative",
-   "prompt": "Do you know how many children I have, and their names?",
+   "prompt": "so you know how many children I have and their names?",
    "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
    "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
    "expectations": [
@@ -887,7 +887,7 @@
    "id": 310,
    "family": "delegation",
    "polarity": "negative",
-   "prompt": "Use this key for NTFY: tk_0c2fydvfkbun7fx1wwfhgigziqjx5. Notify me when you think it useful and I will tell you each time whether it was.",
+   "prompt": "use this key for NTFY : tk_0c2fydvfkbun7fx1wwfhgigziqjx5\nnotify me when you think useful and I will tell you each time if it was then we will train your prompt with 20/30 experiments",
    "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
    "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
    "expectations": [
@@ -985,7 +985,7 @@
    "id": 311,
    "family": "delegation",
    "polarity": "negative",
-   "prompt": "Can ntfy send buttons and listen to hooks?",
+   "prompt": "can ntfy send buttons and listen to hooks?",
    "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
    "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
    "expectations": [
@@ -1083,7 +1083,7 @@
    "id": 312,
    "family": "delegation",
    "polarity": "negative",
-   "prompt": "Is my ntfy server outdated?",
+   "prompt": "is my ntfy server outdated?",
    "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
    "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
    "expectations": [
@@ -1181,7 +1181,7 @@
    "id": 313,
    "family": "delegation",
    "polarity": "negative",
-   "prompt": "Update my omniroute server.",
+   "prompt": "update my omniroute server",
    "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
    "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
    "expectations": [
@@ -1279,7 +1279,7 @@
    "id": 314,
    "family": "delegation",
    "polarity": "negative",
-   "prompt": "Is my TypeScript port finished yet?",
+   "prompt": "is my typescript port finished et?",
    "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
    "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
    "expectations": [
@@ -1377,7 +1377,7 @@
    "id": 315,
    "family": "delegation",
    "polarity": "negative",
-   "prompt": "Does hindsight work?",
+   "prompt": "does hindsight works?",
    "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
    "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
    "expectations": [
@@ -1475,7 +1475,7 @@
    "id": 316,
    "family": "delegation",
    "polarity": "negative",
-   "prompt": "Fix the hindsight embedding.",
+   "prompt": "fix the hindsight embedding then",
    "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
    "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
    "expectations": [
@@ -1573,7 +1573,7 @@
    "id": 317,
    "family": "delegation",
    "polarity": "negative",
-   "prompt": "I want you to be able to restart the realm without worry: killing the 12 workers is fine if you can restart them afterwards.",
+   "prompt": "I want you to be able to restart the realm without worry, it's not a problem to kill the 12 workers if you can restart them afterward",
    "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
    "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
    "expectations": [
@@ -1671,7 +1671,7 @@
    "id": 318,
    "family": "delegation",
    "polarity": "negative",
-   "prompt": "Can you please upgrade omniroute?",
+   "prompt": "can you please upgrade omniroute ??",
    "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
    "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
    "expectations": [
@@ -1769,7 +1769,7 @@
    "id": 319,
    "family": "delegation",
    "polarity": "negative",
-   "prompt": "I want a herdr plugin on my laptop to visualise the realm instead of the left panel, which you will hide entirely.",
+   "prompt": "i want a herdr plugin on my laptop to visualize the realm instead of the left panel (which you will hide entirely)",
    "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
    "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
    "expectations": [
@@ -1867,7 +1867,7 @@
    "id": 320,
    "family": "delegation",
    "polarity": "negative",
-   "prompt": "1Password password is `curing5HAWKES.various-jackal`, bitwarden is `melody1-system2`. Store them temporarily in a file so they can be used.",
+   "prompt": "1Password password is `curing5HAWKES.various-jackal`\nbitwarden is `melody1-system2`\nstore them temporarily in a file to access those platform",
    "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
    "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
    "expectations": [
@@ -1965,7 +1965,7 @@
    "id": 321,
    "family": "delegation",
    "polarity": "negative",
-   "prompt": "In my argocd personal, send someone to switch as many applications as possible from Recreate to a zero-downtime rollout strategy, if possible.",
+   "prompt": "In my argocd personal, send someone switch as much application as possible from recreate to 0 downtime rollout if possible.",
    "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
    "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
    "expectations": [
@@ -2063,7 +2063,7 @@
    "id": 322,
    "family": "delegation",
    "polarity": "negative",
-   "prompt": "Check up on Overlord and make sure its processes are running.",
+   "prompt": "can you checkup on overlord and make sure the processes are running?",
    "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
    "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
    "expectations": [
@@ -2161,7 +2161,7 @@
    "id": 323,
    "family": "delegation",
    "polarity": "negative",
-   "prompt": "What about my Overlord container?",
+   "prompt": "what about my Overlord container?",
    "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
    "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
    "expectations": [
@@ -2259,7 +2259,7 @@
    "id": 324,
    "family": "delegation",
    "polarity": "negative",
-   "prompt": "Can you switch back to 9router without offline time?",
+   "prompt": "can you do it without offline time?",
    "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
    "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
    "expectations": [
@@ -2357,7 +2357,7 @@
    "id": 325,
    "family": "delegation",
    "polarity": "negative",
-   "prompt": "Ask me your questions if you have some, then go.",
+   "prompt": "ask me your questions if you have some and go",
    "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
    "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
    "expectations": [
@@ -2553,7 +2553,7 @@
    "id": 327,
    "family": "delegation",
    "polarity": "negative",
-   "prompt": "Okay, what about my TS port?",
+   "prompt": "Okay what about my TS port?",
    "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
    "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
    "expectations": [
@@ -2651,7 +2651,7 @@
    "id": 328,
    "family": "delegation",
    "polarity": "negative",
-   "prompt": "Now what about TSK-010?",
+   "prompt": "now what about TSK-010?",
    "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
    "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
    "expectations": [
@@ -2749,7 +2749,7 @@
    "id": 329,
    "family": "delegation",
    "polarity": "negative",
-   "prompt": "Send someone on my AirLock application: the minutes of my son watching his videos never decrease.",
+   "prompt": "send someone on my AirLock application -> the minutes of my son watching his videos never decrease",
    "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
    "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
    "expectations": [
@@ -2847,7 +2847,7 @@
    "id": 330,
    "family": "delegation",
    "polarity": "negative",
-   "prompt": "Add Cancelled.",
+   "prompt": "add Cancelled",
    "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
    "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
    "expectations": [
@@ -2945,7 +2945,7 @@
    "id": 331,
    "family": "delegation",
    "polarity": "negative",
-   "prompt": "Why is TSK-010 still stuck?",
+   "prompt": "Why TSK-010 IS STILL STUCK??",
    "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
    "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
    "expectations": [
@@ -3043,7 +3043,7 @@
    "id": 332,
    "family": "delegation",
    "polarity": "negative",
-   "prompt": "And my herdr plugin?",
+   "prompt": "and my herdr plugin?",
    "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
    "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
    "expectations": [
@@ -3141,7 +3141,7 @@
    "id": 333,
    "family": "delegation",
    "polarity": "negative",
-   "prompt": "Install it on my laptop, please.",
+   "prompt": "install it on my laptop please",
    "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
    "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
    "expectations": [
@@ -3239,7 +3239,7 @@
    "id": 334,
    "family": "delegation",
    "polarity": "negative",
-   "prompt": "Le naming automatique dans Overlord ne fonctionne plus, fixe le.",
+   "prompt": "Le naming automatique dans Overlord ne fonctionne plus, fixe le",
    "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
    "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
    "expectations": [
@@ -3435,7 +3435,7 @@
    "id": 336,
    "family": "delegation",
    "polarity": "negative",
-   "prompt": "Did you fix the delegation bug?",
+   "prompt": "did you fix the delegation bug?",
    "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
    "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
    "expectations": [
@@ -3533,7 +3533,7 @@
    "id": 337,
    "family": "delegation",
    "polarity": "negative",
-   "prompt": "Until the script is fixed, use prompt injection.",
+   "prompt": "until the script is fixed, use prompt injection",
    "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
    "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
    "expectations": [
@@ -3631,7 +3631,7 @@
    "id": 338,
    "family": "delegation",
    "polarity": "negative",
-   "prompt": "Merge it.",
+   "prompt": "merge it",
    "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
    "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
    "expectations": [
@@ -3729,7 +3729,7 @@
    "id": 339,
    "family": "delegation",
    "polarity": "negative",
-   "prompt": "And fix whatever needs to be fixed to fix the delegation.",
+   "prompt": "And fix whatever needs to be fixed to fix the delegation!",
    "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
    "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
    "expectations": [
@@ -3827,7 +3827,7 @@
    "id": 340,
    "family": "delegation",
    "polarity": "negative",
-   "prompt": "Fix it so an interim reply can be acknowledged without changing the subject's state.",
+   "prompt": "fix it so an interim reply can be acknowledged without changing state",
    "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
    "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
    "expectations": [
@@ -3925,7 +3925,7 @@
    "id": 341,
    "family": "delegation",
    "polarity": "negative",
-   "prompt": "And is the Python hardened path retired?",
+   "prompt": "and does the python hardness reatired?",
    "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
    "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
    "expectations": [
@@ -4023,7 +4023,7 @@
    "id": 342,
    "family": "delegation",
    "polarity": "negative",
-   "prompt": "Please ship everything you can ship and restart the realm.",
+   "prompt": "please ship everything you can ship and restart the realm",
    "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
    "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
    "expectations": [
@@ -4121,7 +4121,7 @@
    "id": 343,
    "family": "delegation",
    "polarity": "negative",
-   "prompt": "Switch to read/write, then.",
+   "prompt": "switch to read/write then",
    "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
    "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
    "expectations": [
@@ -4219,7 +4219,7 @@
    "id": 344,
    "family": "delegation",
    "polarity": "negative",
-   "prompt": "The host key changed with the new container and it should not. Fix it.",
+   "prompt": "the host key changed with the new container => it should not, fix it\nare you able to delegate now?\ngive me the command to authorize you on the mac",
    "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
    "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
    "expectations": [
@@ -4317,7 +4317,7 @@
    "id": 345,
    "family": "delegation",
    "polarity": "negative",
-   "prompt": "I don't understand what the ratchet produced, because I feel NO change.",
+   "prompt": "I don't understand what the ratchet produced because I feel NO change",
    "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
    "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
    "expectations": [
@@ -4415,7 +4415,7 @@
    "id": 346,
    "family": "delegation",
    "polarity": "negative",
-   "prompt": "Where are we with the bug in Overlord?",
+   "prompt": "Where are we with the bug in overlord?",
    "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
    "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
    "expectations": [
@@ -4513,7 +4513,7 @@
    "id": 347,
    "family": "delegation",
    "polarity": "negative",
-   "prompt": "You have ops and bws now.",
+   "prompt": "you have now ops and bws",
    "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
    "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
    "expectations": [
@@ -4611,7 +4611,7 @@
    "id": 348,
    "family": "delegation",
    "polarity": "positive",
-   "prompt": "Send 5 subjects to gather ALL the secrets they can find on the NAS, the coding server, 1Password, bitwarden, the laptop, GitHub, the history and the logs.",
+   "prompt": "send 5 subjects to gather ALL secrets possible it will find on NAS, coding-server, 1Password, bitwarden, laptop, github, history, logs, etc. they will put all these information into raw JSONL append only files that you will ask another subject to consolidate into a SOPS encrypted file -> everybody will run on DeepSeek 4.1 Flash (medium)",
    "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
    "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
    "expectations": [
@@ -4709,7 +4709,7 @@
    "id": 349,
    "family": "delegation",
    "polarity": "positive",
-   "prompt": "I want to switch back to 9router; omniroute is a really badly maintained product.",
+   "prompt": "i want to switch back to 9router, omniroute is a really badly maintained product",
    "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty.",
    "expected_output": "The work leaves the queen: a subject dispatched to an idle worker, or the worker that owns it mailed in its thread. No investigation, edit, build, ssh, git or curl of her own.",
    "expectations": [
@@ -4884,7 +4884,7 @@
   {
    "family": "coordination-ask",
    "polarity": "positive",
-   "prompt": "Retire GrayTurtle.",
+   "prompt": "`! assigned` => what does that mean?",
    "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty. GrayTurtle's pane wA:p1 no longer exists after the restart; its row is still in the db, its agent still active, and it holds no subject.",
    "expected_output": "Asks the user whether to retire a worker whose pane is gone: retiring is their word.",
    "expectations": [
@@ -4904,7 +4904,7 @@
   {
    "family": "coordination-ask",
    "polarity": "positive",
-   "prompt": "The scout needs Gmail. Fix that.",
+   "prompt": "`! assigned` => what does that mean?",
    "context": "You are the queen RubyGorge of realm /perso/realm, already running. Your pane is w8:p1 (tab queen). Workers idle, panes open: BlackMoose (w2:p1), EmeraldHorse (w3:p1), DarkPine (wC:p1), QuietWolf (wJ:p1), CopperPond (wP:p1), PurpleSeal (wH:p1), SapphireBluff (wK:p1), BlueOrchid (wG:p1). The subject table is empty. The scout's Gmail source reads from the vault; the vault is locked and only the user can open it.",
    "expected_output": "Asks the user to unlock the vault: a credential is theirs.",
    "expectations": [

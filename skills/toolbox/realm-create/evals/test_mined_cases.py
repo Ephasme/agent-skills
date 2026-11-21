@@ -54,5 +54,43 @@ class MinedCases(unittest.TestCase):
             self.assertIsNotNone(harness.check({"call": {"tool": "ask"}}, CORRECT, ""))
 
 
+class Traceability(unittest.TestCase):
+    """A mined case must quote its session: prompt text and turn index both check out."""
+
+    SESSIONS = Path.home() / ".omp/agent/sessions"
+
+    def test_source_points_at_the_quote(self):
+        seen = 0
+        for case in CASES:
+            if not case["source"].endswith(tuple(f"#turn{i}" for i in range(200))):
+                continue
+            name, turn = case["source"].split("#turn")
+            hits = list(self.SESSIONS.glob(f"*/{name}"))
+            if not hits:
+                continue
+            seen += 1
+            users, cur = [], None
+            for line in hits[0].open():
+                try:
+                    import json as _json
+                    row = _json.loads(line)
+                except ValueError:
+                    continue
+                msg = row.get("message") or {}
+                if msg.get("role") == "user":
+                    c = msg.get("content")
+                    t = c if isinstance(c, str) else " ".join(b.get("text", "") for b in c or []
+                                                              if b.get("type") == "text")
+                    if t.strip() and not t.startswith("<system-reminder>"):
+                        users.append(t.strip())
+            if int(turn) >= len(users):
+                continue
+            real = users[int(turn)]
+            # The curated prompt may normalise wording; the first 40 characters must survive.
+            self.assertEqual(case["prompt"][:40], real[:40], f"case {case['id']} quotes the wrong turn")
+        if not seen:
+            self.skipTest("no queen sessions on this machine")
+
+
 if __name__ == "__main__":
     unittest.main()
