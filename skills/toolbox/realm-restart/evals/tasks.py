@@ -1,4 +1,4 @@
-"""Inspect task for realm-restart. Run from this directory: `inspect eval tasks.py --model openai-api/omniroute/work/main -T ref=<commit>`; without ref the working tree is tested."""
+"""Inspect task for realm-restart. Run from this directory: `inspect eval tasks.py --model openrouter/deepseek/deepseek-v4.1-flash-1017 -T ref=<commit>`; without ref the working tree is tested."""
 
 import sys
 from pathlib import Path

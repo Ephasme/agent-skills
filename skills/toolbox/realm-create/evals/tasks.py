@@ -1,6 +1,6 @@
 """Inspect task for realm-create, the queen skill.
 
-Run from this directory: `inspect eval tasks.py --model openai-api/omniroute/work/main -T ref=<commit>`; without ref the working tree is tested.
+Run from this directory: `inspect eval tasks.py --model openrouter/deepseek/deepseek-v4.1-flash-1017 -T ref=<commit>`; without ref the working tree is tested.
 """
 
 from pathlib import Path

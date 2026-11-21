@@ -54,7 +54,7 @@ instrument: fix the rubric, not the prompt under test.
 ## Running a round
 
 ```sh
-. ~/.omp/agent/.env && export OMNIROUTE_API_KEY OMNIROUTE_BASE_URL=https://omniroute.loup-peluso.com/v1
+# The evals go straight to OpenRouter: OPENROUTER_API_KEY must be exported.
 .venv/bin/python -B ratchet_run.py --out ~/.omp/ratchet/realm-queen/r<N> --reps 2 --cases ratchet-cases-118.json
 .venv/bin/python analysis.py --baseline <baseline dir> --branch <round dir> --cases ratchet-cases-118.json \
     --prespecified <ids named before the round>

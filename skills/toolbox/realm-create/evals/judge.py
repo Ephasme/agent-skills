@@ -100,7 +100,7 @@ def main():
     sc.add_argument("--run", required=True)
     sc.add_argument("--sheet", required=True)
     sc.add_argument("--out", default="predictions.jsonl")
-    sc.add_argument("--model", default="openai-api/omniroute/work/main")
+    sc.add_argument("--model", default="openrouter/deepseek/deepseek-v4.1-flash-1017")
     ag = sub.add_parser("agree")
     ag.add_argument("--labels", required=True)
     ag.add_argument("--predictions", required=True)
