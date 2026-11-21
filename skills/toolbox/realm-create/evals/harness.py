@@ -325,8 +325,8 @@ def _reply(state):
 
 
 # Mail, dispatch bodies, the skill store and the realm's own state: what routing work needs.
-DEFAULT_PATH_ALLOW = ("xd://", "skill://", "/tmp/", "~/.local/state/realm",
-                      "/Users/loup/.local/state/realm", "~/.agents/skills", "/Users/loup/.agents/skills")
+DEFAULT_PATH_ALLOW = ("xd://", "skill://", "/tmp/", "~/.local/state/realm", "~/.agents/skills",
+                      str(Path.home() / ".local/state/realm"), str(Path.home() / ".agents/skills"))
 
 
 def check(spec, calls, reply):
