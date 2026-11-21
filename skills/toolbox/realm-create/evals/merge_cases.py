@@ -28,6 +28,12 @@ def main():
         raise SystemExit(f"duplicate case ids: {dupes}")
     cases = base + mined
     fam = collections.Counter(c["family"] for c in cases)
+    prompts = collections.Counter(c["prompt"] for c in cases)
+    if prompts.most_common(1)[0][1] > 1:
+        print("WARNING: duplicate prompts:", [p[:60] for p, n in prompts.items() if n > 1][:5])
+    for c in cases:
+        if not c.get("checks"):
+            raise SystemExit(f"case {c['id']} has no checks: it would always pass")
     Path(a.out).write_text(json.dumps({"note": f"{len(base)} hand-written + {len(mined)} mined from queen sessions.",
                                        "evals": cases}, indent=1, ensure_ascii=False))
     print(f"{len(cases)} cases -> {a.out}")
