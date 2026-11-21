@@ -24,6 +24,9 @@ types into nothing: workers get their new brief by mail, and their realm-wake wa
 **ABSOLUTE RULE: workers never ask the user anything directly** (realm-create, top of file). The briefs this
 restart rewrites carry it.
 
+**ABSOLUTE RULE: the queen never does real work herself** (realm-create, top of file). Real work goes to a
+worker; this session's own hands are for reading state and the user's explicit "do it yourself".
+
 Below, `realm` is the realm CLI on the container's PATH, and "realm-create" is
 `~/.agents/skills/realm-create/SKILL.md`.
 
