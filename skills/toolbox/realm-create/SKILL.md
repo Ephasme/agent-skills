@@ -63,7 +63,7 @@ session's turn on each new mail, as an aside: nothing is typed. Re-briefs and th
   worker and the scout start there, whatever directory you run this from;
 - per worker: registers it, writes its brief (`src/realm/briefs/brief.md` of the realm repository, filled) to
   `$REALM_STATE_DIR/briefs/<key-slug>/<w>.md`, opens its own top-level workspace `🛠️ <name> · <w>` (unfocused, in
-  the realm repository), binds its pane, starts `omp @<brief>` in it, records it;
+  the realm repository), binds its pane, starts `omp --model <your model> @<brief>` in it, records it;
 - waits up to 60 s for each worker to join.
 
 Keep `queen`: that is `QUEEN`. A message in `inbox` is a request from the user: dispatch it in this turn
@@ -171,8 +171,9 @@ No upper bound on workers.
 
 ## The scout
 
-Optional, one per realm, only when the user asks for it: `realm scout spawn --project <key>`. It registers an
-agent, writes its brief (`src/scout/scout-brief.md` of the realm repository, filled), opens its own
+Optional, one per realm, only when the user asks for it:
+`realm scout spawn --project <key> --model <the realm's model>`. It registers an agent, writes its brief
+(`src/scout/scout-brief.md` of the realm repository, filled), opens its own
 `🔭 <name> · scout` workspace and binds its pane. A queue job mails it `[scan]` every hour from 08:00 to 22:00
 and every three hours otherwise (Europe/Paris); its realm-wake wakes it on that mail as on any other. It is not
 a worker: never dispatch a subject to it, it never shows in `worker list`. `realm scout show --project <key>`
@@ -181,7 +182,8 @@ another realm's (the user's word: it must not start from scratch): `realm scout 
 <key>` moves cursors, judged ids, proposals, their tasks and scan times; refused once the new scout has acked.
 
 `--model <m>` on `scout spawn` runs the scout on its own omp model (stored on its row, shown by `scout show`);
-an overlay at `~/.local/state/realm/scout-config/<key>.yml`, passed with `omp --config`, repoints every model role and
+without it, the scout takes the model its row recorded, else the realm's, never omp's configured default. An
+overlay at `~/.local/state/realm/scout-config/<key>.yml`, passed with `omp --config`, repoints every model role and
 `task.agentModelOverrides` entry to it, so its subagents spend that model too, never the global config's. Switching a
 live scout, keeping its conversation, is yours: type into its pane to exit its omp (the exit line names the session
 id), then `realm scout set-model --project <key> --model <m> --resume <id>` and run the command it prints in the same
@@ -222,10 +224,14 @@ user's own request; `--priority urgent` (or `task priority --id N --priority urg
 
 ## The scryer
 
-Permanent, one per realm, spawned with the scout: `realm scryer spawn --project <key>`. It registers an agent,
-writes its brief (`src/scryer/scryer-brief.md` of the realm repository, filled), opens its own
-`🔮 <name> · scryer` workspace and binds its pane; realmd mails it `[pass]` every minute. It is not a worker:
-never dispatch a subject to it, it never shows in `worker list`.
+Permanent, one per realm, spawned with the scout:
+`realm scryer spawn --project <key> --model <the realm's model>`. It registers an agent, writes its brief
+(`src/scryer/scryer-brief.md` of the realm repository, filled), opens its own `🔮 <name> · scryer` workspace and
+binds its pane; realmd mails it `[pass]` every minute. It is not a worker: never dispatch a subject to it, it
+never shows in `worker list`. Without `--model` it takes the model its row recorded, else the realm's, never
+omp's configured default. Move a live scryer to another model with
+`realm scryer set-model --project <key> --model <m>`: it keeps the session and refuses a pass in flight unless
+`--force`.
 
 What it keeps, per subject: `summary` (4-5 sentences on what the subject is and what done means, written once),
 `progress` (0-100), `progress_note` (one sentence) and `progress_ts`, all on `realm table --json`. It writes them
