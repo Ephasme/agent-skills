@@ -324,6 +324,11 @@ def _reply(state):
     return ""
 
 
+# Mail, dispatch bodies, the skill store and the realm's own state: what routing work needs.
+DEFAULT_PATH_ALLOW = ("xd://", "skill://", "/tmp/", "~/.local/state/realm",
+                      "/Users/loup/.local/state/realm", "~/.agents/skills", "/Users/loup/.agents/skills")
+
+
 def check(spec, calls, reply):
     """One assertion → failure message, or None when it holds.
 
@@ -359,7 +364,7 @@ def check(spec, calls, reply):
             path = str(c["args"].get("path", ""))
             if arg.get("match") and not re.search(arg["match"], path):
                 continue
-            if any(path.startswith(p) for p in arg.get("allow", ["xd://", "skill://", "/tmp/"])):
+            if any(path.startswith(p) for p in arg.get("allow", DEFAULT_PATH_ALLOW)):
                 continue
             bad.append(f"{c['tool']} {path[:80]}")
         if kind == "no_path_tool":

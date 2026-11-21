@@ -94,6 +94,8 @@ class Checks(unittest.TestCase):
                  {"tool": "write", "args": {"path": "xd://mcp__agent_mail_perso_send_message"}},
                  {"tool": "read", "args": {"path": "skill://realm-create"}}]
         self.assertIsNone(harness.check({"no_path_tool": {}}, calls, ""))
+        calls.append({"tool": "read", "args": {"path": "/Users/loup/.local/state/realm/realm.db"}})
+        self.assertIsNone(harness.check({"no_path_tool": {}}, calls, ""))
         calls.append({"tool": "edit", "args": {"path": "plugin/herdr/model.ts"}})
         self.assertIsNotNone(harness.check({"no_path_tool": {}}, calls, ""))
 
