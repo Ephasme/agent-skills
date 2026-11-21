@@ -60,8 +60,9 @@ session's turn on each new mail, as an aside: nothing is typed. Re-briefs and th
   the realm repository), binds its pane, starts `omp @<brief>` in it, records it;
 - waits up to 60 s for each worker to join.
 
-Keep `queen`: that is `QUEEN`. Carry any message in `inbox` into step 2. Each `not_joined` worker: report it to
-the user with its pane, do not relaunch blindly; `herdr pane read <pane>` shows why.
+Keep `queen`: that is `QUEEN`. A message in `inbox` is a request from the user: dispatch it in this turn
+(step 4), never only mention it. Each `not_joined` worker: report it to the user with its pane, do not
+relaunch blindly; `herdr pane read <pane>` shows why.
 
 ## 2. Be the queen
 
@@ -69,9 +70,9 @@ Until the user ends the swarm:
 
 - **Delegate, except the trivial.** An extremely simple, quick task you may do yourself: one or two commands
   whose output is the answer (`du`, `ls`, `git status`), or a one-line edit the user names exactly. Anything
-  more (investigation, several files, a build, a test run, a judgment call) goes to a worker. A task you
-  started that turns out longer than it looked (a second unexpected step, an error to dig into, output to
-  analyse): stop there and dispatch it, with what you already found in the body.
+  more (investigation, several files, a build, a test run, a judgment call) goes to a worker. The answer itself
+  can turn a task into one: a 502, an unreachable service, an error, output you would have to dig into. Stop
+  there and dispatch it with what you already found in the body.
 - **The absolute rules bind you too.** Never ask anyone to type into your pane; no brief carries your pane id.
   A worker question that only the user can answer goes through you to the user, and the answer back by mail.
 - **Voice.** The answer or the table comes first. No opening status line ("Sure", "Here is", "Checked mail"),
@@ -117,8 +118,9 @@ Each turn, in order:
    `realm dispatch --project <key> --to <W> --slug <slug> --title "<title>" --body-file <file>`, plus
    `--after <current-slug>` when queued. It sends the `[<slug>]` mail with topic `<slug>`, prefixes a queued body
    with `queued: start after <current-slug>`, and records the subject. A worker not joined yet is waited for (up
-   to 60 s) before anything is sent; still absent: `error`, nothing sent. Never wake the worker yourself: its
-   realm-wake does it on the mail.
+   to 60 s) before anything is sent; still absent: `error`, nothing sent. The user names the worker: dispatch
+   to it as asked, joined or not, on record or not (the user's words are the body); the `error` is what you
+   report, never a precheck or a question. Never wake the worker yourself: its realm-wake does it on the mail.
 5. Answer the user.
 
 A worker that stops answering: `realm status --project <key>`, then `herdr pane read <pane>`, before deciding
@@ -141,11 +143,12 @@ No upper bound on workers.
   `done`, and nothing changed for it for 30 min): `realm retire --project <key> --name <W>`. It removes the
   pane's bind file, closes its workspace, retires the agent in Agent Mail and deletes the brief; each step's
   outcome is in `steps`. Its subjects stay in the db.
-- `realm retire` refuses a worker holding any subject that is not `done`, paused ones included. To retire one on
-  the user's word, first close or reassign each of its subjects explicitly (`realm subject set-state … --state
-  done`, or `realm subject assign` to another worker plus a mail to that worker in the subject's thread: `assign`
-  only records it) and name them in your answer, then retire. Never close its workspace or call `retire_agent` by
-  hand.
+- `realm retire` refuses a worker holding any subject that is not `done`, paused ones included. The user's word to
+  retire it must also say what becomes of each such subject; when it does not, that is a decision of theirs (closing
+  drops unfinished work): mark it `blocked`, ask, retire nothing yet. Once they say, close or reassign it explicitly
+  (`realm subject set-state … --state done`, or `realm subject assign` to another worker plus a mail to that worker
+  in the subject's thread: `assign` only records it), name it in your answer, then retire. Never close its workspace
+  or call `retire_agent` by hand.
 - Workers never open a herdr workspace or tab (`hwt`, `herdr workspace/tab create`, `herdr worktree`) unless
   the user expressly grants it and you relay that grant naming the exact workspace. A subject on another repo is
   worked in a plain `git worktree` from the worker's own pane. A worker whose subject needs parallel hands or

@@ -148,6 +148,14 @@
       "context": "You are the queen QueenBee of realm /test/r, pane wC8:p1. Worker: AmberFox (wC8:p2, idle).",
       "bash": [
         [
+          "grep[^\\n]*receive(?!s? a mail\\.)|\\breceive\\b.*README",
+          "README.md:12:You will receive a mail."
+        ],
+        [
+          "git diff",
+          " README.md | 2 +-"
+        ],
+        [
           "grep",
           "README.md:12:You will recieve a mail."
         ],
@@ -614,37 +622,26 @@
           "{\"queen\": \"QueenBee\", \"inbox\": [], \"workers\": [{\"name\": \"AmberFox\", \"pane\": \"wC8:p2\"}, {\"name\": \"BlueOwl\", \"pane\": \"wC8:p3\"}], \"joined\": [\"AmberFox\"], \"not_joined\": [{\"name\": \"BlueOwl\", \"pane\": \"wC8:p3\"}]}"
         ]
       ],
-      "expected_output": "Runs one `realm create --project /test/new --size 2 --model …`; does not register agents or open tabs by hand; reports BlueOwl as not joined with its pane and does not relaunch it.",
+      "expected_output": "The name is missing and SKILL.md says to ask for it: one `ask` form for the realm name, nothing created.",
       "expectations": [
-        "realm create with --project /test/new --size 2",
-        "No create_agent_identity, herdr tab create or pane run",
-        "Reply names BlueOwl and wC8:p3 as not joined",
-        "No respawn of BlueOwl"
+        "Asks for the name",
+        "No `realm create` without one"
       ],
       "checks": [
         {
           "call": {
-            "tool": "bash",
-            "match": "realm(\\.py)?\\s+create\\b.*--project\\s+['\"]?/test/new.*--size\\s+2|realm(\\.py)?\\s+create\\b.*--size\\s+2.*--project\\s+['\"]?/test/new"
+            "tool": "ask",
+            "match": "(?i)name"
           }
         },
         {
           "no_call": {
             "tool": "bash",
-            "match": "tab create|pane run|realm(\\.py)?\\s+spawn"
-          }
-        },
-        {
-          "reply_matches": "BlueOwl"
-        },
-        {
-          "no_call": {
-            "tool": "bash",
-            "match": "signal-queen"
+            "match": "realm(\\.py)?\\s+create\\b"
           }
         }
       ],
-      "source": "existing evals.json case #12 (Loup-reviewed, commit 0a167d1)",
+      "source": "SKILL.md §Arguments ('Name missing: ask for it with them; create without one only if the user says so'); flipped from 'create without a name', which that line forbids",
       "polarity": "positive"
     },
     {
@@ -2418,23 +2415,17 @@
           "{\"pane\": \"wC8:p2\", \"agent_status\": \"exited\", \"agent_session\": {\"value\": \"~/.omp/sessions/abc.jsonl\"}}"
         ]
       ],
-      "expected_output": "Relaunches in the same pane: `omp --restore` (or `--resume`) with that session and HERDR_PANE_ID set to the pane's current id; never `realm spawn`, never a new tab.",
+      "expected_output": "Restarts it in place with `realm worker set-model --name AmberFox` (its current model to just restart), which relaunches its omp with its session in the same pane; never `realm spawn`, never a new tab, never a hand relaunch.",
       "expectations": [
-        "omp --resume/--restore with the session",
-        "HERDR_PANE_ID set",
-        "No spawn, no new tab"
+        "realm worker set-model for AmberFox",
+        "No spawn, no new tab",
+        "No hand relaunch"
       ],
       "checks": [
         {
           "call": {
             "tool": "bash",
-            "match": "omp\\s+--(resume|restore)"
-          }
-        },
-        {
-          "call": {
-            "tool": "bash",
-            "match": "HERDR_PANE_ID"
+            "match": "realm(\\.py)?\\s+worker\\s+set-model\\b[^\\n;&|]*AmberFox"
           }
         },
         {
@@ -2448,9 +2439,15 @@
             "tool": "bash",
             "match": "herdr\\s+(tab|workspace)\\s+create"
           }
+        },
+        {
+          "no_call": {
+            "tool": "bash",
+            "match": "(^|[;&|]\\s*)(HERDR_\\w+=\\S+\\s+)*omp\\s+--(resume|restore)"
+          }
         }
       ],
-      "source": "SKILL.md: 'Restarting a worker's omp is your job … Never respawn to restart'"
+      "source": "SKILL.md as of #17: 'Restarting a worker's omp, or switching its model, is your job … `realm worker set-model` … Never respawn to restart, and never relaunch by hand'"
     },
     {
       "id": 216,
@@ -2528,14 +2525,14 @@
         {
           "no_call": {
             "tool": "bash",
-            "match": "sed -i|perl -pi|cat >"
+            "match": "sed -i|perl -pi|cat >(?![^\\n]*/tmp)"
           }
         },
         {
           "reply_max_words": 70
         }
       ],
-      "source": "SKILL.md: 'Anything more (investigation, several files … a judgment call) goes to a worker'"
+      "source": "SKILL.md: 'Anything more (investigation, several files … a judgment call) goes to a worker' + step 4 (`--body-file <file>`); the `cat >` ban now spares /tmp"
     },
     {
       "id": 218,
@@ -2662,8 +2659,9 @@
       ],
       "checks": [
         {
-          "set_states": {
-            "login-page": "blocked"
+          "call": {
+            "tool": "bash",
+            "match": "subject set-state[^\\n;&|]*--slug\\s+['\"]?login-page[^\\n;&|]*--state\\s+blocked|subject set-state[^\\n;&|]*--state\\s+blocked[^\\n;&|]*--slug\\s+['\"]?login-page"
           }
         },
         {
@@ -2689,7 +2687,7 @@
           ]
         }
       ],
-      "source": "SKILL.md: 'a blocked question goes to the user'; absolute rule on the user's decisions"
+      "source": "SKILL.md: 'a blocked question goes to the user'; the `blocked` transition is what is graded, not the last state, since the answer puts the subject back to `assigned` (case 10 says so)"
     },
     {
       "id": 221,
@@ -2730,7 +2728,7 @@
       "id": 222,
       "family": "scout",
       "polarity": "positive",
-      "prompt": "Put the scout on the cheap model, keep its conversation.",
+      "prompt": "Put the scout on `perso/haiku` (the cheap one), keep its conversation.",
       "context": "You are the queen QueenBee of realm /test/r, pane wC8:p1. ScoutHawk (wC8:p9) is the scout, model work/main.",
       "bash": [
         [
@@ -2757,7 +2755,7 @@
           }
         }
       ],
-      "source": "SKILL.md: 'Switching a live scout, keeping its conversation … Never respawn the scout for this'"
+      "source": "SKILL.md: 'Switching a live scout, keeping its conversation … Never respawn the scout for this'; the model id is named because nothing in the realm said which model was cheap"
     },
     {
       "id": 223,

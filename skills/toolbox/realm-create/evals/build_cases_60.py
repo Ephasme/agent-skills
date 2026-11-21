@@ -28,8 +28,66 @@ OVERRIDES = {
                   "queen's #1667 (RusticCat's S0 A/B/C, #1660, decided by the queen)",
     },
 }
+# Case 4's `grep` stub answers with the pre-edit line, so a queen who fixes the typo herself sees "recieve" still
+# there and escalates to a worker — correct behaviour, wrong fixture. The fixed-text rules go first: they win the
+# first-match lookup for `grep -n "receive" README.md` (`receive` never matches `recieve`).
+#
+# Case 12 contradicts SKILL.md §Arguments ("Name missing: ask for it with them; create without one only if the
+# user says so"): it expected a creation without a name. It now grades that rule.
+#
+# Case 217 forbade `cat >` outright, but SKILL.md step 4 requires writing the dispatch body to a file and passing
+# `--body-file`, which needs exactly that. Only a heredoc outside /tmp is an edit of the repo.
+#
+# Case 220's `set_states` reads the LAST state per slug, so a queen who sets `blocked`, asks, relays the answer and
+# returns the subject to `assigned` — the behaviour its own expected_output describes — failed. It now requires the
+# `blocked` transition, whenever it happens.
+#
+# Case 222 said "the cheap model" and named none, so asking for the id was defensible; no mail or config in the
+# realm says which is cheap. The prompt names one.
+OVERRIDES[4] = {
+    "bash": [[r"grep[^\n]*receive(?!s? a mail\.)|\breceive\b.*README", "README.md:12:You will receive a mail."],
+             ["git diff", " README.md | 2 +-"]]
+            + json.loads((HERE / "ratchet-cases.json").read_text())["evals"][3].get("bash", []),
+}
+OVERRIDES[12] = {
+    "expected_output": "The name is missing and SKILL.md says to ask for it: one `ask` form for the realm name, "
+                       "nothing created.",
+    "expectations": ["Asks for the name", "No `realm create` without one"],
+    "checks": [
+        {"call": {"tool": "ask", "match": "(?i)name"}},
+        {"no_call": {"tool": "bash", "match": "realm(\\.py)?\\s+create\\b"}},
+    ],
+    "source": "SKILL.md §Arguments ('Name missing: ask for it with them; create without one only if the user says "
+              "so'); flipped from 'create without a name', which that line forbids",
+}
+OVERRIDES[217] = {
+    "checks": [
+        {"call": {"tool": "bash", "match": "realm(\\.py)?\\s+dispatch\\b[^\\n;&|]*--to\\s+AmberFox"}},
+        {"no_call": {"tool": "bash", "match": "sed -i|perl -pi|cat >(?![^\\n]*/tmp)"}},
+        {"reply_max_words": 70},
+    ],
+    "source": "SKILL.md: 'Anything more (investigation, several files … a judgment call) goes to a worker' + step 4 "
+              "(`--body-file <file>`); the `cat >` ban now spares /tmp",
+}
+OVERRIDES[220] = {
+    "checks": [
+        {"call": {"tool": "bash", "match": "subject set-state[^\\n;&|]*--slug\\s+['\"]?login-page[^\\n;&|]*--state\\s+blocked"
+                                          "|subject set-state[^\\n;&|]*--state\\s+blocked[^\\n;&|]*--slug\\s+['\"]?login-page"}},
+        {"call": {"tool": "ask", "match": "push"}},
+        {"any": [{"call": {"tool": "reply_message", "match": "\"message_id\": 730\\b"}},
+                 {"call": {"tool": "send_message", "match": "\"thread_id\": \"720\""}}]},
+    ],
+    "source": "SKILL.md: 'a blocked question goes to the user'; the `blocked` transition is what is graded, not the "
+              "last state, since the answer puts the subject back to `assigned` (case 10 says so)",
+}
+OVERRIDES[222] = {
+    "prompt": "Put the scout on `perso/haiku` (the cheap one), keep its conversation.",
+    "source": "SKILL.md: 'Switching a live scout, keeping its conversation … Never respawn the scout for this'; "
+              "the model id is named because nothing in the realm said which model was cheap",
+}
 for c in OLD["evals"]:
     c.update(OVERRIDES.get(c["id"], {}))
+
 
 NEW = [
     {
@@ -272,16 +330,18 @@ NEW = [
         "context": Q + " AmberFox (wC8:p2) holds 'login-page' (assigned). Its pane is at a shell prompt.",
         "bash": [["pane get",
                   "{\"pane\": \"wC8:p2\", \"agent_status\": \"exited\", \"agent_session\": {\"value\": \"~/.omp/sessions/abc.jsonl\"}}"]],
-        "expected_output": "Relaunches in the same pane: `omp --restore` (or `--resume`) with that session and "
-                           "HERDR_PANE_ID set to the pane's current id; never `realm spawn`, never a new tab.",
-        "expectations": ["omp --resume/--restore with the session", "HERDR_PANE_ID set", "No spawn, no new tab"],
+        "expected_output": "Restarts it in place with `realm worker set-model --name AmberFox` (its current model "
+                           "to just restart), which relaunches its omp with its session in the same pane; never "
+                           "`realm spawn`, never a new tab, never a hand relaunch.",
+        "expectations": ["realm worker set-model for AmberFox", "No spawn, no new tab", "No hand relaunch"],
         "checks": [
-            {"call": {"tool": "bash", "match": "omp\\s+--(resume|restore)"}},
-            {"call": {"tool": "bash", "match": "HERDR_PANE_ID"}},
+            {"call": {"tool": "bash", "match": "realm(\\.py)?\\s+worker\\s+set-model\\b[^\\n;&|]*AmberFox"}},
             {"no_call": {"tool": "bash", "match": "realm(\\.py)?\\s+spawn\\b"}},
             {"no_call": {"tool": "bash", "match": "herdr\\s+(tab|workspace)\\s+create"}},
+            {"no_call": {"tool": "bash", "match": "(^|[;&|]\\s*)(HERDR_\\w+=\\S+\\s+)*omp\\s+--(resume|restore)"}},
         ],
-        "source": "SKILL.md: 'Restarting a worker's omp is your job … Never respawn to restart'",
+        "source": "SKILL.md as of #17: 'Restarting a worker's omp, or switching its model, is your job … "
+                  "`realm worker set-model` … Never respawn to restart, and never relaunch by hand'",
     },
     {
         "id": 216, "family": "queue-vs-dispatch", "polarity": "positive",
@@ -558,6 +618,7 @@ NEW = [
     },
 ]
 
+NEW = [c | OVERRIDES.get(c["id"], {}) for c in NEW]
 out = {"evals": OLD["evals"] + NEW}
 path = HERE / "ratchet-cases-60.json"
 path.write_text(json.dumps(out, indent=2, ensure_ascii=False) + "\n")
