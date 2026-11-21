@@ -180,9 +180,10 @@ another realm's (the user's word: it must not start from scratch): `realm scout 
 `--model <m>` on `scout spawn` runs the scout on its own omp model (stored on its row, shown by `scout show`);
 an overlay at `~/.local/state/realm/scout-config/<key>.yml`, passed with `omp --config`, repoints every model role and
 `task.agentModelOverrides` entry to it, so its subagents spend that model too, never the global config's. Switching a
-live scout, keeping its conversation: exit its omp (the exit line names the session id), run
-`realm scout set-model --project <key> --model <m> --resume <id>`, and run the command it prints in the same pane.
-Never respawn the scout for this.
+live scout, keeping its conversation, is yours: type into its pane to exit its omp (the exit line names the session
+id), then `realm scout set-model --project <key> --model <m> --resume <id>` and run the command it prints in the same
+pane. The pane rule above protects the queen's pane, not the scout's. Never respawn the scout for this, never hand
+the step to the user.
 
 The scout reads Slack, both Gmail accounts, and the WhatsApp/iMessage chats allowlisted in
 `~/.config/realm/scout.json` (private: names contacts, never in a repository), all through `realm scout fetch`,
