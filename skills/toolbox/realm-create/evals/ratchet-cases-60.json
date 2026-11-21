@@ -2738,10 +2738,24 @@
       ],
       "expected_output": "`realm scout set-model --model <m> --resume <session>`, after exiting its omp, then the command it prints in the same pane; never `scout spawn` for this.",
       "expectations": [
+        "exit the scout's omp in its pane before set-model",
         "scout set-model with --resume",
-        "No scout spawn"
+        "No scout spawn",
+        "No ask to the user"
       ],
       "checks": [
+        {
+          "before": [
+            {
+              "tool": "bash",
+              "match": "(send-text|send-keys|pane run).*wC8:p9"
+            },
+            {
+              "tool": "bash",
+              "match": "scout set-model\\b[^\\n;&|]*--resume"
+            }
+          ]
+        },
         {
           "call": {
             "tool": "bash",
@@ -2753,6 +2767,9 @@
             "tool": "bash",
             "match": "scout spawn\\b"
           }
+        },
+        {
+          "no_tool": "ask"
         }
       ],
       "source": "SKILL.md: 'Switching a live scout, keeping its conversation … Never respawn the scout for this'; the model id is named because nothing in the realm said which model was cheap"
