@@ -19,7 +19,7 @@ from inspect_ai.model import ChatMessageAssistant, ChatMessageSystem, ChatMessag
 import harness
 
 HERE = Path(__file__).parent
-MODEL = os.environ.get("RATCHET_MODEL", "openai-api/omniroute/work/main")
+MODEL = os.environ.get("RATCHET_MODEL", "openrouter/deepseek/deepseek-v4.1-flash-1017")
 
 
 def done_slots(out):

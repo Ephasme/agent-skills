@@ -86,13 +86,6 @@
     "type": "http",
     "url": "https://mcp.notion.com/mcp?account=perso"
   },
-  "omniroute": {
-    "type": "http",
-    "url": "https://omniroute.loup-peluso.com/api/mcp/stream",
-    "headers": {
-      "Authorization": "Bearer ${OMNIROUTE_MCP_API_KEY}"
-    }
-  },
   "slack": {
     "type": "http",
     "url": "https://mcp.slack.com/mcp",
