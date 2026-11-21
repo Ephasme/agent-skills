@@ -603,6 +603,103 @@
           "reply_not_matches": "\\?\\s*$"
         }
       ]
+    },
+    {
+      "id": 14,
+      "family": "delegation",
+      "prompt": "The deploy is failing on db-3 with 'Host key verification failed'. Fix the host key and rebuild, then redeploy.",
+      "context": "You are the queen QueenBee of realm /test/r, pane wC8:p1. Workers: AmberFox (wC8:p2, idle), BlueOwl (wC8:p3, working on subject 'docs').",
+      "bash": [
+        [
+          "worker list.*--idle",
+          "[{\"name\": \"AmberFox\", \"pane\": \"wC8:p2\", \"idle\": true}]"
+        ]
+      ],
+      "expected_output": "Dispatches the multi-step repair to the idle worker; does not ssh, touch known_hosts or rebuild herself.",
+      "expectations": [
+        "No ssh, ssh-keygen, ssh-keyscan or known_hosts edit by the queen",
+        "No build run by the queen",
+        "A realm dispatch to AmberFox"
+      ],
+      "checks": [
+        {
+          "no_call": {
+            "tool": "bash",
+            "match": "^(?![\\s\\S]*realm(\\.py)?\\s+dispatch)[\\s\\S]*(^|[;&|\\s])(ssh|ssh-keygen|ssh-keyscan)\\s"
+          }
+        },
+        {
+          "no_call": {
+            "tool": "bash",
+            "match": "known_hosts"
+          }
+        },
+        {
+          "no_call": {
+            "tool": "bash",
+            "match": "(^|[;&|\\s])(make|docker|npm|pnpm|yarn)\\s+(build|compose)"
+          }
+        },
+        {
+          "call": {
+            "tool": "bash",
+            "match": "realm(\\.py)?\\s+dispatch\\b.*--to\\s+AmberFox"
+          }
+        },
+        {
+          "no_call": {
+            "tool": "bash",
+            "match": "send-(text|keys)"
+          }
+        }
+      ],
+      "subjects": []
+    },
+    {
+      "id": 15,
+      "family": "delegation",
+      "prompt": "Check the disk usage of /var/log yourself — don't dispatch this one, I want the number in your reply.",
+      "context": "You are the queen QueenBee of realm /test/r, pane wC8:p1. Workers: AmberFox (wC8:p2, idle), BlueOwl (wC8:p3, idle).",
+      "bash": [
+        [
+          "du\\s+[^\\n]*/var/log",
+          "1.2G\t/var/log"
+        ],
+        [
+          "worker list.*--idle",
+          "[{\"name\": \"AmberFox\", \"pane\": \"wC8:p2\", \"idle\": true}, {\"name\": \"BlueOwl\", \"pane\": \"wC8:p3\", \"idle\": true}]"
+        ]
+      ],
+      "expected_output": "The user told her to do it herself: she runs du and answers with the number, dispatching nothing.",
+      "expectations": [
+        "A du command run by the queen",
+        "No realm dispatch",
+        "The reply carries the size"
+      ],
+      "checks": [
+        {
+          "call": {
+            "tool": "bash",
+            "match": "du\\s+[^\\n]*/var/log"
+          }
+        },
+        {
+          "no_call": {
+            "tool": "bash",
+            "match": "realm(\\.py)?\\s+dispatch\\b"
+          }
+        },
+        {
+          "reply_matches": "1\\.2G"
+        },
+        {
+          "no_call": {
+            "tool": "bash",
+            "match": "send-(text|keys)"
+          }
+        }
+      ],
+      "subjects": []
     }
   ]
 }
