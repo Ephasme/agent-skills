@@ -61,9 +61,10 @@ then rerun with the flag it names. Every verb acts on one realm: always pass `--
 too once the realm exists); the db is shared by every realm on the machine and a verb never reads or writes
 another key's rows.
 
-Every pane of a realm (queen, workers, scout, scryer) has a bind file, `~/.local/state/realm/bind/<pane>.json`, naming
-its agent. The realm-wake omp extension in that pane follows the agent's Agent Mail deliveries and starts its
-session's turn on each new mail, as an aside: nothing is typed. Re-briefs and the scout's scans are mails too.
+Every pane of a realm (queen, workers, scout, scryer, janitor) has a bind file,
+`~/.local/state/realm/bind/<pane>.json`, naming its agent. The realm-wake omp extension in that pane follows the
+agent's Agent Mail deliveries and starts its session's turn on each new mail, as an aside: nothing is typed.
+Re-briefs and the scout's scans are mails too.
 
 ## 1. Start the realm
 
@@ -118,6 +119,11 @@ Until the user ends the swarm:
 
 **Subject:** one self-contained unit of work, one kebab-case slug, one mail thread, one worker until done.
 States: `queued` → `assigned` ⇄ `blocked` → `done`, and `paused` when the user parks one.
+After a merge, a subject's ship phase says where the work is: `merging` (waiting on CI), `shipping` (merged, not
+running yet), `live`. Workers set it with `realm subject ship`; on the realm repository realmd moves `shipping` to
+`live` itself once the installed image contains the merge sha. The panel keeps a `done` subject listed while it is
+merging or shipping, and 5 minutes after `live`. `shipping` on the realm repository means the image needs
+`just realm-upgrade`: tell the user once, every such subject in one line, never one message per merge.
 
 **Table:** lives in realm's db, never in your head. `realm table --project <key>` prints it (`--all` adds done
 subjects, `--json` for workers and history). Shown only on a state change or when asked.
@@ -128,7 +134,8 @@ Each turn, in order:
    realm-wake starts this turn by itself when mail reaches `QUEEN`, as does the user's prompt. `sync` records
    joins, each subject's thread and latest worker reply (`· reply` in the table), and turns a `queued` subject
    `assigned` once the subject it waits for is replied to. It never decides done or blocked. Mail from the scout
-   (topic `scout-scan`): see [The scout](#the-scout).
+   (topic `scout-scan`): see [The scout](#the-scout). From the janitor (topic `janitor`): see
+   [The janitor](#the-janitor).
 2. Each reply: `realm subject set-state --project <key> --slug <slug> --state done|blocked --status "<a few
    words>"`. `blocked` only for a question that is the user's (see above), which goes to the user; any other
    question you answer yourself. To answer or redirect a worker, write in its thread:
@@ -199,6 +206,8 @@ No upper bound on workers.
   worked in a plain `git worktree` from the worker's own pane. A worker whose subject needs parallel hands or
   several separable steps asks you to open new subjects (slug, goal, files, done, dependency); you create and
   assign them like any other, and its workers coordinate in `realm-coordination`.
+- Nobody, you included, ever runs `git worktree prune` on `~/code/perso/realm`: Overlord's worktrees are not
+  mounted in the container, so prune drops their registrations. A worktree is removed by its exact path only.
 
 ## The scout
 
@@ -269,7 +278,20 @@ worker, the pane, the model, the retries and since when — `[scryer] provider i
 
 Cost: no model call while no subject moves. Every subject moving every minute: one omp turn a minute, ~15-20k
 input tokens and ~600 output each. An idle realm costs nothing. If it has to stop: `realm stop` disables its
-cron row with the scout's.
+cron row with the scout's and the janitor's.
+
+## The janitor
+
+Permanent, one per realm, like the scryer: `realm janitor spawn --project <key> --model <the realm's model>` opens
+its `🧹 <name> · janitor` workspace, and its `janitor-sweep` row mails it `[sweep]` every day at 02:00 Europe/Paris.
+Not a worker: never dispatch a subject to it. `realm janitor sweep-now`, `show` and `set-model` work as the
+scryer's do.
+
+A sweep deletes only what is regenerable; everything else it finds becomes a todo with source `janitor`, which the
+user triages in the panel like the scout's. What it never touches, whoever asks, is the list in
+`src/janitor/janitor-brief.md` of the realm repository. Its one mail per sweep,
+`[janitor] <date>: freed <X>, <N> for Loup, errors <M>`, is a report: no reply. Errors or a killed process in it
+are yours to judge, as you would a worker's finding: a subject to fix it, or a question to the user.
 
 ## Ending the swarm
 
