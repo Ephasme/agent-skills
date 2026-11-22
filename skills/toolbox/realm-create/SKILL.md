@@ -112,7 +112,7 @@ Until the user ends the swarm:
   deploy or a release, a merge on a branch they own, deleting data or anything else irreversible or external;
   money, or sending as them; a product choice (what gets built for them, what they see or pay for) nothing in
   the repo or thread settles; a grant this skill reserves to them (a herdr workspace for a worker: forward the
-  request, never refuse it for them); realm's `needs` exits; scout proposals. The subject goes `blocked`, and
+  request, never refuse it for them); realm's `needs` exits. The subject goes `blocked`, and
   you ask with the `ask` tool: one form per turn, every such decision batched in it, your recommended option
   preselected, plain words and the context needed to decide inside the form.
 
@@ -128,7 +128,7 @@ Each turn, in order:
    realm-wake starts this turn by itself when mail reaches `QUEEN`, as does the user's prompt. `sync` records
    joins, each subject's thread and latest worker reply (`· reply` in the table), and turns a `queued` subject
    `assigned` once the subject it waits for is replied to. It never decides done or blocked. Mail from the scout
-   (topic `scout-proposals`): see [The scout](#the-scout).
+   (topic `scout-scan`): see [The scout](#the-scout).
 2. Each reply: `realm subject set-state --project <key> --slug <slug> --state done|blocked --status "<a few
    words>"`. `blocked` only for a question that is the user's (see above), which goes to the user; any other
    question you answer yourself. To answer or redirect a worker, write in its thread:
@@ -210,7 +210,7 @@ and every three hours otherwise (Europe/Paris); its realm-wake wakes it on that 
 a worker: never dispatch a subject to it, it never shows in `worker list`. `realm scout show --project <key>`
 gives its last scan and cursors. A new scout continuing
 another realm's (the user's word: it must not start from scratch): `realm scout adopt --from <old> --project
-<key>` moves cursors, judged ids, proposals, their tasks and scan times; refused once the new scout has acked.
+<key>` moves cursors, judged ids and scan times; refused once the new scout has acked.
 
 `--model <m>` on `scout spawn` runs the scout on its own omp model (stored on its row, shown by `scout show`);
 without it, the scout takes the model its row recorded, else the realm's, never omp's configured default. An
@@ -226,28 +226,18 @@ The scout reads Slack, both Gmail accounts, and the WhatsApp/iMessage chats allo
 which reads with read-only credentials: Slack and Gmail keys from `mcp/secrets.sops.yaml` (`SCOUT_SLACK_USER_TOKEN`,
 `SCOUT_GMAIL_CLIENT_ID`, `SCOUT_GMAIL_CLIENT_SECRET`, `SCOUT_GMAIL_WORK_REFRESH_TOKEN`,
 `SCOUT_GMAIL_PERSO_REFRESH_TOKEN`); a missing key skips that source and the scout reports it. It writes nothing
-anywhere; each calendar or to-do action it finds is a proposal, mailed to you per source
-(`[scout-proposals] <source>: N new`) and pushed as titles to the user's phone (ntfy, same file).
+anywhere but the realm's todo list: each calendar or to-do action it finds is a todo (`realm todo add`, source
+`scout`), and each scan pushes the new todos' titles to the user's phone (ntfy, same file). The user triages them
+in the panel. Its only mail to you is a source it skipped or that failed (topic `scout-scan`): relay it to the
+user if it needs them (a credential, a sign-in), else note it.
 
-**Nothing the scout proposes happens without the user's yes on that exact item.** The user's time is theirs:
-never accept, decline or answer a meeting or a slot for them, approved or not.
+**Nothing the scout finds happens without the user's word on that exact todo.** The user's time is theirs:
+never accept, decline or answer a meeting or a slot for them.
 
-On a `scout-proposals` mail, or when the user asks:
-
-1. `realm proposal list --project <key> --md`: show the user the open proposals, as is.
-2. The user answers per item (`ok P3 P5, no P4`). Only their explicit words count: no answer is no decision, and
-   the item stays `proposed`. `realm proposal decide --project <key> --approve 3,5 --reject 4`. Each approved
-   item is also kept as one short fact (title, why, date; never the excerpt) in the realm's Hindsight bank.
-   A rejection carries why, from the user's words, never guessed: `--reason mistake` (the scout misjudged the
-   message), `stale` (went old unanswered), `done`, `unwanted` or `cancelled` (planned, then called off), plus
-   `--note "<their words>"`. Re-run `--reject N --reason …` to
-   add it to an item already rejected. `realm proposal list --reason mistake` exports the scout's mistakes.
-   "Unclear" (they must dig before deciding) is not a rejection: `--unclear 6` keeps it open, flagged in the list.
-3. Approved `task.add`: `realm proposal apply --project <key> --ids 3`. It lands in `realm task list`.
-4. Approved `calendar.*`: a subject to a worker, body = the proposal's exact payload (calendar `work` = the
-   `google_workspace` account, `perso` = `google_perso`), done = the event made, then
-   `realm proposal applied --project <key> --id <n> --ref <event id>` (or `--failed --ref <reason>`). No
-   invitation sent unless the payload lists attendees.
+`realm todo list --project <key>` shows the open todos when the user asks. A todo the user hands you is a
+subject like any other; for a calendar one, the body is the event as the todo states it (calendar `work` = the
+`google_workspace` account, `perso` = `google_perso`), done = the event made. No invitation sent unless the user
+names attendees.
 
 The user's to-do list: `realm task list|add|done|drop|reopen|priority --project <key>`. `task add` only on the
 user's own request; `--priority urgent` (or `task priority --id N --priority urgent`) when the user says so.
