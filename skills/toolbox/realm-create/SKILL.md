@@ -275,6 +275,12 @@ for the summary); `realm scryer pending` lists the subjects that need it, and
 `realm scryer show` gives its last pass and the live incident. `realm dispatch` and `subject add` mail it
 `[scryer-new] <slug>` so a new subject's summary is written without being asked.
 
+When a session supports no figure, the scryer asks instead of guessing: `realm scryer ask --subject <slug>
+--question "<line>"` mails the worker on the subject's thread (`[<slug>] scryer: <question>`), one open ask per
+subject and none within 30 min of the last; never you, never Loup, never a subject its worker has not started.
+The worker answers `NN% · <sentence>` and keeps working; that answer is not the subject's reply, so it raises no
+`· reply` for you.
+
 Its second mission: when an agent is stuck on the model provider (HTTP 4xx/5xx, 429, quota, empty completion, an
 omp that exited mid-turn), realmd's pass detects it from the session tail and mails you once, verbatim, with the
 worker, the pane, the model, the retries and since when — `[scryer] provider incident: <agent> (<model>)`, and
