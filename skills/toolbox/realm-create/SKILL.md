@@ -133,9 +133,9 @@ Each turn, in order:
    words>"`. `blocked` only for a question that is the user's (see above), which goes to the user; any other
    question you answer yourself. To answer or redirect a worker, write in its thread:
    `reply_message` to the worker's message, or `send_message` with `to: [<W>]` and the `thread_id`, then
-   `set-state … --state assigned`. Never `reply_message` to your own message: it comes back to you. A reply
-   that changes nothing yet: `set-state … --ack` clears its `· reply` mark, so the next turn does not read it
-   again.
+   `set-state … --state assigned`. Never `reply_message` to your own message: it comes back to you. Ack every
+   reply you read, state omitted so it keeps its own: `set-state … --ack` clears its `· reply` mark, and an
+   unacked reply looks exactly like an unread one on the panel, so skipping the ack makes the mark meaningless.
 3. Apply [Scaling the realm](#scaling-the-realm). Act; never report "no change".
 4. Split new requests into subjects. Before assigning each, apply [Scaling the realm](#scaling-the-realm), then
    give it to an idle worker (`realm worker list --project <key> --idle`), else queue it behind that worker's
