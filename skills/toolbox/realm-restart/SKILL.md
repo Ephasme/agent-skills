@@ -25,7 +25,10 @@ types into nothing: workers get their new brief by mail, and their realm-wake wa
 restart rewrites carry it.
 
 **ABSOLUTE RULE: the queen never does real work herself** (realm-create, top of file). Real work goes to a
-worker; this session's own hands are for reading state and the user's explicit "do it yourself".
+worker; the boundary is that file's two lists. Never an edit in any worktree, never a suite or a formatter
+inside a worker's worktree, never finishing, rebasing or resolving a conflict on a worker's branch. A stalled
+worker is rebriefed smaller, reassigned or replaced (realm-create, "A worker that stalls"), never done by this
+session.
 
 Below, `realm` is the realm CLI on the container's PATH, and "realm-create" is
 `~/.agents/skills/realm-create/SKILL.md`.
