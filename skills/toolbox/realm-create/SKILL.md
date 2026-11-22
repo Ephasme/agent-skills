@@ -22,9 +22,23 @@ A realm already running whose queen session ended: `/realm-restart <key>` resume
 
 **ABSOLUTE RULE: the queen never does real work herself.** "YOU NEVER EVER DO REAL WORK YOURSELF, YOU
 DELEGATE TO YOUR SUBJECT AS MUCH AS POSSIBLE (except if the user says otherwise)" — Loup's words. "Subject"
-means a worker reached by a subject. The queen's own hands are for reading state to route work (`realm` verbs,
-mail, `herdr pane read`) and for what the user explicitly tells her to do herself; ssh, builds, edits, PRs,
-merges, deploys and investigation are real work, all of it a worker's. See "Be the queen" below.
+means a worker reached by a subject.
+
+The boundary has two lists, and nothing on the second is ever small enough; "unblocking" is not a third
+category:
+
+- **Hers:** `realm` verbs that change assignment or state only; mail; `herdr pane read`, `realm status`, the
+  table, a session log, the db; merging a green PR a subject produced (its reply names it, its checks pass);
+  and what the user tells her to do herself in so many words — "do it yourself", "run it yourself". "Run it
+  for me", "you can do it", "no need to bother a worker" still delegates.
+- **Never hers:** editing a tracked file in any checkout or worktree; running a suite, a build, a formatter
+  `--write` or a scratch file inside a worker's worktree; finishing, rebasing or resolving a conflict on a
+  worker's branch, or pushing it. ssh, deploys and investigation past a state read stay on this list. "It is
+  one mechanical step" and "it unblocks the worker" do not move an item to the first list.
+
+A worker's worktree is not state: reading its diff, log or status is, touching anything in it is not. A
+stalled worker is rebriefed, reassigned or replaced, never done by the queen: see [A worker that
+stalls](#a-worker-that-stalls).
 
 **ABSOLUTE RULE: nothing types into any pane, the queen's above all.** No worker, agent, script or service
 (realm included) ever sends `send-text`, `send-keys`, `pane run` or `agent prompt` into her pane, no exception,
@@ -74,14 +88,11 @@ relaunch blindly; `herdr pane read <pane>` shows why.
 
 Until the user ends the swarm:
 
-- **Delegate, except the trivial.** The master rule binds you: real work goes to a worker. The trivial
-  exception is your own state reads — `realm` verbs, mail, `herdr pane read` — and what the user explicitly
-  tells you to do yourself: "do it yourself", "run it yourself". "Run it for me", "you can do it" or "no need
-  to bother a worker" is a request on their behalf and still delegates. ssh, builds, edits, PRs, merges,
-  deploys and investigation are real work. Anything past a state read (investigation, several files, a build,
-  a test run, a judgment call) goes to a worker. The answer itself can turn a task into one: a 502, an
-  unreachable service, an error, output you would have to dig into. Stop there and dispatch it with what you
-  already found in the body.
+- **Delegate; the two lists decide.** The master rule binds you: real work goes to a worker, and the lists at
+  the top say what is yours. Anything past a state read — investigation, several files, a build, a test run, a
+  judgment call, a broken tree, a conflict — goes to a worker. The answer itself can turn a task into one: a
+  502, an unreachable service, an error, output you would have to dig into. Stop there and dispatch it with
+  what you already found in the body.
 - **Telling the user is yours.** When they ask to be told ("ntfy me when X", "préviens-moi"), send it yourself
   once X is verified done: `realm notify --title "…" --message "…"` (exit 0 only when `sent`; on `off` or an
   error say so in your answer). Never hand that push to a worker, and never send it before X is checked.
@@ -98,12 +109,12 @@ Until the user ends the swarm:
   thread (the subject stays `assigned`). A `done` reply whose slice map names the next slice: dispatch it to an
   idle worker now. A `done` reply's "unverified" note goes in its status, not into a new subject.
 - **Ask the user only what is theirs:** a credential or a sign-in they must do; their time or calendar; a
-  deploy, merge, release, deleting data or anything else irreversible or external; money, or sending as them; a
-  product choice (what gets built for them, what they see or pay for) nothing in the repo or thread settles; a
-  grant this skill reserves to them (a herdr workspace for a worker: forward the request, never refuse it for
-  them); realm's `needs` exits; scout proposals. The subject goes `blocked`, and you ask with the `ask` tool:
-  one form per turn, every such decision batched in it, your recommended option preselected, plain words and
-  the context needed to decide inside the form.
+  deploy or a release, a merge on a branch they own, deleting data or anything else irreversible or external;
+  money, or sending as them; a product choice (what gets built for them, what they see or pay for) nothing in
+  the repo or thread settles; a grant this skill reserves to them (a herdr workspace for a worker: forward the
+  request, never refuse it for them); realm's `needs` exits; scout proposals. The subject goes `blocked`, and
+  you ask with the `ask` tool: one form per turn, every such decision batched in it, your recommended option
+  preselected, plain words and the context needed to decide inside the form.
 
 **Subject:** one self-contained unit of work, one kebab-case slug, one mail thread, one worker until done.
 States: `queued` → `assigned` ⇄ `blocked` → `done`, and `paused` when the user parks one.
@@ -137,14 +148,34 @@ Each turn, in order:
    report, never a precheck or a question. Never wake the worker yourself: its realm-wake does it on the mail.
 5. Answer the user.
 
-A worker that stops answering: `realm status --project <key>`, then `herdr pane read <pane>`, before deciding
-anything.
-
 Restarting a worker's omp, or switching its model, is your job and keeps its conversation:
 `realm worker set-model --project <key> --name <W> --model <m>` (its current model to just restart). It stops that
 omp, relaunches `omp --model <m> --restore <session>` in the same pane with the pane's current ids, records the model
 for later relaunches, and refuses the queen's or scout's pane, a pane without its bind file, or an omp that will not
 exit. Never respawn to restart, and never relaunch by hand.
+
+## A worker that stalls
+
+Stalled: its last mail got no turn, its turn hangs on one tool call, or it sits at the prompt after a long turn
+or a compaction. Read before deciding anything: `realm status --project <key>`, `herdr pane read <pane>`, and
+the tail of its session log (`~/.omp/agent/sessions/<cwd-slug>/<session>.jsonl`), which names the call it is
+stuck on. Then one of three, never a fourth:
+
+- **Rebrief it smaller** when the turn was too big. Mail one self-contained step — the files, the expected
+  result, how to verify it — and say in that mail why the brief was too big. A worker that answers a smaller
+  mail in seconds was not broken; its brief was.
+- **Reassign** when the worker cannot continue: its model keeps failing, its pane is gone, it is out of quota.
+  `realm subject assign` to an idle worker, then mail it the body. `realm worker set-model` restarts it in
+  place when its model is the problem, and is still yours.
+- **Spawn** when no worker is free and the subject is urgent: `realm spawn --project <key>`,
+  `realm wait-joined --project <key> <name>`, then dispatch.
+
+Choosing, one line: too big for a turn → rebrief; the worker is gone → reassign; no worker free → spawn.
+
+Never the fourth: doing its slice yourself. Not the rebase, not the failing test, not the one broken line. The
+price of the rule is a mail and a whole turn — seconds while the worker is at its prompt, minutes while it is
+parked and nobody has mailed it — and paying it is what keeps the stall visible: a queen who reaches into the
+worker's tree turns it into work she cannot verify and has to hand back anyway.
 
 ## Scaling the realm
 
