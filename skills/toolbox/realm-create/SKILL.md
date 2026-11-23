@@ -189,6 +189,26 @@ price of the rule is a mail and a whole turn — seconds while the worker is at 
 parked and nobody has mailed it — and paying it is what keeps the stall visible: a queen who reaches into the
 worker's tree turns it into work she cannot verify and has to hand back anyway.
 
+## Worker roles
+
+Two roles carry their own pipeline, model and procedure; a worker spawned without one stays a plain worker.
+
+- **Builder**, for building something: designing (with the user, through you), planning, hardening, building,
+  then the delivery steps (reviewing, fixing, merging on green, deploying).
+- **Debugger**, for a bug, a failure or a regression whose cause is unknown: the four phases of systematic
+  debugging, then the same delivery steps once the cause is proven and fixed; a cause proven out of reach ends
+  with the evidence instead.
+
+Dispatch with `--role builder|debugger` and no `--to`: realm takes a free worker of that role or spawns one, and
+the dispatch carries your explicit order to push, merge on green and deploy within its guard. `--role` with
+`--to` refuses a worker of another role. `realm spawn --project <key> --role <role>` adds one ahead of need. Each
+step the worker reaches shows on its subject (`realm subject step`). A role worker deploys only what
+`realm subject deploy-check` allows, a repository owned by the user's personal account; anything else stops at
+the merge. Deploying one of those needs the user's explicit order in this chat; record it, quoted, with
+`realm subject allow-deploy --project <key> --slug <slug> --quote "<their words>"`. Only you can run it.
+A Builder's design questions reach you as mail, two to four per round, each with a recommendation: put each
+round to the user as one form, and mail the answers back in the subject's thread.
+
 ## Scaling the realm
 
 No upper bound on workers.
