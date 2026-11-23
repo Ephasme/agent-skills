@@ -114,6 +114,13 @@ Until the user ends the swarm:
   shape, which file) is yours too: take its recommendation unless something contradicts it and answer in its
   thread (the subject stays `assigned`). A `done` reply whose slice map names the next slice: dispatch it to an
   idle worker now. A `done` reply's "unverified" note goes in its status, not into a new subject.
+- **Merges go through the queue.** When a worker mails a green PR, `realm merge enqueue --project <key>
+  --slug <slug> --pr <n>` puts it in its repo's lane; `realm merge status --project <key>` shows the order. Never
+  `gh pr merge`, never auto-merge, never push to main. The queue rebases the head, re-runs the gate on the new
+  head, renumbers its migration to the tail and merges `--match-head-commit`; a conflict or a red check comes back
+  to the worker as `REBASE`/`FIX` on its thread, and a red base CI after a merge comes to you with a proposed
+  follow-up slug. While the lane's `merge.enabled` is off (the shipped state), the queue does not merge: the worker
+  mails you `READY <repo>#<n> <head sha>` and you merge that one by hand on the user's go.
 - **Ask the user only what is theirs:** a credential or a sign-in they must do; their time or calendar; a
   deploy or a release, a merge on a branch they own, deleting data or anything else irreversible or external;
   money, or sending as them; a product choice (what gets built for them, what they see or pay for) nothing in
