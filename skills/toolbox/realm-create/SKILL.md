@@ -1,16 +1,15 @@
 ---
 name: realm-create
 description: >-
-  Starts an agent swarm on Agent Mail: connects the current session as the
+  Starts an agent swarm on raven: connects the current session as the
   queen under a project key, registers N worker agents, opens one herdr workspace
   per worker running a fresh omp session that joins the same project, then runs the
   queen loop — answer the user, split work into subjects, dispatch each subject
-  to a worker by mail, track it to done. Invoked as `/realm-create KEY SIZE
+  to a worker with `realm msg`, track it to done. Invoked as `/realm-create KEY SIZE
   [NAME]`, e.g. `/realm-create /laptop/general 3 "secret garden"`.
 compatibility: >-
-  Runs inside the realm container (spare-cycles/realm): the `realm` CLI on PATH, its herdr server, the omp CLI
-  with the realm-wake extension, and an Agent Mail MCP server named agent-mail-perso in ~/.omp/agent/mcp.json
-  exposing macro_start_session, create_agent_identity, send_message, fetch_inbox and reply_message.
+  Runs inside the realm container (spare-cycles/realm): the `realm` CLI on PATH (its `msg` verbs for raven),
+  its herdr server, and the omp CLI with the realm-wake extension.
 disable-model-invocation: true
 ---
 
@@ -50,7 +49,7 @@ message to the user on any channel. A worker's question reaches the queen by mai
 queen asks the user and mails the answer back. The worker brief carries this rule, and the rule that a worker
 holding more than four tasks in a row keeps a to-do list and reports open items in its reply.
 
-Arguments: `<key>` is the Agent Mail project key (`human_key`, e.g. `/laptop/general`), the realm's identity;
+Arguments: `<key>` is the realm's project key (`human_key`, e.g. `/laptop/general`), the realm's identity;
 `<size>` is the initial number of workers, an integer ≥ 1; `<name>` is the realm's human name, unique across
 realms (e.g. `secret garden`). Key or size missing or invalid: ask, start nothing. Name missing: ask for it with
 them; create without one only if the user says so.
@@ -63,7 +62,7 @@ another key's rows.
 
 Every pane of a realm (queen, workers, scout, scryer, janitor) has a bind file,
 `~/.local/state/realm/bind/<pane>.json`, naming its agent. The realm-wake omp extension in that pane follows the
-agent's Agent Mail deliveries and starts its session's turn on each new mail, as an aside: nothing is typed.
+agent's raven deliveries and starts its session's turn on each new mail, as an aside: nothing is typed.
 Re-briefs and the scout's scans are mails too.
 
 ## 1. Start the realm
@@ -97,11 +96,16 @@ Until the user ends the swarm:
 - **Telling the user is yours.** When they ask to be told ("ntfy me when X", "préviens-moi"), send it yourself
   once X is verified done: `realm notify --title "…" --message "…"` (exit 0 only when `sent`; on `off` or an
   error say so in your answer). Never hand that push to a worker, and never send it before X is checked.
-- **Pin what the user will need later.** Whenever you give the user something they will need once the
-  conversation buries it (a command to run, a URL, a decision, a step by hand), also pin it: `realm pin add
-  --project <key> --text "<one line>" [--link <url>]... [--cmd "<command>"] [--level <CRITICAL|HIGH|MEDIUM|LOW|NONE>]`.
+- **Pin every deliverable the moment it exists.** Whenever a worker produces something Loup will need once the
+  conversation buries it — a report, a list, an evaluation, a Lavish page, a doc merged into a repo, a shared
+  artefact under `~/.local/state/realm/shared/` — pin it at once, with its http(s) link (`--link <url>`,
+  repeatable) or a `--cmd` that opens the local file. Every decision Loup owes is pinned too, the moment you put it
+  to him. Level is how urgent Loup's action is, `LOW` for a reference document. The verb:
+  `realm pin add --project <key> --text "<one line>" [--link <url>]... [--cmd "<command>"] [--level <CRITICAL|HIGH|MEDIUM|LOW|NONE>]`.
   It shows in the panel's PINNED block. Once it is done, `realm pin done --project <key> --id pin-<n>`; `realm pin
-  list --project <key>` shows the open ones. Only you pin: a worker that has something to pin mails it to you.
+  list --project <key>` shows the open ones. Example: the friction log is pinned the moment its Lavish page lands —
+  `--link` to the page, `--cmd` to open `docs/friction-log.md`. Only you pin: a worker that has something to pin
+  mails it to you.
 - **The absolute rules bind you too.** Never ask anyone to type into your pane; no brief carries your pane id.
   A worker question that only the user can answer goes through you to the user, and the answer back by mail.
 - **Three strikes, Loup's rule.** A worker that makes the same mistake three times in a row on a subject is
@@ -149,7 +153,7 @@ subjects, `--json` for workers and history). Shown only on a state change or whe
 
 Each turn, in order:
 
-1. `fetch_inbox` for `QUEEN` (unread_only, include_bodies), then `realm sync --project <key>`. Never poll or wait:
+1. `realm msg inbox --project <key> --agent <QUEEN> --mark-read`, then `realm sync --project <key>`. Never poll or wait:
    realm-wake starts this turn by itself when mail reaches `QUEEN`, as does the user's prompt. `sync` records
    joins, each subject's thread and latest worker reply (`· reply` in the table), and turns a `queued` subject
    `assigned` once the subject it waits for is replied to. It never decides done or blocked. Mail from the scout
@@ -158,8 +162,10 @@ Each turn, in order:
 2. Each reply: `realm subject set-state --project <key> --slug <slug> --state done|blocked --status "<a few
    words>"`. `blocked` only for a question that is the user's (see above), which goes to the user; any other
    question you answer yourself. To answer or redirect a worker, write in its thread:
-   `reply_message` to the worker's message, or `send_message` with `to: [<W>]` and the `thread_id`, then
-   `set-state … --state assigned`. Never `reply_message` to your own message: it comes back to you. Ack every
+   `realm msg reply --from <QUEEN> --to <message-id>` to the worker's message, or
+   `realm msg send --from <QUEEN> --to <W> --thread <id> --topic <slug>` (write the body to a
+   `--body-file`, `-` for stdin), then
+   `set-state … --state assigned`. Never `realm msg reply` to your own message: it comes back to you. Ack every
    reply you read, state omitted so it keeps its own: `set-state … --ack` clears its `· reply` mark, and an
    unacked reply looks exactly like an unread one on the panel, so skipping the ack makes the mark meaningless.
 3. Apply [Scaling the realm](#scaling-the-realm). Act; never report "no change".
@@ -250,14 +256,14 @@ No upper bound on workers.
   `realm wait-joined --project <key> <name>`.
 - **In:** for each worker `realm worker list --project <key> --scale-in` returns (every subject it held is
   `done`, and nothing changed for it for 30 min): `realm retire --project <key> --name <W>`. It removes the
-  pane's bind file, closes its workspace, retires the agent in Agent Mail and deletes the brief; each step's
+  pane's bind file, closes its workspace, retires the agent and deletes the brief; each step's
   outcome is in `steps`. Its subjects stay in the db.
 - `realm retire` refuses a worker holding any subject that is not `done`, paused ones included. The user's word to
   retire it must also say what becomes of each such subject; when it does not, that is a decision of theirs (closing
   drops unfinished work): mark it `blocked`, ask, retire nothing yet. Once they say, close or reassign it explicitly
   (`realm subject set-state … --state done`, or `realm subject assign` to another worker plus a mail to that worker
   in the subject's thread: `assign` only records it), name it in your answer, then retire. Never close its workspace
-  or call `retire_agent` by hand.
+  or retire the agent by hand.
 - Workers never open a herdr workspace or tab (`hwt`, `herdr workspace/tab create`, `herdr worktree`) unless
   the user expressly grants it and you relay that grant naming the exact workspace. A subject on another repo is
   worked in a plain `git worktree` from the worker's own pane. A worker whose subject needs parallel hands or
