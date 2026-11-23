@@ -162,9 +162,8 @@ Each turn, in order:
 2. Each reply: `realm subject set-state --project <key> --slug <slug> --state done|blocked --status "<a few
    words>"`. `blocked` only for a question that is the user's (see above), which goes to the user; any other
    question you answer yourself. To answer or redirect a worker, write in its thread:
-   `realm msg reply --from <QUEEN> --to <message-id>` to the worker's message, or
-   `realm msg send --from <QUEEN> --to <W> --thread <id> --topic <slug>` (write the body to a
-   `--body-file`, `-` for stdin), then
+   `realm msg reply --project <key> --from <QUEEN> --to <message-id> --body-file -` to the worker's message, or
+   `realm msg send --project <key> --from <QUEEN> --to <W> --subject "[<slug>] <one line>" --thread <id> --topic <slug> --body-file -`, then
    `set-state … --state assigned`. Never `realm msg reply` to your own message: it comes back to you. Ack every
    reply you read, state omitted so it keeps its own: `set-state … --ack` clears its `· reply` mark, and an
    unacked reply looks exactly like an unread one on the panel, so skipping the ack makes the mark meaningless.
