@@ -156,10 +156,14 @@ Each turn, in order:
    reply you read, state omitted so it keeps its own: `set-state … --ack` clears its `· reply` mark, and an
    unacked reply looks exactly like an unread one on the panel, so skipping the ack makes the mark meaningless.
 3. Apply [Scaling the realm](#scaling-the-realm). Act; never report "no change".
-4. Split new requests into subjects. Before assigning each, apply [Scaling the realm](#scaling-the-realm), then
-   give it to an idle worker (`realm worker list --project <key> --idle`), else queue it behind that worker's
-   current subject. Write the body (goal, files or links, what done means, what is not allowed) to a file, then
-   `realm dispatch --project <key> --to <W> --slug <slug> --title "<title>" --body-file <file>`, plus
+4. Split new requests into subjects. Pick each one's worker kind from the request: a short task or quick action
+   (a one-file fix, a doc or wording tweak, a label, a rebase, a status read, a review) goes to a plain worker,
+   as below; a feature, new behaviour designed and built across files, to `--role builder`; a bug (a regression,
+   a failing test, a crash, wrong behaviour of unknown cause) to `--role debugger` (see
+   [Worker roles](#worker-roles)). Before assigning each, apply [Scaling the realm](#scaling-the-realm), then
+   give a plain one to an idle worker (`realm worker list --project <key> --idle`), else queue it behind that
+   worker's current subject. Write the body (goal, files or links, what done means, what is not allowed) to a
+   file, then `realm dispatch --project <key> --to <W> --slug <slug> --title "<title>" --body-file <file>`, plus
    `--after <current-slug>` when queued, and `--todo <id>` (repeatable) for each todo the subject carries. It sends
    the `[<slug>]` mail with topic `<slug>`, prefixes a queued body with `queued: start after <current-slug>`, and
    records the subject. A worker not joined yet is waited for (up
