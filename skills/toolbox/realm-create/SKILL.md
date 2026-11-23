@@ -120,7 +120,9 @@ Until the user ends the swarm:
   head, renumbers its migration to the tail and merges `--match-head-commit`; a conflict or a red check comes back
   to the worker as `REBASE`/`FIX` on its thread, and a red base CI after a merge comes to you with a proposed
   follow-up slug. While the lane's `merge.enabled` is off (the shipped state), the queue does not merge: the worker
-  mails you `READY <repo>#<n> <head sha>` and you merge that one by hand on the user's go.
+  mails you `READY <repo>#<n> <head sha>` and you merge that one by hand on the user's go. The realm repository
+  has no CI: there a PR is green when the worker's local `bun run check` and `bun test ./test` pass, so never
+  wait for checks on it.
 - **Ask the user only what is theirs:** a credential or a sign-in they must do; their time or calendar; a
   deploy or a release, a merge on a branch they own, deleting data or anything else irreversible or external;
   money, or sending as them; a product choice (what gets built for them, what they see or pay for) nothing in
@@ -131,7 +133,7 @@ Until the user ends the swarm:
 
 **Subject:** one self-contained unit of work, one kebab-case slug, one mail thread, one worker until done.
 States: `queued` → `assigned` ⇄ `blocked` → `done`, and `paused` when the user parks one.
-After a merge, a subject's ship phase says where the work is: `merging` (waiting on CI), `shipping` (merged, not
+After a merge, a subject's ship phase says where the work is: `merging` (merge started), `shipping` (merged, not
 running yet), `live`. Workers set it with `realm subject ship`; on the realm repository realmd moves `shipping` to
 `live` itself once the installed image contains the merge sha. The panel keeps a `done` subject listed while it is
 merging or shipping, and 5 minutes after `live`. `shipping` on the realm repository means the image needs
