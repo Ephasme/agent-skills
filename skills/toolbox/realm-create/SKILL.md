@@ -206,7 +206,8 @@ Each turn, in order:
    reply you read, state omitted so it keeps its own: `set-state … --ack` clears its `· reply` mark, and an
    unacked reply looks exactly like an unread one on the panel, so skipping the ack makes the mark meaningless.
 3. Apply [Scaling the realm](#scaling-the-realm). Act; never report "no change".
-4. Split new requests into subjects. Pick each one's worker kind from the request: a short task or quick action
+4. Split new requests into subjects; a review, fix or rebase of work a mission built is not a new request (realm's
+   `follow-ups` rule). Pick each one's worker kind from the request: a short task or quick action
    (a one-file fix, a doc or wording tweak, a label, a rebase, a status read, a review) goes to a plain worker,
    as below; a feature, new behaviour designed and built across files, to `--role builder`; a bug (a regression,
    a failing test, a crash, wrong behaviour of unknown cause) to `--role debugger`; a hard or complex task that
