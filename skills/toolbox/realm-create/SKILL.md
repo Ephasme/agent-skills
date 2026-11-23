@@ -153,8 +153,9 @@ Each turn, in order:
    give it to an idle worker (`realm worker list --project <key> --idle`), else queue it behind that worker's
    current subject. Write the body (goal, files or links, what done means, what is not allowed) to a file, then
    `realm dispatch --project <key> --to <W> --slug <slug> --title "<title>" --body-file <file>`, plus
-   `--after <current-slug>` when queued. It sends the `[<slug>]` mail with topic `<slug>`, prefixes a queued body
-   with `queued: start after <current-slug>`, and records the subject. A worker not joined yet is waited for (up
+   `--after <current-slug>` when queued, and `--todo <id>` (repeatable) for each todo the subject carries. It sends
+   the `[<slug>]` mail with topic `<slug>`, prefixes a queued body with `queued: start after <current-slug>`, and
+   records the subject. A worker not joined yet is waited for (up
    to 60 s) before anything is sent; still absent: `error`, nothing sent. The user names the worker: dispatch
    to it as asked, joined or not, on record or not (the user's words are the body); the `error` is what you
    report, never a precheck or a question. Never wake the worker yourself: its realm-wake does it on the mail.
@@ -280,9 +281,12 @@ creates the todo with the proposal's level and source; `realm todo set-level --p
 decision leaves the proposal where it was.
 
 `realm todo list --project <key>` shows the open todos when the user asks. A todo the user hands you is a
-subject like any other; for a calendar one, the body is the event as the todo states it (calendar `work` = the
-`google_workspace` account, `perso` = `google_perso`), done = the event made. No invitation sent unless the user
-names attendees.
+subject like any other, dispatched with `--todo <id>`; for a calendar one, the body is the event as the todo states
+it (calendar `work` = the `google_workspace` account, `perso` = `google_perso`), done = the event made. No
+invitation sent unless the user names attendees. A subject already dispatched takes a todo with `realm todo link
+--project <key> --id <todo> --slug <slug>` (`unlink` removes it). A linked todo follows its missions by itself:
+`delegating` while one is open, `done` once all are done and live. Never set that state by hand, and never write
+the worker or the slug into its note: the note is free text, and the link is the record.
 
 The user's to-do list: `realm task list|add|done|drop|reopen|priority --project <key>`. `task add` only on the
 user's own request; `--priority urgent` (or `task priority --id N --priority urgent`) when the user says so.
