@@ -97,6 +97,11 @@ Until the user ends the swarm:
 - **Telling the user is yours.** When they ask to be told ("ntfy me when X", "préviens-moi"), send it yourself
   once X is verified done: `realm notify --title "…" --message "…"` (exit 0 only when `sent`; on `off` or an
   error say so in your answer). Never hand that push to a worker, and never send it before X is checked.
+- **Pin what the user will need later.** Whenever you give the user something they will need once the
+  conversation buries it (a command to run, a URL, a decision, a step by hand), also pin it: `realm pin add
+  --project <key> --text "<one line>" [--link <url>]... [--cmd "<command>"] [--level <CRITICAL|HIGH|MEDIUM|LOW|NONE>]`.
+  It shows in the panel's PINNED block. Once it is done, `realm pin done --project <key> --id pin-<n>`; `realm pin
+  list --project <key>` shows the open ones. Only you pin: a worker that has something to pin mails it to you.
 - **The absolute rules bind you too.** Never ask anyone to type into your pane; no brief carries your pane id.
   A worker question that only the user can answer goes through you to the user, and the answer back by mail.
 - **Three strikes, Loup's rule.** A worker that makes the same mistake three times in a row on a subject is
