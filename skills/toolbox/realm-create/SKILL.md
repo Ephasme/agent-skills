@@ -161,10 +161,12 @@ Each turn, in order:
 4. Split new requests into subjects. Pick each one's worker kind from the request: a short task or quick action
    (a one-file fix, a doc or wording tweak, a label, a rebase, a status read, a review) goes to a plain worker,
    as below; a feature, new behaviour designed and built across files, to `--role builder`; a bug (a regression,
-   a failing test, a crash, wrong behaviour of unknown cause) to `--role debugger` (see
-   [Worker roles](#worker-roles)). Before assigning each, apply [Scaling the realm](#scaling-the-realm), then
-   give a plain one to an idle worker (`realm worker list --project <key> --idle`), else queue it behind that
-   worker's current subject. Write the body (goal, files or links, what done means, what is not allowed) to a
+   a failing test, a crash, wrong behaviour of unknown cause) to `--role debugger`; a hard or complex task that
+   needs long design exchanges (product thinking, scope, UX, tradeoffs) to `--role chancellor`, whose spec then
+   goes to builders attached to it (see [Worker roles](#worker-roles)). Before assigning each, apply
+   [Scaling the realm](#scaling-the-realm), then give a plain one to an idle worker (`realm worker list --project
+   <key> --idle`), else queue it behind that worker's current subject. Write the body (goal, files or links, what
+   done means, what is not allowed) to a
    file, then `realm dispatch --project <key> --to <W> --slug <slug> --title "<title>" --body-file <file>`, plus
    `--after <current-slug>` when queued, and `--todo <id>` (repeatable) for each todo the subject carries. It sends
    the `[<slug>]` mail with topic `<slug>`, prefixes a queued body with `queued: start after <current-slug>`, and
@@ -205,23 +207,33 @@ worker's tree turns it into work she cannot verify and has to hand back anyway.
 
 ## Worker roles
 
-Two roles carry their own pipeline, model and procedure; a worker spawned without one stays a plain worker.
+Three roles carry their own pipeline, model and procedure; a worker spawned without one stays a plain worker.
 
-- **Builder**, for building something: designing (with the user, through you), planning, hardening, building,
-  then the delivery steps (reviewing, fixing, merging on green, deploying).
+- **Builder**, for building something: designing (with the user, through you or its Chancellor), planning,
+  hardening, building, then the delivery steps (reviewing, fixing, merging on green, deploying).
 - **Debugger**, for a bug, a failure or a regression whose cause is unknown: the four phases of systematic
   debugging, then the same delivery steps once the cause is proven and fixed; a cause proven out of reach ends
   with the evidence instead.
+- **Chancellor**, the product manager of hard or complex work: framing, specifying (a spec with acceptance
+  criteria, left uncommitted in its worktree), briefing. It ships nothing: no push, PR, merge or deploy. Its
+  `briefing` reply proposes builder subjects; dispatch each with `--chancellor <C>`.
 
-Dispatch with `--role builder|debugger` and no `--to`: realm takes a free worker of that role or spawns one, and
-the dispatch carries your explicit order to push, merge on green and deploy within its guard. `--role` with
-`--to` refuses a worker of another role. `realm spawn --project <key> --role <role>` adds one ahead of need. Each
-step the worker reaches shows on its subject (`realm subject step`). A role worker deploys only what
-`realm subject deploy-check` allows, a repository owned by the user's personal account; anything else stops at
-the merge. Deploying one of those needs the user's explicit order in this chat; record it, quoted, with
+Dispatch with `--role builder|debugger|chancellor` and no `--to`: realm takes a free worker of that role or spawns
+one, and a Builder's or Debugger's dispatch carries your explicit order to push, merge on green and deploy within
+its guard. `--role` with `--to` refuses a worker of another role. `realm spawn --project <key> --role <role>` adds
+one ahead of need. Each step the worker reaches shows on its subject (`realm subject step`). A role worker deploys
+only what `realm subject deploy-check` allows, a repository owned by the user's personal account; anything else
+stops at the merge. Deploying one of those needs the user's explicit order in this chat; record it, quoted, with
 `realm subject allow-deploy --project <key> --slug <slug> --quote "<their words>"`. Only you can run it.
-A Builder's design questions reach you as mail, two to four per round, each with a recommendation: put each
-round to the user as one form, and mail the answers back in the subject's thread.
+A Builder's design questions, when no Chancellor is attached, reach you as mail, two to four per round, each with
+a recommendation: put each round to the user as one form, and mail the answers back in the subject's thread.
+
+`realm dispatch … --chancellor <C>` attaches a mission to a Chancellor (`realm subject set-chancellor --project
+<key> --slug <slug> --chancellor <C>|--clear` later): its worker's questions, design, plan and the review before
+READY go to the Chancellor, which settles them. You keep only what reaches you: the Chancellor's escalations
+(questions only the user can answer, or a deadlock, batched per mission, in the mission's thread), the worker's
+READY and its final reply. Its exchange with the worker never marks `· reply`. `realm retire` refuses a Chancellor
+still attached to an open mission: close or detach those first.
 
 ## Scaling the realm
 
