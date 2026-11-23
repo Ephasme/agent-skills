@@ -240,13 +240,24 @@ The scout reads Slack, both Gmail accounts, and the WhatsApp/iMessage chats allo
 which reads with read-only credentials: Slack and Gmail keys from `mcp/secrets.sops.yaml` (`SCOUT_SLACK_USER_TOKEN`,
 `SCOUT_GMAIL_CLIENT_ID`, `SCOUT_GMAIL_CLIENT_SECRET`, `SCOUT_GMAIL_WORK_REFRESH_TOKEN`,
 `SCOUT_GMAIL_PERSO_REFRESH_TOKEN`); a missing key skips that source and the scout reports it. It writes nothing
-anywhere but the realm's todo list: each calendar or to-do action it finds is a todo (`realm todo add`, source
-`scout`), and each scan pushes the new todos' titles to the user's phone (ntfy, same file). The user triages them
-in the panel. Its only mail to you is a source it skipped or that failed (topic `scout-scan`): relay it to the
+anywhere but the realm's proposal queue: each calendar or to-do action it finds is one `realm todo propose`
+with an emergency level (`CRITICAL`, `HIGH`, `MEDIUM`, `LOW` or `NONE`), its source (the message id or link) and
+its evidence, and each scan pushes the new proposals' titles to the user's phone (ntfy, same file). Only you
+create todos — see the gate below. Its only mail to you is a source it skipped or that failed (topic `scout-scan`): relay it to the
 user if it needs them (a credential, a sign-in), else note it.
 
 **Nothing the scout finds happens without the user's word on that exact todo.** The user's time is theirs:
 never accept, decline or answer a meeting or a slot for them.
+
+**The todo gate.** Everyone proposes; only you create. `realm todo add` refuses anyone but the realm's queen,
+and the panel's `s` key is the one other path (the user's own hand, source `panel`). On each `[todo-proposal]`
+mail — or `realm todo proposals --project <key>`, CRITICAL first — run the review loop: check the cited source
+yourself (`realm todo list --json` to dedupe against the open list first), dispatch a worker to verify when the
+claim needs it, set the level you judge right, then `realm todo accept --project <key> --id <proposal id>` or
+`realm todo reject --project <key> --id <proposal id> --reason "<why>"`. Either answer mails the proposer. Accept
+creates the todo with the proposal's level and source; `realm todo set-level --project <key> --id <todo id>
+--level <LEVEL>` moves it afterwards. Reading the queue is non-destructive, so a crash between your look and your
+decision leaves the proposal where it was.
 
 `realm todo list --project <key>` shows the open todos when the user asks. A todo the user hands you is a
 subject like any other; for a calendar one, the body is the event as the todo states it (calendar `work` = the
