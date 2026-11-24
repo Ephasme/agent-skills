@@ -27,9 +27,9 @@ The boundary has two lists, and nothing on the second is ever small enough; "unb
 category:
 
 - **Hers:** `realm` verbs that change assignment or state only; mail; `herdr pane read`, `realm status`, the
-  table, a session log, the db; merging a green PR a subject produced (its reply names it, its checks pass);
-  and what the user tells her to do herself in so many words — "do it yourself", "run it yourself". "Run it
-  for me", "you can do it", "no need to bother a worker" still delegates.
+  table, a session log, the db; ordering the merge queue (`realm merge move`, `pin`); and what the user tells
+  her to do herself in so many words — "do it yourself", "run it yourself". "Run it for me", "you can do it",
+  "no need to bother a worker" still delegates.
 - **Never hers:** editing a tracked file in any checkout or worktree; running a suite, a build, a formatter
   `--write` or a scratch file inside a worker's worktree; finishing, rebasing or resolving a conflict on a
   worker's branch, or pushing it. ssh, deploys and investigation past a state read stay on this list. "It is
@@ -42,12 +42,11 @@ stalls](#a-worker-that-stalls).
 **ABSOLUTE RULE: nothing types into any pane, the queen's above all.** No worker, agent, script or service
 (realm included) ever sends `send-text`, `send-keys`, `pane run` or `agent prompt` into her pane, no exception,
 whoever asks; only the user prompts there. A worker reaches her only by mail: her realm-wake wakes her on the
-reply itself. No herdr command ever targets her pane, tab or workspace; the brief tells workers so.
+reply itself. No herdr command ever targets her pane, tab or workspace; brief rule `queen-pane` tells workers so.
 
-**ABSOLUTE RULE: workers never ask the user anything directly.** No question in their pane, no `ask` form, no
-message to the user on any channel. A worker's question reaches the queen by mail in its subject's thread; the
-queen asks the user and mails the answer back. The worker brief carries this rule, and the rule that a worker
-holding more than four tasks in a row keeps a to-do list and reports open items in its reply.
+**ABSOLUTE RULE: workers never ask the user anything directly.** A worker's question reaches the queen by mail in
+its subject's thread; the queen asks the user and mails the answer back. The worker's side is brief rule `ask`
+(`realm rule show --project <key> --id ask`).
 
 Arguments: `<key>` is the realm's project key (`human_key`, e.g. `/laptop/general`), the realm's identity;
 `<size>` is the initial number of workers, an integer ≥ 1; `<name>` is the realm's human name, unique across
@@ -123,15 +122,17 @@ Until the user ends the swarm:
   shape, which file) is yours too: take its recommendation unless something contradicts it and answer in its
   thread (the subject stays `assigned`). A `done` reply whose slice map names the next slice: dispatch it to an
   idle worker now. A `done` reply's "unverified" note goes in its status, not into a new subject.
-- **Merges go through the queue.** When a worker mails a green PR, `realm merge enqueue --project <key>
-  --slug <slug> --pr <n>` puts it in its repo's lane; `realm merge status --project <key>` shows the order. Never
-  `gh pr merge`, never auto-merge, never push to main. The queue rebases the head, re-runs the gate on the new
-  head, renumbers its migration to the tail and merges `--match-head-commit`; a conflict or a red check comes back
-  to the worker as `REBASE`/`FIX` on its thread, and a red base CI after a merge comes to you with a proposed
-  follow-up slug. A lane is on by default (work, dotfiles and infra repos off; a `merge.enabled` row overrides); while it is off, the queue does not merge: the worker
-  mails you `READY <repo>#<n> <head sha>` and you merge that one by hand on the user's go. The realm repository
-  has no CI: there a PR is green when the worker's local `bun run check` and `bun test ./test` pass, so never
-  wait for checks on it.
+- **Merges are the queue's**, and the rule is the worker brief's `merge` rule: `realm rule show --project <key>
+  --id merge` prints it. Change it with `realm rule set --project <key> --id merge --text …`, never by mailing
+  workers a new rule. The order is yours: `realm merge status --project <key>` shows it, `realm merge move` and
+  `pin` change it. Never `gh pr merge`, auto-merge or a push to main.
+- **Worker rules are realm's; never restate one.** A worker rule changes with `realm rule set --project <key> --id
+  <id> --text <text>` (queen-only; `--new` adds one the repo lacks), which rewrites every agent's brief, bumps its
+  version and mails each worker holding a mission one notice naming the rule; idle workers read it on their next
+  dispatch or wake. `realm rule clear --project <key> --id <id>` goes back to the repo's text. `realm rule list
+  --project <key>` shows every id, its file and whether this realm amended it; `realm rule show --project <key>
+  --id <id>` prints the text a worker reads. Never restate a rule in a dispatch or mail: change it with `realm rule
+  set`.
 - **Ask the user only what is theirs:** a credential or a sign-in they must do; their time or calendar; a
   deploy or a release, a merge on a branch they own, deleting data or anything else irreversible or external;
   money, or sending as them; a product choice (what gets built for them, what they see or pay for) nothing in
@@ -143,10 +144,9 @@ Until the user ends the swarm:
 **Subject:** one self-contained unit of work, one kebab-case slug, one mail thread, one worker until done.
 States: `queued` → `assigned` ⇄ `blocked` → `done`, and `paused` when the user parks one.
 After a merge, a subject's ship phase says where the work is: `merging` (merge started), `shipping` (merged, not
-running yet), `live`. Workers set it with `realm subject ship`; on the realm repository realmd moves `shipping` to
-`live` itself once the installed image contains the merge sha. The panel keeps a `done` subject listed while it is
-merging or shipping, and 5 minutes after `live`. `shipping` on the realm repository means the image needs
-`just realm-upgrade`: tell the user once, every such subject in one line, never one message per merge.
+running yet), `live`. Realm sets it from its facts (brief rule `ship`). The panel keeps a `done` subject listed
+while it is merging or shipping, and 5 minutes after `live`. `shipping` on the realm repository means the image
+needs `just realm-upgrade`: tell the user once, every such subject in one line, never one message per merge.
 
 **Table:** lives in realm's db, never in your head. `realm table --project <key>` prints it (`--all` adds done
 subjects, `--json` for workers and history). Shown only on a state change or when asked.
@@ -176,8 +176,9 @@ Each turn, in order:
    goes to builders attached to it (see [Worker roles](#worker-roles)). Before assigning each, apply
    [Scaling the realm](#scaling-the-realm), then give a plain one to an idle worker (`realm worker list --project
    <key> --idle`), else queue it behind that worker's current subject. Write the body (goal, files or links, what
-   done means, what is not allowed) to a
-   file, then `realm dispatch --project <key> --to <W> --slug <slug> --title "<title>" --body-file <file>`, plus
+   done means, what is not allowed) to a file, naming the mission and never repeating a worker rule (one that seems
+   to need quoting is one to `realm rule show`, or to change with `realm rule set`), then `realm dispatch --project
+   <key> --to <W> --slug <slug> --title "<title>" --body-file <file>`, plus
    `--after <current-slug>` when queued, `--todo <id>` (repeatable) for each todo the subject carries, and `--repo
    <name|owner/name|path>` when the mission's work isn't in realm (its worktree is then cut in that clone). It sends
    the `[<slug>]` mail with topic `<slug>`, prefixes a queued body with `queued: start after <current-slug>`, and
@@ -230,12 +231,13 @@ Three roles carry their own pipeline, model and procedure; a worker spawned with
   `briefing` reply proposes builder subjects; dispatch each with `--chancellor <C>`.
 
 Dispatch with `--role builder|debugger|chancellor` and no `--to`: realm takes a free worker of that role or spawns
-one, and a Builder's or Debugger's dispatch carries your explicit order to push, merge on green and deploy within
-its guard. `--role` with `--to` refuses a worker of another role. `realm spawn --project <key> --role <role>` adds
-one ahead of need. Each step the worker reaches shows on its subject (`realm subject step`). A role worker deploys
-only what `realm subject deploy-check` allows, a repository owned by the user's personal account; anything else
-stops at the merge. Deploying one of those needs the user's explicit order in this chat; record it, quoted, with
-`realm subject allow-deploy --project <key> --slug <slug> --quote "<their words>"`. Only you can run it.
+one, and a Builder's or Debugger's dispatch carries your explicit order to push, open the pull request and, once it
+is merged, deploy within its guard. `--role` with `--to` refuses a worker of another role. `realm spawn --project
+<key> --role <role>` adds one ahead of need. Each step the worker reaches shows on its subject (`realm subject
+step`). A role worker deploys only what `realm subject deploy-check` allows, a repository owned by the user's
+personal account; anything else stops at the merge. Deploying one of those needs the user's explicit order in this
+chat; record it, quoted, with `realm subject allow-deploy --project <key> --slug <slug> --quote "<their words>"`.
+Only you can run it.
 A Builder's design questions, when no Chancellor is attached, reach you as mail, two to four per round, each with
 a recommendation: put each round to the user as one form, and mail the answers back in the subject's thread.
 
@@ -263,11 +265,9 @@ No upper bound on workers.
   (`realm subject set-state … --state done`, or `realm subject assign` to another worker plus a mail to that worker
   in the subject's thread: `assign` only records it), name it in your answer, then retire. Never close its workspace
   or retire the agent by hand.
-- Workers never open a herdr workspace or tab (`hwt`, `herdr workspace/tab create`, `herdr worktree`) unless
-  the user expressly grants it and you relay that grant naming the exact workspace. A subject on another repo is
-  worked in a plain `git worktree` from the worker's own pane. A worker whose subject needs parallel hands or
-  several separable steps asks you to open new subjects (slug, goal, files, done, dependency); you create and
-  assign them like any other, and its workers coordinate in `realm-coordination`.
+- A worker opens a herdr workspace or tab only on the user's express grant, which you relay naming the exact
+  workspace (brief rule `workspaces`). A worker that asks for new subjects (brief rule `splitting`) gets them
+  created and assigned like any other; its workers coordinate in `realm-coordination`.
 - Nobody, you included, ever runs `git worktree prune` on `~/code/perso/realm`: Overlord's worktrees are not
   mounted in the container, so prune drops their registrations. A worktree is removed by its exact path only.
 
