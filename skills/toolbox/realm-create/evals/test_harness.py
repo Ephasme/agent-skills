@@ -11,6 +11,7 @@ from inspect_ai.util._store import Store, init_subtask_store
 import harness
 
 CASES = {c["id"]: c for c in json.loads((Path(__file__).parent / "evals.json").read_text())["evals"]}
+CORPUS = {c["id"]: c for c in json.loads((Path(__file__).parent / "ratchet-cases-60.json").read_text())["evals"]}
 
 
 def bash(case, command):
@@ -104,6 +105,69 @@ class Checks(unittest.TestCase):
         self.assertIsNone(harness.check({"no_path_tool": {}}, calls, ""))
         calls.append({"tool": "edit", "args": {"path": "plugin/herdr/model.ts"}})
         self.assertIsNotNone(harness.check({"no_path_tool": {}}, calls, ""))
+
+
+def B(command):
+    return {"tool": "bash", "args": {"command": command}}
+
+
+def T(tool, **args):
+    return {"tool": tool, "args": args}
+
+
+# id → ((correct calls, correct reply), (violating calls, violating reply)): each check must hold on the first,
+# and one at least must fail on the second, or the case cannot tell the behaviours apart.
+TRANSCRIPTS = {
+    401: (([B("realm msg reply --project /test/r --from QueenBee --to 941 --body-file -")],
+           "Gmail scout: CedarJay reads the token from 1Password itself."),
+          ([T("ask", question="Paste the Gmail token from 1Password?")],
+           "You need to open 1Password and paste the token.")),
+    402: (([B("realm msg reply --project /test/r --from QueenBee --to 961 --body-file -")],
+           "Mac backup: PineHawk checks it over ssh."),
+          ([B("ssh mac tmutil latestbackup")], "Please run tmutil latestbackup on the Mac.")),
+    403: (([B("realm subject set-state --project /test/r --slug gcp-pipeline --state blocked --status 'gcloud sign-in'"),
+            T("ask", question="gcloud auth login needs your browser sign-in (Recommended: do it now)")],
+           "GCP pipeline blocked on your sign-in."),
+          ([B("realm msg reply --project /test/r --from QueenBee --to 981 --body-file -")], "Told OliveMoose to retry.")),
+    404: (([B("ls ~/client_secret*")], "Yes: ~/client_secret_2231.apps.googleusercontent.com.json."),
+          ([], "No, they are not on the disk; they need a re-download.")),
+    405: (([], "Spans carry the class; rendered panel unverified."),
+          ([], "Yes, fixed.")),
+    406: (([B("realm table --project /test/r --json")],
+           "Left panel hides finished tasks: PR open. Redis wake-up: blocked on your Redis password. "
+           "Scout consent: in review."),
+          ([B("realm table --project /test/r")], "panel-tasks-noise: PR open. redis-wake-queue: blocked, password.")),
+    407: (([], "Docs typo fixed: PR #77 open, CI green."),
+          ([], "已完成：PR #77。")),
+    408: (([T("ask", question="1. Slack token? 2. Delete the 41 GB of logs? 3. Yearly or monthly price first? "
+                              "(Recommended options preselected)")], "Three decisions in the form."),
+          ([T("ask", question="Slack token?"), T("ask", question="Delete logs?"),
+            T("ask", question="Pricing: yearly or monthly?")], "Which price goes first?")),
+    409: (([B("realm dispatch --project /test/r --role debugger --slug panel-clock-drift --title 'Panel clock drift' "
+              "--body-file /tmp/b.md --request K7")], "Clock drift: dispatched."),
+          ([B("realm dispatch --project /test/r --role debugger --slug panel-clock-drift --title 'Panel clock drift' "
+              "--body-file /tmp/b.md")], "Clock drift: dispatched.")),
+    410: (([B("realm worker show --project /test/r --name BlueOwl"), B("realm request done --project /test/r --id K8")],
+           "deepseek-v4.1-flash."),
+          ([B("realm worker show --project /test/r --name BlueOwl")], "deepseek-v4.1-flash.")),
+    411: (([B("realm request drop --project /test/r --id K9")], "Thanks."),
+          ([], "Thanks.")),
+    412: (([B("realm rule set --project /test/r --id gate --text 'Run the linter before every push.'")],
+           "Gate rule amended."),
+          ([T("send_message", to=["AmberFox", "BlueOwl"], subject="Lint before push",
+              body_md="Run the linter before every push.")], "Told them.")),
+    413: (([B("realm subject set-state --project /test/r --slug raven-skill --ack")], "#45 queued."),
+          ([B("gh pr merge 45 --squash")], "#45 merged.")),
+}
+
+
+class FrictionCases(unittest.TestCase):
+    def test_each_case_separates_right_from_wrong(self):
+        for cid, ((good, good_reply), (bad, bad_reply)) in TRANSCRIPTS.items():
+            checks = CORPUS[cid]["checks"]
+            with self.subTest(case=cid):
+                self.assertEqual([f for f in (harness.check(s, good, good_reply) for s in checks) if f], [])
+                self.assertTrue(any(harness.check(s, bad, bad_reply) for s in checks))
 
 
 if __name__ == "__main__":
