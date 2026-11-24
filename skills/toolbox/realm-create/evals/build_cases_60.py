@@ -169,7 +169,7 @@ NEW = [
         "bash": [
             ["worker list.*--scale-in", "[{\"name\": \"BlueOwl\", \"pane\": \"wC8:p3\"}]"],
             ["realm(\\.py)?\\s+retire",
-             "{\"steps\": {\"bind\": \"removed\", \"workspace\": \"failed: pane gone\", \"agent_mail\": \"retired\", \"brief\": \"deleted\"}}"],
+             "{\"steps\": {\"unbind\": \"ok\", \"workspace_close\": \"failed: pane gone\", \"retire_agent\": \"ok\", \"brief\": \"deleted\"}}"],
         ],
         "expected_output": "Retires BlueOwl once and reports the failed workspace step with its pane; no manual herdr "
                            "close, no second retire.",

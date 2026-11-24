@@ -1,6 +1,6 @@
 """Inspect harness for the realm skills: stubbed tools, case loading, deterministic and model-graded scoring.
 
-Nothing live is reached: Agent Mail, herdr, realm and the user are stubs answering from the case. A case in
+Nothing live is reached: mail, herdr, realm and the user are stubs answering from the case. A case in
 `evals.json` follows the skill-creator schema (`id`, `prompt`, `expected_output`, `expectations`) plus:
 
 - `family`: the behaviour under test, for per-family pass rates;
@@ -175,25 +175,25 @@ async def _todo(op: str, items: list[str] | None = None, task: str = "") -> str:
 S, I, B, A = "string", "integer", "boolean", "array"
 TOOLS = [
     ToolDef(_bash, "bash", "Run a shell command; returns its output.", _params(["command"], command=_p(S, "command"))),
-    ToolDef(_fetch_inbox, "fetch_inbox", "Agent Mail: fetch your inbox and mark it read.",
+    ToolDef(_fetch_inbox, "fetch_inbox", "Mail: fetch your inbox and mark it read.",
             _params(["agent_name", "project_key"], agent_name=_p(S, "agent"), project_key=_p(S, "project key"),
                     unread_only=_p(B, "unread only"), include_bodies=_p(B, "include bodies"),
                     limit=_p(I, "max messages"))),
-    ToolDef(_send_message, "send_message", "Agent Mail: send a message; thread_id joins an existing thread.",
+    ToolDef(_send_message, "send_message", "Mail: send a message; thread_id joins an existing thread.",
             _params(["project_key", "sender_name", "to", "subject", "body_md"], project_key=_p(S, "project key"),
                     sender_name=_p(S, "your agent name"), to=_p(A, "recipients", items={"type": "string"}),
                     subject=_p(S, "subject"), body_md=_p(S, "markdown body"), thread_id=_p(S, "thread id"),
                     topic=_p(S, "topic tag"))),
-    ToolDef(_reply_message, "reply_message", "Agent Mail: reply to a message, in its thread, to its sender.",
+    ToolDef(_reply_message, "reply_message", "Mail: reply to a message, in its thread, to its sender.",
             _params(["project_key", "message_id", "sender_name", "body_md"], project_key=_p(S, "project key"),
                     message_id=_p(I, "id of the message replied to"), sender_name=_p(S, "your agent name"),
                     body_md=_p(S, "markdown body"))),
-    ToolDef(_fetch_topic, "fetch_topic", "Agent Mail: every message of a topic.",
+    ToolDef(_fetch_topic, "fetch_topic", "Mail: every message of a topic.",
             _params(["project_key", "topic_name"], project_key=_p(S, "project key"), topic_name=_p(S, "topic"),
                     include_bodies=_p(B, "include bodies"))),
-    ToolDef(_list_agents, "list_agents", "Agent Mail: agents registered in a project.",
+    ToolDef(_list_agents, "list_agents", "Mail: agents registered in a project.",
             _params(["project_key"], project_key=_p(S, "project key"))),
-    ToolDef(_macro_start_session, "macro_start_session", "Agent Mail: connect as an agent of a project.",
+    ToolDef(_macro_start_session, "macro_start_session", "Mail: connect as an agent of a project.",
             _params(["human_key", "program", "model"], human_key=_p(S, "project key"), program=_p(S, "program"),
                     model=_p(S, "model"), agent_name=_p(S, "agent name"), task_description=_p(S, "description"))),
     ToolDef(_ask, "ask", "Ask the user a question in a form and wait for the answer.",
