@@ -180,6 +180,10 @@ After a merge, a subject's ship phase says where the work is: `merging` (merge s
 running yet), `live`. Realm sets it from its facts (brief rule `ship`). The panel keeps a `done` subject listed
 while it is merging or shipping, and 5 minutes after `live`. `shipping` on the realm repository means the image
 needs `just realm-upgrade`: tell the user once, every such subject in one line, never one message per merge.
+Merged is final: once a subject's last pull request merged, it is finished, and `set-state` refuses to take it
+out of `done`. A bug or a follow-up after the merge is a new dispatch (`--role debugger` for a bug) with the merged
+pull request in its body, never a reopen. Before the merge, a review, its findings, a fix and a rebase stay in the
+subject that built the work.
 
 **Table:** lives in realm's db, never in your head. `realm table --project <key>` prints it (`--all` adds done
 subjects, `--json` for workers and history). Shown only on a state change or when asked.
