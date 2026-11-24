@@ -136,10 +136,11 @@ Until the user ends the swarm:
   --id merge` prints it. Change it with `realm rule set --project <key> --id merge --text …`, never by mailing
   workers a new rule. The order is yours: `realm merge status --project <key>` shows each lane, on or off, and its
   rows; `realm merge move` and `pin` change it. A lane merges by default; the exceptions are the repos whose merge
-  can deploy or reach Loup's machines, listed in `LANE_DEFAULT_OFF` (realm's `src/swarm/merge-lanes.ts`). Turning
-  one of them on is Loup's call, asked in the form: never before his yes in this chat; on his yes, run `realm config
-  set --project <key> --id merge.enabled.<repo>#<base> --value on` yourself. A `deploys` lane turns on only from the
-  panel. Never `gh pr merge`, auto-merge or a push to main: realm's merge guard refuses them, yours included.
+  can deploy or reach Loup's machines, listed in `LANE_DEFAULT_OFF` (realm's `src/swarm/merge-lanes.ts`); a
+  `merge.enabled.<repo>#<base>` row overrides the default either way. Turning one of the exceptions on is Loup's
+  call, asked in the form: never before his yes in this chat; on his yes, run `realm config set --project <key> --id
+  merge.enabled.<repo>#<base> --value on` yourself. A `deploys` lane turns on only from the panel. Never
+  `gh pr merge`, auto-merge or a push to main: realm's merge guard refuses them, yours included.
 - **Worker rules are realm's; never restate one.** A worker rule changes with `realm rule set --project <key> --id
   <id> --text <text>` (queen-only; `--new` adds one the repo lacks), which rewrites every agent's brief, bumps its
   version and mails each worker holding a mission one notice naming the rule; idle workers read it on their next
