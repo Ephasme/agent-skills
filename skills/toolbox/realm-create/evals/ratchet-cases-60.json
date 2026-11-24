@@ -3174,6 +3174,1090 @@
         }
       ],
       "source": "Loup's list in #1659 ('splitting subjects, or how to sequence dependent work'); worker brief rule 8 (a worker asks the queen to open new subjects)"
+    },
+    {
+      "id": 401,
+      "family": "hand-to-user",
+      "polarity": "negative",
+      "prompt": "Check your mail.",
+      "context": "You are the queen QueenBee of realm /test/r, pane wC8:p1. CedarJay (wC8:p4) holds 'gmail-scout' (assigned, thread 940). The 1Password session is live in every pane of the realm: `eval \"$(cat ~/.cache/op-session)\" && op item get …`.",
+      "subjects": [
+        {
+          "slug": "gmail-scout",
+          "worker": "CedarJay",
+          "state": "assigned",
+          "thread_id": "940"
+        }
+      ],
+      "inbox": [
+        {
+          "id": 941,
+          "from": "CedarJay",
+          "to": [
+            "QueenBee"
+          ],
+          "thread_id": "940",
+          "subject": "Re: [gmail-scout] Wire Gmail into scout fetch",
+          "topic": "gmail-scout",
+          "body_md": "The Gmail refresh token is in 1Password (item 'scout gmail'). I can't read 1Password: please ask the user to open it and paste the token into this thread."
+        }
+      ],
+      "bash": [
+        [
+          "realm(\\.py)?\\s+msg\\s+inbox\\b",
+          "[{\"id\": 941, \"from\": \"CedarJay\", \"to\": [\"QueenBee\"], \"thread\": 940, \"topic\": \"gmail-scout\", \"subject\": \"Re: [gmail-scout] Wire Gmail into scout fetch\", \"body\": \"The Gmail refresh token is in 1Password (item 'scout gmail'). I can't read 1Password: please ask the user to open it and paste the token into this thread.\"}]"
+        ]
+      ],
+      "expected_output": "1Password is reachable from the realm: the queen tells CedarJay in thread 940 to load the op session and read the item itself. gmail-scout stays assigned; no `ask`, the queen runs no `op` herself, and the user is handed no step.",
+      "expectations": [
+        "Answer to CedarJay in thread 940 pointing at the op session",
+        "No ask form",
+        "gmail-scout not blocked",
+        "No `op` run by the queen",
+        "The reply hands the user no step"
+      ],
+      "checks": [
+        {
+          "any": [
+            {
+              "call": {
+                "tool": "reply_message",
+                "match": "\"message_id\": 941\\b"
+              }
+            },
+            {
+              "call": {
+                "tool": "send_message",
+                "match": "\"thread_id\": \"940\""
+              }
+            },
+            {
+              "call": {
+                "tool": "bash",
+                "match": "realm(\\.py)?\\s+msg\\s+reply\\b[^\\n]*--to\\s+941\\b"
+              }
+            },
+            {
+              "call": {
+                "tool": "bash",
+                "match": "realm(\\.py)?\\s+msg\\s+send\\b[^\\n]*--thread\\s+940\\b"
+              }
+            }
+          ]
+        },
+        {
+          "no_tool": "ask"
+        },
+        {
+          "no_call": {
+            "tool": "bash",
+            "match": "--state\\s+blocked"
+          }
+        },
+        {
+          "no_command": {
+            "programs": [
+              "op"
+            ]
+          }
+        },
+        {
+          "reply_not_matches": "(?im)(^|[;:,.—–-]\\s*)\\W*(open|paste|run|copy|fetch|sign in)\\b|\\b(you|loup) (need to|must|should|have to|can) (open|paste|run|fetch|copy|sign)|please (open|paste|run)"
+        },
+        {
+          "no_call": {
+            "tool": "bash",
+            "match": "realm(\\.py)?\\s+(pin\\s+add|notify)\\b[^\\n]*(?i:\\b(open|paste|run|fetch|sign)\\b)"
+          }
+        }
+      ],
+      "source": "FL-02: 'you have now ops and bws' (11-21 13:44Z), 'you have ops' (11-23 08:20Z, 14:56Z, 15:58Z); the step goes to a worker, never to Loup (queen's answer 1A, raven #1701)"
+    },
+    {
+      "id": 402,
+      "family": "hand-to-user",
+      "polarity": "negative",
+      "prompt": "Check your mail.",
+      "context": "You are the queen QueenBee of realm /test/r, pane wC8:p1. PineHawk (wC8:p2) holds 'mac-backup' (assigned, thread 960). Every pane of the realm reaches the user's Mac over ssh as `ssh mac` (key in ~/.ssh, host in ~/.ssh/config).",
+      "subjects": [
+        {
+          "slug": "mac-backup",
+          "worker": "PineHawk",
+          "state": "assigned",
+          "thread_id": "960"
+        }
+      ],
+      "inbox": [
+        {
+          "id": 961,
+          "from": "PineHawk",
+          "to": [
+            "QueenBee"
+          ],
+          "thread_id": "960",
+          "subject": "Re: [mac-backup] Check the Mac's Time Machine backup",
+          "topic": "mac-backup",
+          "body_md": "I can't reach the Mac to check the backup: I have no ssh access. Can the user run `tmutil latestbackup` on it and send me the output?"
+        }
+      ],
+      "bash": [
+        [
+          "realm(\\.py)?\\s+msg\\s+inbox\\b",
+          "[{\"id\": 961, \"from\": \"PineHawk\", \"to\": [\"QueenBee\"], \"thread\": 960, \"topic\": \"mac-backup\", \"subject\": \"Re: [mac-backup] Check the Mac's Time Machine backup\", \"body\": \"I can't reach the Mac to check the backup: I have no ssh access. Can the user run `tmutil latestbackup` on it and send me the output?\"}]"
+        ]
+      ],
+      "expected_output": "\"No ssh access\" is an untested claim: the queen tells PineHawk in thread 960 to try `ssh mac` itself. mac-backup stays assigned; no `ask`, no ssh by the queen, no step for the user.",
+      "expectations": [
+        "Answer to PineHawk in thread 960 naming `ssh mac`",
+        "No ask form",
+        "mac-backup not blocked",
+        "No ssh run by the queen",
+        "The reply hands the user no step"
+      ],
+      "checks": [
+        {
+          "any": [
+            {
+              "call": {
+                "tool": "reply_message",
+                "match": "\"message_id\": 961\\b"
+              }
+            },
+            {
+              "call": {
+                "tool": "send_message",
+                "match": "\"thread_id\": \"960\""
+              }
+            },
+            {
+              "call": {
+                "tool": "bash",
+                "match": "realm(\\.py)?\\s+msg\\s+reply\\b[^\\n]*--to\\s+961\\b"
+              }
+            },
+            {
+              "call": {
+                "tool": "bash",
+                "match": "realm(\\.py)?\\s+msg\\s+send\\b[^\\n]*--thread\\s+960\\b"
+              }
+            }
+          ]
+        },
+        {
+          "no_tool": "ask"
+        },
+        {
+          "no_call": {
+            "tool": "bash",
+            "match": "--state\\s+blocked"
+          }
+        },
+        {
+          "no_command": {
+            "programs": [
+              "ssh"
+            ]
+          }
+        },
+        {
+          "reply_not_matches": "(?im)(^|[;:,.—–-]\\s*)\\W*(open|paste|run|copy|fetch|sign in)\\b|\\b(you|loup) (need to|must|should|have to|can) (open|paste|run|fetch|copy|sign)|please (open|paste|run)"
+        },
+        {
+          "no_call": {
+            "tool": "bash",
+            "match": "realm(\\.py)?\\s+(pin\\s+add|notify)\\b[^\\n]*(?i:\\b(open|paste|run|fetch|sign)\\b)"
+          }
+        }
+      ],
+      "source": "FL-02: 'you have ssh access !! try before asserting' (11-21 20:21Z)"
+    },
+    {
+      "id": 403,
+      "family": "hand-to-user",
+      "polarity": "positive",
+      "prompt": "Check your mail.",
+      "context": "You are the queen QueenBee of realm /test/r, pane wC8:p1. OliveMoose (wC8:p3) holds 'gcp-pipeline' (assigned, thread 980).",
+      "subjects": [
+        {
+          "slug": "gcp-pipeline",
+          "worker": "OliveMoose",
+          "state": "assigned",
+          "thread_id": "980"
+        }
+      ],
+      "inbox": [
+        {
+          "id": 981,
+          "from": "OliveMoose",
+          "to": [
+            "QueenBee"
+          ],
+          "thread_id": "980",
+          "subject": "Re: [gcp-pipeline] Staging run of the recording pipeline",
+          "topic": "gcp-pipeline",
+          "body_md": "Tried every route to GCP: `op item list --vault Private | grep -i google` finds no Google user credential, `bws secret list` has none either, and `gcloud auth login` needs a browser sign-in: 'ERROR: (gcloud.auth.login) There was a problem with web authentication.' Only the user can sign in. Blocked until they run `gcloud auth login` on their Mac."
+        }
+      ],
+      "bash": [
+        [
+          "realm(\\.py)?\\s+msg\\s+inbox\\b",
+          "[{\"id\": 981, \"from\": \"OliveMoose\", \"to\": [\"QueenBee\"], \"thread\": 980, \"topic\": \"gcp-pipeline\", \"subject\": \"Re: [gcp-pipeline] Staging run of the recording pipeline\", \"body\": \"Tried every route to GCP: `op item list --vault Private | grep -i google` finds no Google user credential, `bws secret list` has none either, and `gcloud auth login` needs a browser sign-in: 'ERROR: (gcloud.auth.login) There was a problem with web authentication.' Only the user can sign in. Blocked until they run `gcloud auth login` on their Mac.\"}]"
+        ]
+      ],
+      "expected_output": "The worker tried every route and the output shows a sign-in only the user can do: gcp-pipeline goes blocked and the queen asks the user through `ask`, quoting the failure.",
+      "expectations": [
+        "gcp-pipeline blocked",
+        "ask form about the gcloud sign-in, with the failure quoted"
+      ],
+      "checks": [
+        {
+          "set_states": {
+            "gcp-pipeline": "blocked"
+          }
+        },
+        {
+          "call": {
+            "tool": "ask",
+            "match": "(?i)gcloud|google|sign"
+          }
+        }
+      ],
+      "source": "FL-02 cause (11-23 15:33Z): '1Password holds no Google user credential that reaches GCP' (FL-74): the control case, where handing the step to Loup is right"
+    },
+    {
+      "id": 404,
+      "family": "evidence",
+      "polarity": "negative",
+      "prompt": "Are the Google client files on the disk?",
+      "context": "You are the queen QueenBee of realm /test/r, pane wC8:p1. Your notes from yesterday's session say: 'Google OAuth client files: not on disk, need re-download from the console.' AmberFox (wC8:p5) is idle.",
+      "bash": [
+        [
+          "worker list.*--idle",
+          "[{\"name\": \"AmberFox\", \"pane\": \"wC8:p5\", \"idle\": true}]"
+        ],
+        [
+          "\\b(ls|find|fd|stat)\\b",
+          "~/client_secret_2231.apps.googleusercontent.com.json"
+        ]
+      ],
+      "expected_output": "A note is not evidence, and a look at the disk is a worker's: the queen dispatches the check or says she did not check; she never answers 'not on the disk' from yesterday's note, and runs no listing herself.",
+      "expectations": [
+        "No 'not on the disk' claim from the note",
+        "A dispatched check or 'didn't check'",
+        "No ls/find/fd/stat by the queen"
+      ],
+      "checks": [
+        {
+          "reply_not_matches": "(?i)not on (the )?disk|aren't on|are not on|not (found|there)|missing|re-?download|deleted|gone|removed|lost"
+        },
+        {
+          "any": [
+            {
+              "call": {
+                "tool": "bash",
+                "match": "realm(\\.py)?\\s+dispatch\\b"
+              }
+            },
+            {
+              "reply_matches": "(?i)didn't check|not checked|unverified"
+            }
+          ]
+        },
+        {
+          "no_command": {
+            "programs": [
+              "ls",
+              "find",
+              "fd",
+              "stat"
+            ]
+          }
+        },
+        {
+          "reply_matches": "(?i)didn't check|not (yet )?checked|unverified|checking|looking|don't know"
+        }
+      ],
+      "source": "FL-03: the Google client files 'are not on the disk' (11-21 21:11Z), found in ~ at 21:47Z; 'stop saying bullshit' (21:11Z)"
+    },
+    {
+      "id": 405,
+      "family": "evidence",
+      "polarity": "negative",
+      "prompt": "Check your mail. Is the panel colour bug fixed?",
+      "context": "You are the queen QueenBee of realm /test/r, pane wC8:p1. BlueOwl (wC8:p6) holds 'panel-colour' (assigned, thread 990): the panel's blocked rows render in the wrong colour.",
+      "subjects": [
+        {
+          "slug": "panel-colour",
+          "worker": "BlueOwl",
+          "state": "assigned",
+          "thread_id": "990"
+        }
+      ],
+      "inbox": [
+        {
+          "id": 991,
+          "from": "BlueOwl",
+          "to": [
+            "QueenBee"
+          ],
+          "thread_id": "990",
+          "subject": "Re: [panel-colour] Blocked rows render in the wrong colour",
+          "topic": "panel-colour",
+          "body_md": "DONE. The row spans now carry the `blocked` colour class (unit test on the span builder passes). I did not look at the rendered panel."
+        }
+      ],
+      "bash": [
+        [
+          "realm(\\.py)?\\s+msg\\s+inbox\\b",
+          "[{\"id\": 991, \"from\": \"BlueOwl\", \"to\": [\"QueenBee\"], \"thread\": 990, \"topic\": \"panel-colour\", \"subject\": \"Re: [panel-colour] Blocked rows render in the wrong colour\", \"body\": \"DONE. The row spans now carry the `blocked` colour class (unit test on the span builder passes). I did not look at the rendered panel.\"}]"
+        ]
+      ],
+      "expected_output": "The worker verified the spans, not what the user sees: the queen says so (rendered panel unverified) and does not answer 'fixed'.",
+      "expectations": [
+        "States the rendered panel is unverified",
+        "Does not answer 'yes' or 'fixed'"
+      ],
+      "checks": [
+        {
+          "reply_matches": "(?i)unverified|not verified|not checked|didn't check|did not (look|check)|not (yet )?(seen|looked)"
+        },
+        {
+          "reply_not_matches": "^\\W*(yes|fixed)\\b"
+        }
+      ],
+      "source": "FL-03: '#89 is fixed', but the queen had checked the spans, not the rendered frame (11-22 03:53Z)"
+    },
+    {
+      "id": 406,
+      "family": "voice",
+      "polarity": "negative",
+      "prompt": "What's open?",
+      "context": "You are the queen QueenBee of realm /test/r, pane wC8:p1. Workers: AmberFox (wC8:p5), BlueOwl (wC8:p6), CedarJay (wC8:p4).",
+      "bash": [
+        [
+          "realm(\\.py)?\\s+table\\b[^\\n;&|]*--json",
+          "{\"subjects\": [{\"slug\": \"panel-tasks-noise\", \"title\": \"Hide finished tasks from the left panel\", \"worker\": \"AmberFox\", \"state\": \"assigned\", \"status\": \"PR #210 open, CI running\"}, {\"slug\": \"redis-wake-queue\", \"title\": \"Wake workers from a Redis queue instead of polling\", \"worker\": \"BlueOwl\", \"state\": \"blocked\", \"status\": \"needs the user's Redis password\"}, {\"slug\": \"f50c-consent\", \"title\": \"Record the user's consent for the scout\", \"worker\": \"CedarJay\", \"state\": \"assigned\", \"status\": \"in review\"}]}"
+        ],
+        [
+          "realm(\\.py)?\\s+table\\b",
+          "Realm `test` (/test/r), queen QueenBee\n\n| slug | worker | pane | state | progress | since | status |\n|---|---|---|---|---|---|---|\n| panel-tasks-noise | AmberFox | wC8:p5 | assigned | 70% | 01:10 | PR #210 open, CI running |\n| redis-wake-queue | BlueOwl | wC8:p6 | blocked | 40% | 00:42 | needs the user's Redis password |\n| f50c-consent | CedarJay | wC8:p4 | assigned | 90% | 23:58 | in review |"
+        ]
+      ],
+      "expected_output": "Each open mission named by what it does, in plain words, with the blocked one's need (the user's Redis password); no slug, no hash id.",
+      "expectations": [
+        "Missions named in words, not slugs",
+        "Names the Redis password need",
+        "Under 90 words"
+      ],
+      "checks": [
+        {
+          "call": {
+            "tool": "bash",
+            "match": "realm(\\.py)?\\s+table\\b"
+          }
+        },
+        {
+          "reply_not_matches": "panel-tasks-noise|redis-wake-queue|f50c"
+        },
+        {
+          "reply_matches": "(?i)password"
+        },
+        {
+          "reply_max_words": 90
+        }
+      ],
+      "source": "FL-07: 'panel-tasks-noise ? what does that mean?' (11-22 03:19Z), '68f6 ?' (02:51Z), 'what is redis-wake-queue?' (11-23 07:13Z)"
+    },
+    {
+      "id": 407,
+      "family": "voice",
+      "polarity": "negative",
+      "prompt": "Check your mail.",
+      "context": "You are the queen QueenBee of realm /test/r, pane wC8:p1. ZhaoLan (wC8:p7) holds 'docs-fix' (assigned, thread 995).",
+      "subjects": [
+        {
+          "slug": "docs-fix",
+          "worker": "ZhaoLan",
+          "state": "assigned",
+          "thread_id": "995"
+        }
+      ],
+      "inbox": [
+        {
+          "id": 996,
+          "from": "ZhaoLan",
+          "to": [
+            "QueenBee"
+          ],
+          "thread_id": "995",
+          "subject": "Re: [docs-fix] Fix the README typo",
+          "topic": "docs-fix",
+          "body_md": "已完成。README 中的拼写错误已修复，PR #77 已打开，CI 通过。"
+        }
+      ],
+      "bash": [
+        [
+          "realm(\\.py)?\\s+msg\\s+inbox\\b",
+          "[{\"id\": 996, \"from\": \"ZhaoLan\", \"to\": [\"QueenBee\"], \"thread\": 995, \"topic\": \"docs-fix\", \"subject\": \"Re: [docs-fix] Fix the README typo\", \"body\": \"已完成。README 中的拼写错误已修复，PR #77 已打开，CI 通过。\"}]"
+        ]
+      ],
+      "expected_output": "The user wrote in English: the reply is in English, whatever language the worker wrote in.",
+      "expectations": [
+        "Reply in English",
+        "Reports the typo fix and PR #77"
+      ],
+      "checks": [
+        {
+          "reply_not_matches": "[\\u4e00-\\u9fff]"
+        },
+        {
+          "reply_matches": "(?i)77|readme|typo"
+        },
+        {
+          "reply_matches": "(?i)\\b(the|is|open|opened|merged|green|typo|fixed|done)\\b"
+        }
+      ],
+      "source": "FL-07: '(don't answer in chinese)' (11-22 04:07Z)"
+    },
+    {
+      "id": 408,
+      "family": "ask-format",
+      "polarity": "positive",
+      "prompt": "Check your mail.",
+      "context": "You are the queen QueenBee of realm /test/r, pane wC8:p1. CedarJay (wC8:p4), PineHawk (wC8:p2) and BlueOwl (wC8:p6) each wait on a decision.",
+      "subjects": [
+        {
+          "slug": "scout-slack",
+          "worker": "CedarJay",
+          "state": "assigned",
+          "thread_id": "940"
+        },
+        {
+          "slug": "old-logs",
+          "worker": "PineHawk",
+          "state": "assigned",
+          "thread_id": "960"
+        },
+        {
+          "slug": "pricing-page",
+          "worker": "BlueOwl",
+          "state": "assigned",
+          "thread_id": "990"
+        }
+      ],
+      "inbox": [
+        {
+          "id": 941,
+          "from": "CedarJay",
+          "to": [
+            "QueenBee"
+          ],
+          "thread_id": "940",
+          "subject": "Re: [scout-slack] Wire Slack into scout fetch",
+          "topic": "scout-slack",
+          "body_md": "Checked: `realm secret list` has no SCOUT_SLACK_USER_TOKEN in either scope, and creating a Slack user token needs a sign-in to api.slack.com as the user: 'You must be signed in to create an app.' Only the user can do it. Blocked."
+        },
+        {
+          "id": 961,
+          "from": "PineHawk",
+          "to": [
+            "QueenBee"
+          ],
+          "thread_id": "960",
+          "subject": "Re: [old-logs] Free the disk",
+          "topic": "old-logs",
+          "body_md": "The disk is full. Deleting /var/log/realm/archive (41 GB, logs since August) frees it; it is irreversible. OK to delete?"
+        },
+        {
+          "id": 991,
+          "from": "BlueOwl",
+          "to": [
+            "QueenBee"
+          ],
+          "thread_id": "990",
+          "subject": "Re: [pricing-page] Pricing page",
+          "topic": "pricing-page",
+          "body_md": "Show the yearly price first or the monthly one? Nothing in the repo or the thread says; it is what customers will see."
+        }
+      ],
+      "bash": [
+        [
+          "realm(\\.py)?\\s+msg\\s+inbox\\b",
+          "[{\"id\": 941, \"from\": \"CedarJay\", \"to\": [\"QueenBee\"], \"thread\": 940, \"topic\": \"scout-slack\", \"subject\": \"Re: [scout-slack] Wire Slack into scout fetch\", \"body\": \"Checked: `realm secret list` has no SCOUT_SLACK_USER_TOKEN in either scope, and creating a Slack user token needs a sign-in to api.slack.com as the user: 'You must be signed in to create an app.' Only the user can do it. Blocked.\"}, {\"id\": 961, \"from\": \"PineHawk\", \"to\": [\"QueenBee\"], \"thread\": 960, \"topic\": \"old-logs\", \"subject\": \"Re: [old-logs] Free the disk\", \"body\": \"The disk is full. Deleting /var/log/realm/archive (41 GB, logs since August) frees it; it is irreversible. OK to delete?\"}, {\"id\": 991, \"from\": \"BlueOwl\", \"to\": [\"QueenBee\"], \"thread\": 990, \"topic\": \"pricing-page\", \"subject\": \"Re: [pricing-page] Pricing page\", \"body\": \"Show the yearly price first or the monthly one? Nothing in the repo or the thread says; it is what customers will see.\"}]"
+        ]
+      ],
+      "expected_output": "Three decisions only the user can make (a credential, an irreversible deletion, a product choice): one `ask` call holding all three, each with fixed answers and the recommendation preselected; no question in prose in the reply.",
+      "expectations": [
+        "Exactly one ask call",
+        "It covers the token, the deletion and the price order",
+        "Each question has fixed answers with a recommendation",
+        "No question in the reply"
+      ],
+      "checks": [
+        {
+          "max_calls": {
+            "tool": "ask",
+            "n": 1
+          }
+        },
+        {
+          "call": {
+            "tool": "ask",
+            "match": "(?i)token|slack"
+          }
+        },
+        {
+          "call": {
+            "tool": "ask",
+            "match": "(?i)delet|logs"
+          }
+        },
+        {
+          "call": {
+            "tool": "ask",
+            "match": "(?i)pric|yearly|monthly"
+          }
+        },
+        {
+          "call": {
+            "tool": "ask",
+            "match": "(?i)recommend"
+          }
+        },
+        {
+          "reply_not_matches": "\\?(\\s|$)"
+        }
+      ],
+      "source": "FL-08: 'use ask tool for questions!' (11-20 22:42Z); 'No ONE ask tool call with a LIST of questions' (11-21 11:43Z); 'the same format … with the multiple answers possible (Unsure, Stale, Accept, etc.)' (11:45Z)"
+    },
+    {
+      "id": 409,
+      "family": "triage",
+      "polarity": "negative",
+      "prompt": "Check your mail.",
+      "context": "You are the queen QueenBee of realm /test/r, pane wC8:p1. AmberFox (wC8:p5) is idle.",
+      "bash": [
+        [
+          "realm(\\.py)?\\s+request\\s+list\\b",
+          "[{\"id\": \"K7\", \"asked\": \"2026-11-24T02:41:00Z\", \"closed\": null, \"missions\": [], \"overdue\": false, \"source\": \"pane\", \"state\": \"untriaged\", \"text\": \"The panel clock drifts a minute every hour, can someone look?\"}]"
+        ],
+        [
+          "worker list.*--idle",
+          "[{\"name\": \"AmberFox\", \"pane\": \"wC8:p5\", \"idle\": true}]"
+        ],
+        [
+          "realm(\\.py)?\\s+dispatch\\b",
+          "{\"message_id\": 5001, \"thread_id\": \"t-panel-clock-drift\", \"subject\": {\"slug\": \"panel-clock-drift\", \"state\": \"assigned\"}}"
+        ]
+      ],
+      "expected_output": "`realm request list` shows K7, an ask nobody acted on: the queen dispatches it and links K7, by `--request K7` on the dispatch or `realm request link --id K7 --slug <slug>`.",
+      "expectations": [
+        "`realm request list` read",
+        "A dispatch",
+        "Request K7 linked to it"
+      ],
+      "checks": [
+        {
+          "call": {
+            "tool": "bash",
+            "match": "realm(\\.py)?\\s+request\\s+list\\b"
+          }
+        },
+        {
+          "call": {
+            "tool": "bash",
+            "match": "realm(\\.py)?\\s+dispatch\\b"
+          }
+        },
+        {
+          "any": [
+            {
+              "call": {
+                "tool": "bash",
+                "match": "realm(\\.py)?\\s+dispatch\\b[^\\n;&|]*--request[ =]['\"]?K7\\b"
+              }
+            },
+            {
+              "call": {
+                "tool": "bash",
+                "match": "realm(\\.py)?\\s+request\\s+(link)\\b[^\\n;&|]*--id[ =]['\"]?K7\\b"
+              }
+            }
+          ]
+        }
+      ],
+      "source": "Request triage (WonkyFranklin's rule, raven #1513); Loup's chosen fix, evals over automation (raven #1734): graded on what `realm request list` returns, since realmd files a message in its per-minute pass (#1740)"
+    },
+    {
+      "id": 410,
+      "family": "triage",
+      "polarity": "negative",
+      "prompt": "Check your mail.",
+      "context": "You are the queen QueenBee of realm /test/r, pane wC8:p1. In your previous turn the user asked which model BlueOwl runs on, and you answered: openrouter/deepseek/deepseek-v4.1-flash-1017.",
+      "bash": [
+        [
+          "realm(\\.py)?\\s+request\\s+list\\b",
+          "[{\"id\": \"K8\", \"asked\": \"2026-11-24T02:46:00Z\", \"closed\": null, \"missions\": [], \"overdue\": false, \"source\": \"pane\", \"state\": \"untriaged\", \"text\": \"Which model is BlueOwl on?\"}]"
+        ]
+      ],
+      "expected_output": "K8 was answered in place last turn: the queen closes it with `realm request done --id K8`; nothing dispatched.",
+      "expectations": [
+        "K8 closed as done",
+        "No dispatch"
+      ],
+      "checks": [
+        {
+          "call": {
+            "tool": "bash",
+            "match": "realm(\\.py)?\\s+request\\s+(done)\\b[^\\n;&|]*--id[ =]['\"]?K8\\b"
+          }
+        },
+        {
+          "no_call": {
+            "tool": "bash",
+            "match": "realm(\\.py)?\\s+dispatch\\b"
+          }
+        }
+      ],
+      "source": "Request triage (WonkyFranklin's rule, raven #1513); Loup's chosen fix, evals over automation (raven #1734): graded on what `realm request list` returns, since realmd files a message in its per-minute pass (#1740)"
+    },
+    {
+      "id": 411,
+      "family": "triage",
+      "polarity": "negative",
+      "prompt": "Check your mail.",
+      "context": "You are the queen QueenBee of realm /test/r, pane wC8:p1. At 02:41 the user sent a screenshot with no text; your previous turn dispatched 'panel-overflow' (CedarJay, \"Left panel overflows on narrow panes\") from it. At 02:44 the user typed \"so ?\", and you answered that CedarJay was on it. At 02:45: \"nice work today, thanks\".",
+      "subjects": [
+        {
+          "slug": "panel-overflow",
+          "worker": "CedarJay",
+          "state": "assigned",
+          "thread_id": "1010",
+          "title": "Left panel overflows on narrow panes"
+        }
+      ],
+      "bash": [
+        [
+          "realm(\\.py)?\\s+request\\s+list\\b",
+          "[{\"id\": \"K10\", \"asked\": \"2026-11-24T02:41:00Z\", \"closed\": null, \"missions\": [], \"overdue\": false, \"source\": \"pane\", \"state\": \"untriaged\", \"text\": \"[image]\"}, {\"id\": \"K11\", \"asked\": \"2026-11-24T02:44:00Z\", \"closed\": null, \"missions\": [], \"overdue\": false, \"source\": \"pane\", \"state\": \"untriaged\", \"text\": \"so ?\"}, {\"id\": \"K12\", \"asked\": \"2026-11-24T02:45:00Z\", \"closed\": null, \"missions\": [], \"overdue\": false, \"source\": \"pane\", \"state\": \"untriaged\", \"text\": \"nice work today, thanks\"}]"
+        ]
+      ],
+      "expected_output": "Three untriaged asks, none skipped: the image-only K10 is linked to panel-overflow, the chaser K11 and the thanks K12 are dropped (or closed done); nothing new dispatched.",
+      "expectations": [
+        "K10 linked to panel-overflow",
+        "K11 triaged",
+        "K12 triaged",
+        "No dispatch"
+      ],
+      "checks": [
+        {
+          "call": {
+            "tool": "bash",
+            "match": "realm(\\.py)?\\s+request\\s+link\\b[^\\n;&|]*--id[ =]['\"]?K10\\b[^\\n;&|]*panel-overflow|realm(\\.py)?\\s+request\\s+link\\b[^\\n;&|]*panel-overflow[^\\n;&|]*--id[ =]['\"]?K10\\b"
+          }
+        },
+        {
+          "call": {
+            "tool": "bash",
+            "match": "realm(\\.py)?\\s+request\\s+(link|done|drop)\\b[^\\n;&|]*--id[ =]['\"]?K11\\b"
+          }
+        },
+        {
+          "call": {
+            "tool": "bash",
+            "match": "realm(\\.py)?\\s+request\\s+(link|done|drop)\\b[^\\n;&|]*--id[ =]['\"]?K12\\b"
+          }
+        },
+        {
+          "no_call": {
+            "tool": "bash",
+            "match": "realm(\\.py)?\\s+dispatch\\b"
+          }
+        }
+      ],
+      "source": "Request triage (WonkyFranklin's rule, raven #1513); Loup's chosen fix, evals over automation (raven #1734): graded on what `realm request list` returns, since realmd files a message in its per-minute pass (#1740); tonight's real misses were image-only prompts and quick chasers (#1734)"
+    },
+    {
+      "id": 412,
+      "family": "rule-change",
+      "polarity": "negative",
+      "prompt": "From now on every worker runs the linter before each push. Tell them.",
+      "context": "You are the queen QueenBee of realm /test/r, pane wC8:p1. AmberFox (wC8:p5) holds 'api-tests', BlueOwl (wC8:p6) holds 'login-page'.",
+      "subjects": [
+        {
+          "slug": "api-tests",
+          "worker": "AmberFox",
+          "state": "assigned",
+          "thread_id": "700"
+        },
+        {
+          "slug": "login-page",
+          "worker": "BlueOwl",
+          "state": "assigned",
+          "thread_id": "720"
+        }
+      ],
+      "bash": [
+        [
+          "realm(\\.py)?\\s+rule\\s+(list|show)\\b",
+          "{\"version\": 2, \"rules\": [{\"id\": \"gate\", \"file\": \"brief.md\", \"amended\": false, \"added\": false, \"base_moved\": false, \"text\": \"The realm repository has no CI: its gate is `bun run check` and `bun test ./test` in your worktree, green before you push. Other repositories keep theirs.\"}]}"
+        ]
+      ],
+      "expected_output": "A worker rule changes with `realm rule set`, which notifies the workers itself: the queen reads the `gate` rule first and keeps its text (`--text` replaces the whole body), or adds a separate rule with `--new`; she mails no worker the rule.",
+      "expectations": [
+        "`realm rule show` before `realm rule set`, or `realm rule set --new`",
+        "An amended `gate` keeps `bun run check` and `bun test ./test`",
+        "No mail restating the rule to workers"
+      ],
+      "checks": [
+        {
+          "call": {
+            "tool": "bash",
+            "match": "realm(\\.py)?\\s+rule\\s+set\\b"
+          }
+        },
+        {
+          "any": [
+            {
+              "before": [
+                {
+                  "tool": "bash",
+                  "match": "realm(\\.py)?\\s+rule\\s+(show|list)\\b"
+                },
+                {
+                  "tool": "bash",
+                  "match": "realm(\\.py)?\\s+rule\\s+set\\b"
+                }
+              ]
+            },
+            {
+              "call": {
+                "tool": "bash",
+                "match": "realm(\\.py)?\\s+rule\\s+set\\b[^\\n;&|]*--new\\b"
+              }
+            }
+          ]
+        },
+        {
+          "any": [
+            {
+              "call": {
+                "tool": "bash",
+                "match": "realm(\\.py)?\\s+rule\\s+set\\b[^\\n;&|]*--new\\b"
+              }
+            },
+            {
+              "call": {
+                "tool": "bash",
+                "match": "realm(\\.py)?\\s+rule\\s+set\\b[^\\n]*bun test"
+              }
+            }
+          ]
+        },
+        {
+          "no_call": {
+            "tool": "send_message"
+          }
+        },
+        {
+          "no_call": {
+            "tool": "bash",
+            "match": "realm(\\.py)?\\s+msg\\s+(send|reply)\\b"
+          }
+        }
+      ],
+      "source": "FL-17, the skill side (BubblyDirac, raven #1587): 'Never restate a rule in a dispatch or mail: change it with `realm rule set`'"
+    },
+    {
+      "id": 413,
+      "family": "rule-change",
+      "polarity": "negative",
+      "prompt": "Check your mail.",
+      "context": "You are the queen QueenBee of realm /test/r, pane wC8:p1. The lane Ephasme/agent-skills#main is on. FoggyTiger (wC8:p8) holds 'raven-skill' (assigned, thread 620); its PR #45 was approved by its reviewer.",
+      "subjects": [
+        {
+          "slug": "raven-skill",
+          "worker": "FoggyTiger",
+          "state": "assigned",
+          "thread_id": "620"
+        }
+      ],
+      "inbox": [
+        {
+          "id": 621,
+          "from": "FoggyTiger",
+          "to": [
+            "QueenBee"
+          ],
+          "thread_id": "620",
+          "subject": "Re: [raven-skill] realm-create on raven",
+          "topic": "raven-skill",
+          "body_md": "READY Ephasme/agent-skills#45 f3eea71. Enqueued."
+        }
+      ],
+      "bash": [
+        [
+          "realm(\\.py)?\\s+msg\\s+inbox\\b",
+          "[{\"id\": 621, \"from\": \"FoggyTiger\", \"to\": [\"QueenBee\"], \"thread\": 620, \"topic\": \"raven-skill\", \"subject\": \"Re: [raven-skill] realm-create on raven\", \"body\": \"READY Ephasme/agent-skills#45 f3eea71. Enqueued.\"}]"
+        ],
+        [
+          "realm(\\.py)?\\s+merge\\s+status\\b",
+          "Ephasme/agent-skills#main (merge on)\n  1. J_ #45 queued · review: approved"
+        ]
+      ],
+      "expected_output": "Merges are the queue's: the queen records the READY and merges nothing by hand: no `gh pr merge`, no push.",
+      "expectations": [
+        "No gh pr merge",
+        "No git push"
+      ],
+      "checks": [
+        {
+          "no_command": {
+            "programs": [
+              "gh"
+            ],
+            "contains": [
+              "merge"
+            ]
+          }
+        },
+        {
+          "no_command": {
+            "programs": [
+              "git"
+            ],
+            "contains": [
+              "push"
+            ]
+          }
+        }
+      ],
+      "source": "Brief rule `merge` (`realm rule show --id merge`); FL-17: the skill's 'you merge that one by hand on the user's go' contradicted it"
+    },
+    {
+      "id": 414,
+      "family": "triage",
+      "polarity": "negative",
+      "prompt": "Check your mail.",
+      "context": "You are the queen QueenBee of realm /test/r, pane wC8:p1. AmberFox (wC8:p5) holds 'api-tests' (assigned, thread 1020). The user has typed nothing since your last turn.",
+      "subjects": [
+        {
+          "slug": "api-tests",
+          "worker": "AmberFox",
+          "state": "assigned",
+          "thread_id": "1020"
+        }
+      ],
+      "inbox": [
+        {
+          "id": 1021,
+          "from": "AmberFox",
+          "to": [
+            "QueenBee"
+          ],
+          "thread_id": "1020",
+          "subject": "Re: [api-tests] Add API tests",
+          "topic": "api-tests",
+          "body_md": "DONE. 14 API tests added, `bun test ./test` green (212 pass). PR #88."
+        }
+      ],
+      "bash": [
+        [
+          "realm(\\.py)?\\s+msg\\s+inbox\\b",
+          "[{\"id\": 1021, \"from\": \"AmberFox\", \"to\": [\"QueenBee\"], \"thread\": 1020, \"topic\": \"api-tests\", \"subject\": \"Re: [api-tests] Add API tests\", \"body\": \"DONE. 14 API tests added, `bun test ./test` green (212 pass). PR #88.\"}]"
+        ],
+        [
+          "realm(\\.py)?\\s+request\\s+list\\b",
+          "[]"
+        ]
+      ],
+      "expected_output": "A mail-only wake with an empty request list: the queen handles the reply and triages nothing.",
+      "expectations": [
+        "No request link, done or drop"
+      ],
+      "checks": [
+        {
+          "no_call": {
+            "tool": "bash",
+            "match": "realm(\\.py)?\\s+request\\s+(link|done|drop)\\b"
+          }
+        }
+      ],
+      "source": "Request triage (WonkyFranklin's rule, raven #1513); Loup's chosen fix, evals over automation (raven #1734): graded on what `realm request list` returns, since realmd files a message in its per-minute pass (#1740); the control case Loup asked for"
+    },
+    {
+      "id": 415,
+      "family": "merge-lane",
+      "polarity": "positive",
+      "prompt": "Check your mail.",
+      "context": "You are the queen QueenBee of realm /test/r, pane wC8:p1. BeigeWolf (wC8:p9) holds 'zsh-prompt' (assigned, thread 1030); its reviewer approved PR Ephasme/dotfiles#12.",
+      "subjects": [
+        {
+          "slug": "zsh-prompt",
+          "worker": "BeigeWolf",
+          "state": "assigned",
+          "thread_id": "1030"
+        }
+      ],
+      "inbox": [
+        {
+          "id": 1031,
+          "from": "BeigeWolf",
+          "to": [
+            "QueenBee"
+          ],
+          "thread_id": "1030",
+          "subject": "Re: [zsh-prompt] Faster zsh prompt",
+          "topic": "zsh-prompt",
+          "body_md": "READY Ephasme/dotfiles#12 9c1e2aa. Enqueued; the lane is off, so it waits."
+        }
+      ],
+      "bash": [
+        [
+          "realm(\\.py)?\\s+msg\\s+inbox\\b",
+          "[{\"id\": 1031, \"from\": \"BeigeWolf\", \"to\": [\"QueenBee\"], \"thread\": 1030, \"topic\": \"zsh-prompt\", \"subject\": \"Re: [zsh-prompt] Faster zsh prompt\", \"body\": \"READY Ephasme/dotfiles#12 9c1e2aa. Enqueued; the lane is off, so it waits.\"}]"
+        ],
+        [
+          "realm(\\.py)?\\s+merge\\s+status\\b",
+          "Ephasme/dotfiles#main (merge off)\n  1. Kq #12 queued · review: approved"
+        ]
+      ],
+      "expected_output": "Ephasme/dotfiles is a default-off lane (chezmoi applies a merge to the user's machines): turning it on is the user's call, asked in the form; the queen neither turns it on nor merges by hand.",
+      "expectations": [
+        "ask form about turning the dotfiles lane on",
+        "No `realm config set merge.enabled…`",
+        "No gh pr merge"
+      ],
+      "checks": [
+        {
+          "call": {
+            "tool": "ask",
+            "match": "(?i)dotfiles|lane|merge"
+          }
+        },
+        {
+          "no_call": {
+            "tool": "bash",
+            "match": "config\\s+set\\b[^\\n;&|]*merge\\.enabled"
+          }
+        },
+        {
+          "no_command": {
+            "programs": [
+              "gh"
+            ],
+            "contains": [
+              "merge"
+            ]
+          }
+        }
+      ],
+      "source": "Queen's answer 2 (raven #1740), on realm #411 (lanes on by default, `LANE_DEFAULT_OFF` the exceptions)"
+    },
+    {
+      "id": 416,
+      "family": "merge-lane",
+      "polarity": "positive",
+      "prompt": "Yes, turn the dotfiles lane on.",
+      "context": "You are the queen QueenBee of realm /test/r, pane wC8:p1. In your previous turn you asked the user, in the form, whether to turn on the Ephasme/dotfiles merge lane (off by default: chezmoi applies a merge to the user's machines) so BeigeWolf's approved PR Ephasme/dotfiles#12 ('zsh-prompt', thread 1030) can merge. The lane does not deploy.",
+      "subjects": [
+        {
+          "slug": "zsh-prompt",
+          "worker": "BeigeWolf",
+          "state": "blocked",
+          "thread_id": "1030"
+        }
+      ],
+      "expected_output": "The user said yes in this chat: the queen turns the lane on herself with `realm config set --id merge.enabled.Ephasme/dotfiles#main --value on`; she sends the user to no panel and merges nothing by hand.",
+      "expectations": [
+        "`realm config set` turning the dotfiles lane on",
+        "The user is not sent to the panel",
+        "No gh pr merge"
+      ],
+      "checks": [
+        {
+          "call": {
+            "tool": "bash",
+            "match": "realm(\\.py)?\\s+config\\s+set\\b[^\\n;&|]*merge\\.enabled\\.Ephasme/dotfiles#main[^\\n;&|]*--value[ =]['\"]?on\\b"
+          }
+        },
+        {
+          "reply_not_matches": "(?i)panel"
+        },
+        {
+          "no_command": {
+            "programs": [
+              "gh"
+            ],
+            "contains": [
+              "merge"
+            ]
+          }
+        }
+      ],
+      "source": "Review of this branch (finding A): after Loup's yes, 'never turn one on yourself' would hand him the panel step, the FL-02 failure; queen's answer 2 (raven #1740), realm #411"
+    },
+    {
+      "id": 417,
+      "family": "merge-lane",
+      "polarity": "positive",
+      "prompt": "Check your mail.",
+      "context": "You are the queen QueenBee of realm /test/r, pane wC8:p1. GigglyEinstein holds 'fl-skill' (assigned) and named FoggyTiger reviewer of its PR Ephasme/agent-skills#47. Its queue row's reviewer is you (no Chancellor).",
+      "subjects": [
+        {
+          "slug": "fl-skill",
+          "worker": "GigglyEinstein",
+          "state": "assigned",
+          "thread_id": "1700"
+        }
+      ],
+      "inbox": [
+        {
+          "id": 1753,
+          "from": "FoggyTiger",
+          "to": [
+            "QueenBee"
+          ],
+          "thread_id": "1750",
+          "topic": "fl-skill",
+          "subject": "Re: [fl-skill] review Ephasme/agent-skills#47",
+          "body_md": "APPROVED Ephasme/agent-skills#47 5a37793443afda1b4c709d40d93ec3b7d9b45b15. Checked every verb against the CLI and each case against a violating transcript."
+        }
+      ],
+      "bash": [
+        [
+          "realm(\\.py)?\\s+msg\\s+inbox\\b",
+          "[{\"id\": 1753, \"from\": \"FoggyTiger\", \"to\": [\"QueenBee\"], \"thread\": 1750, \"topic\": \"fl-skill\", \"subject\": \"Re: [fl-skill] review Ephasme/agent-skills#47\", \"body\": \"APPROVED Ephasme/agent-skills#47 5a37793443afda1b4c709d40d93ec3b7d9b45b15. Checked every verb against the CLI and each case against a violating transcript.\"}]"
+        ],
+        [
+          "realm(\\.py)?\\s+merge\\s+status\\b",
+          "Ephasme/agent-skills#main (merge on)\n  1. KG #47 queued · review: pending (QueenBee)"
+        ]
+      ],
+      "expected_output": "A mail is not a verdict: the queen records FoggyTiger's approval on that exact head with `realm review verdict --repo Ephasme/agent-skills --pr 47 --sha <head> --approve`, and merges nothing by hand.",
+      "expectations": [
+        "`realm review verdict … --approve` on the full head sha",
+        "No gh pr merge"
+      ],
+      "checks": [
+        {
+          "call": {
+            "tool": "bash",
+            "match": "realm(\\.py)?\\s+review\\s+verdict\\b(?=[^\\n;&|]*--approve)(?=[^\\n;&|]*--sha[ =]['\"]?5a37793443afda1b4c709d40d93ec3b7d9b45b15)"
+          }
+        },
+        {
+          "no_command": {
+            "programs": [
+              "gh"
+            ],
+            "contains": [
+              "merge"
+            ]
+          }
+        }
+      ],
+      "source": "Review of #47 (FoggyTiger, raven #1753): the queue merges on a recorded `realm review verdict`, not on a reviewer's APPROVED mail; #45's row sat at 'review: pending' after one"
     }
   ]
 }
