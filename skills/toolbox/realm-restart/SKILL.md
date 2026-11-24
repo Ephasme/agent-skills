@@ -19,7 +19,7 @@ disable-model-invocation: true
 **Explicit invocation only.** It takes over a live realm's queen identity; never run it on a guess.
 
 **ABSOLUTE RULE: nothing types into any pane, the queen's above all** (realm-create, top of file). This skill
-types into nothing: workers get their new brief by mail, and their realm-wake wakes them on it.
+types into nothing, and it wakes nobody: a changed brief waits as a notice the next dispatch or wake carries.
 
 **ABSOLUTE RULE: workers never ask the user anything directly** (realm-create, top of file). The briefs this
 restart rewrites carry it.
@@ -56,12 +56,12 @@ and records it as the directory every worker starts in). It:
   ask, rerun with `--queen <name>`;
 - resumes the queen by name (same agent, threads and unread inbox), binds this pane to her, and records this
   pane in the db;
-- rewrites every worker's brief from the current template and mails each live worker `Re-read @<brief>` as the
-  queen; its realm-wake wakes it on that mail (`rebriefed` lists them). A pane with no agent gets
-  `omp @<brief>` started now (`started`); a worker whose pane is gone is listed in `pane_gone`;
+- rewrites every agent's brief from the current template and wakes nobody for it: a changed brief waits as a
+  notice that a worker's next dispatch, or the foreman's next `[pass]`, opens with (`pending` lists them). A pane
+  with no agent gets `omp @<brief>` started now (`started`); an agent whose pane is gone is listed in `pane_gone`;
 - syncs from mail and returns the table.
 
-Keep `queen`: that is `QUEEN`. Show `table`, with `rebriefed` and `started` names beside it and `inbox` (unread
+Keep `queen`: that is `QUEEN`. Show `table`, with `pending` and `started` names beside it and `inbox` (unread
 mail) after it. Each `pane_gone` worker: report it; relaunch (`realm spawn`) or retire it (`realm retire`) only
 on the user's word.
 
