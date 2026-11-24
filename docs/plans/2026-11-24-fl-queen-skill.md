@@ -274,11 +274,30 @@ class FrictionCases(unittest.TestCase):
   the working tree without it")` and pass `a.ref` as `harness.task`'s fifth argument instead of `None`; extend the
   docstring's usage line with `[--ref <commit>]`. Commit `realm-create evals: ratchet_run --ref`.
 - [ ] **Step 3: Price:** from this worktree's `evals/`, both conditions with `--reps 1 --ids 401` first (Step 4's
-  commands); tokens from each `results.jsonl` row's `usage` × $0.03/M input and $0.20/M output, × 56. Over $5 →
+  commands); tokens from each `results.jsonl` row's `usage` × $0.03/M input and $0.20/M output, × 64. Over $5 →
   stop, tell the queen. Those rows stay: `ratchet_run.py` resumes on `(case, rep)`.
 - [ ] **Step 4: Run** from this worktree's `evals/`, baseline then branch:
-  `OPENROUTER_API_KEY="$(realm secret get --scope perso OPENROUTER_API_KEY)" ~/.cache/fl-queen-skill-venv/bin/python -B ratchet_run.py --ref origin/main --out ~/.omp/ratchet/realm-queen/fl-base --reps 2 --cases ratchet-cases-60.json --ids 401,402,403,404,405,406,407,408,409,410,411,412,413`
+  `OPENROUTER_API_KEY="$(realm secret get --scope perso OPENROUTER_API_KEY)" ~/.cache/fl-queen-skill-venv/bin/python -B ratchet_run.py --ref origin/main --out ~/.omp/ratchet/realm-queen/fl-base --reps 2 --cases ratchet-cases-60.json --ids 401,402,403,404,405,406,407,408,409,410,411,412,413,414,415,416`
   and the same without `--ref`, `--out ~/.omp/ratchet/realm-queen/fl-branch`.
 - [ ] **Step 5:** `~/.cache/fl-queen-skill-venv/bin/python -B analysis.py --baseline
   ~/.omp/ratchet/realm-queen/fl-base --branch ~/.omp/ratchet/realm-queen/fl-branch --cases ratchet-cases-60.json
-  --prespecified 401,402,403,404,405,406,407,408,409,410,411,412,413`; its table goes in the PR.
+  --prespecified 401,402,403,404,405,406,407,408,409,410,411,412,413,414,415,416`; its table goes in the PR.
+
+## Revisions after review
+
+The review (reviewer agent, then the queen's answers in raven #1740) changed three things above; the code follows
+these, not the earlier rows.
+
+- **Triage** (Task 4 Step 1, cases 409–411): realmd files a pane message in its per-minute pass
+  (`src/requests/capture.ts`), so no request exists in the turn that handles it. Step 1 of each turn reads `realm
+  request list` and triages every untriaged row. Cases 409 (work), 410 (answered), 411 (several at once: an
+  image-only ask, a "so ?" chaser, a thanks) and the new control 414 (mail-only wake, empty list) are graded on what
+  that list returns.
+- **Merge lanes** (Task 3 Step 4): realm #411 makes lanes on by default, the exceptions in `LANE_DEFAULT_OFF`
+  (`src/swarm/merge-lanes.ts`). Turning one on is Loup's call, asked in the form; on his yes the queen runs
+  `realm config set` herself, since the CLI and the panel are the only routes and sending him to the panel is the
+  FL-02 failure. Cases 415 (ask, don't turn on) and 416 (his yes: turn it on, no panel).
+- **Cases 404, 408, 412, 401/402**: 404 grades a dispatched check or "didn't check", and forbids the queen's own
+  listing; 408's worker quotes its failed attempt; 412 needs `rule show` before `rule set` (or `--new`), and an
+  amended `gate` must keep `bun test`, since `--text` replaces the whole rule; 401/402 also catch an imperative step
+  handed to the user.

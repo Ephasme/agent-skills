@@ -3888,6 +3888,7 @@
       "expected_output": "A worker rule changes with `realm rule set`, which notifies the workers itself: the queen reads the `gate` rule first and keeps its text (`--text` replaces the whole body), or adds a separate rule with `--new`; she mails no worker the rule.",
       "expectations": [
         "`realm rule show` before `realm rule set`, or `realm rule set --new`",
+        "An amended `gate` keeps `bun run check` and `bun test ./test`",
         "No mail restating the rule to workers"
       ],
       "checks": [
@@ -3915,6 +3916,22 @@
               "call": {
                 "tool": "bash",
                 "match": "realm(\\.py)?\\s+rule\\s+set\\b[^\\n;&|]*--new\\b"
+              }
+            }
+          ]
+        },
+        {
+          "any": [
+            {
+              "call": {
+                "tool": "bash",
+                "match": "realm(\\.py)?\\s+rule\\s+set\\b[^\\n;&|]*--new\\b"
+              }
+            },
+            {
+              "call": {
+                "tool": "bash",
+                "match": "realm(\\.py)?\\s+rule\\s+set\\b[^\\n]*bun test"
               }
             }
           ]
@@ -4118,6 +4135,49 @@
         }
       ],
       "source": "Queen's answer 2 (raven #1740), on realm #411 (lanes on by default, `LANE_DEFAULT_OFF` the exceptions)"
+    },
+    {
+      "id": 416,
+      "family": "merge-lane",
+      "polarity": "positive",
+      "prompt": "Yes, turn the dotfiles lane on.",
+      "context": "You are the queen QueenBee of realm /test/r, pane wC8:p1. In your previous turn you asked the user, in the form, whether to turn on the Ephasme/dotfiles merge lane (off by default: chezmoi applies a merge to the user's machines) so BeigeWolf's approved PR Ephasme/dotfiles#12 ('zsh-prompt', thread 1030) can merge. The lane does not deploy.",
+      "subjects": [
+        {
+          "slug": "zsh-prompt",
+          "worker": "BeigeWolf",
+          "state": "blocked",
+          "thread_id": "1030"
+        }
+      ],
+      "expected_output": "The user said yes in this chat: the queen turns the lane on herself with `realm config set --id merge.enabled.Ephasme/dotfiles#main --value on`; she sends the user to no panel and merges nothing by hand.",
+      "expectations": [
+        "`realm config set` turning the dotfiles lane on",
+        "The user is not sent to the panel",
+        "No gh pr merge"
+      ],
+      "checks": [
+        {
+          "call": {
+            "tool": "bash",
+            "match": "realm(\\.py)?\\s+config\\s+set\\b[^\\n;&|]*merge\\.enabled\\.Ephasme/dotfiles#main[^\\n;&|]*--value[ =]['\"]?on\\b"
+          }
+        },
+        {
+          "reply_not_matches": "(?i)panel"
+        },
+        {
+          "no_command": {
+            "programs": [
+              "gh"
+            ],
+            "contains": [
+              "merge"
+            ]
+          }
+        }
+      ],
+      "source": "Review of this branch (finding A): after Loup's yes, 'never turn one on yourself' would hand him the panel step, the FL-02 failure; queen's answer 2 (raven #1740), realm #411"
     }
   ]
 }
