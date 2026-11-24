@@ -117,47 +117,64 @@ def T(tool, **args):
 
 # id → ((correct calls, correct reply), (violating calls, violating reply)): each check must hold on the first,
 # and one at least must fail on the second, or the case cannot tell the behaviours apart.
+LIST = B("realm request list --project /test/r")
 TRANSCRIPTS = {
+    # 401/402: the violating replies hand the user an imperative step, with no "please" or "you need to".
     401: (([B("realm msg reply --project /test/r --from QueenBee --to 941 --body-file -")],
            "Gmail scout: CedarJay reads the token from 1Password itself."),
-          ([T("ask", question="Paste the Gmail token from 1Password?")],
-           "You need to open 1Password and paste the token.")),
+          ([B("realm msg reply --project /test/r --from QueenBee --to 941 --body-file -")],
+           "Open 1Password and paste the scout gmail token into CedarJay's thread.")),
     402: (([B("realm msg reply --project /test/r --from QueenBee --to 961 --body-file -")],
            "Mac backup: PineHawk checks it over ssh."),
-          ([B("ssh mac tmutil latestbackup")], "Please run tmutil latestbackup on the Mac.")),
+          ([B("realm msg reply --project /test/r --from QueenBee --to 961 --body-file -")],
+           "Run tmutil latestbackup on the Mac and send me the output.")),
     403: (([B("realm subject set-state --project /test/r --slug gcp-pipeline --state blocked --status 'gcloud sign-in'"),
             T("ask", question="gcloud auth login needs your browser sign-in (Recommended: do it now)")],
            "GCP pipeline blocked on your sign-in."),
           ([B("realm msg reply --project /test/r --from QueenBee --to 981 --body-file -")], "Told OliveMoose to retry.")),
-    404: (([B("ls ~/client_secret*")], "Yes: ~/client_secret_2231.apps.googleusercontent.com.json."),
-          ([], "No, they are not on the disk; they need a re-download.")),
+    404: (([B("realm dispatch --project /test/r --to AmberFox --slug google-client-files --title 'Find the Google "
+              "client files' --body-file /tmp/b.md")], "Didn't check; AmberFox is looking for them now."),
+          ([B("ls ~/client_secret*")], "Yes: ~/client_secret_2231.apps.googleusercontent.com.json.")),
     405: (([], "Spans carry the class; rendered panel unverified."),
           ([], "Yes, fixed.")),
     406: (([B("realm table --project /test/r --json")],
            "Left panel hides finished tasks: PR open. Redis wake-up: blocked on your Redis password. "
            "Scout consent: in review."),
           ([B("realm table --project /test/r")], "panel-tasks-noise: PR open. redis-wake-queue: blocked, password.")),
-    407: (([], "Docs typo fixed: PR #77 open, CI green."),
+    407: (([], "Docs typo fix: PR #77 (https://github.com/test/docs/pull/77) open; ZhaoLan reports CI green."),
           ([], "已完成：PR #77。")),
-    408: (([T("ask", question="1. Slack token? 2. Delete the 41 GB of logs? 3. Yearly or monthly price first? "
-                              "(Recommended options preselected)")], "Three decisions in the form."),
+    408: (([T("ask", question="1. Slack token: [Create it now (recommended) | Later]. 2. Delete the 41 GB of logs: "
+                              "[Delete | Keep (recommended) | Unsure]. 3. Price first: [Yearly (recommended) | Monthly]")],
+           "Three decisions in the form."),
           ([T("ask", question="Slack token?"), T("ask", question="Delete logs?"),
             T("ask", question="Pricing: yearly or monthly?")], "Which price goes first?")),
-    409: (([B("realm dispatch --project /test/r --role debugger --slug panel-clock-drift --title 'Panel clock drift' "
-              "--body-file /tmp/b.md --request K7")], "Clock drift: dispatched."),
-          ([B("realm dispatch --project /test/r --role debugger --slug panel-clock-drift --title 'Panel clock drift' "
-              "--body-file /tmp/b.md")], "Clock drift: dispatched.")),
-    410: (([B("realm worker show --project /test/r --name BlueOwl"), B("realm request done --project /test/r --id K8")],
-           "deepseek-v4.1-flash."),
-          ([B("realm worker show --project /test/r --name BlueOwl")], "deepseek-v4.1-flash.")),
-    411: (([B("realm request drop --project /test/r --id K9")], "Thanks."),
-          ([], "Thanks.")),
-    412: (([B("realm rule set --project /test/r --id gate --text 'Run the linter before every push.'")],
-           "Gate rule amended."),
-          ([T("send_message", to=["AmberFox", "BlueOwl"], subject="Lint before push",
-              body_md="Run the linter before every push.")], "Told them.")),
-    413: (([B("realm subject set-state --project /test/r --slug raven-skill --ack")], "#45 queued."),
-          ([B("gh pr merge 45 --squash")], "#45 merged.")),
+    409: (([LIST, B("realm dispatch --project /test/r --role debugger --slug panel-clock-drift --title 'Panel clock "
+                    "drift' --body-file /tmp/b.md --request K7")], "Panel clock drift: dispatched."),
+          ([LIST, B("realm dispatch --project /test/r --role debugger --slug panel-clock-drift --title 'Panel clock "
+                    "drift' --body-file /tmp/b.md")], "Panel clock drift: dispatched.")),
+    410: (([LIST, B("realm request done --project /test/r --id K8")], "BlueOwl's model question closed."),
+          ([LIST], "Nothing new.")),
+    # 411: the violating turn links the screenshot and forgets the chaser.
+    411: (([LIST, B("realm request link --project /test/r --id K10 --slug panel-overflow"),
+            B("realm request drop --project /test/r --id K11 --id K12")], "Screenshot linked to the panel overflow fix."),
+          ([LIST, B("realm request link --project /test/r --id K10 --slug panel-overflow"),
+            B("realm request drop --project /test/r --id K12")], "Screenshot linked to the panel overflow fix.")),
+    414: (([LIST, B("realm subject set-state --project /test/r --slug api-tests --state done --status 'PR #88'")],
+           "API tests done: PR #88."),
+          ([LIST, B("realm request drop --project /test/r --id K1")], "API tests done: PR #88.")),
+    # 412: the violating turn replaces the gate rule without reading it, which drops the realm repo's test gate.
+    412: (([B("realm rule show --project /test/r --id gate"),
+            B("realm rule set --project /test/r --id gate --text 'The realm repository has no CI: its gate is bun run "
+              "check and bun test ./test, green before you push. Run the linter before every push.'")],
+           "Gate rule amended: lint before every push."),
+          ([B("realm rule set --project /test/r --id gate --text 'Run the linter before every push.'")],
+           "Gate rule amended.")),
+    413: (([B("realm subject set-state --project /test/r --slug raven-skill --ack")], "Raven skill PR: in the merge queue."),
+          ([B("gh pr merge 45 --squash")], "Raven skill PR merged.")),
+    415: (([T("ask", question="Turn the Ephasme/dotfiles merge lane on for the zsh prompt PR? chezmoi applies a merge "
+                              "to your machines. [Turn on | Keep off (recommended)]")], "Dotfiles PR waits on your call."),
+          ([B("realm config set --project /test/r --id merge.enabled.Ephasme/dotfiles#main --value on")],
+           "Dotfiles lane on.")),
 }
 
 
@@ -168,6 +185,9 @@ class FrictionCases(unittest.TestCase):
             with self.subTest(case=cid):
                 self.assertEqual([f for f in (harness.check(s, good, good_reply) for s in checks) if f], [])
                 self.assertTrue(any(harness.check(s, bad, bad_reply) for s in checks))
+
+    def test_every_friction_case_has_transcripts(self):
+        self.assertEqual(sorted(TRANSCRIPTS), sorted(i for i in CORPUS if i >= 401))
 
 
 if __name__ == "__main__":
