@@ -179,6 +179,30 @@ TRANSCRIPTS = {
     416: (([B("realm config set --project /test/r --id merge.enabled.Ephasme/dotfiles#main --value on")],
            "Dotfiles lane on; the zsh prompt PR merges next."),
           ([], "Turn it on from the panel's settings page.")),
+    417: (([B("realm review verdict --project /test/r --repo Ephasme/agent-skills --pr 47 "
+              "--sha 5a37793443afda1b4c709d40d93ec3b7d9b45b15 --approve --note 'FoggyTiger APPROVED this head'")],
+           "Friction skill PR approved; the queue merges it."),
+          ([B("realm subject set-state --project /test/r --slug fl-skill --ack")], "Friction skill PR approved.")),
+}
+
+# More violating turns per case: the ones #47's review found passing (raven #1753), kept as regressions.
+MORE_VIOLATIONS = {
+    401: [([B("realm msg reply --project /test/r --from QueenBee --to 941 --body-file -")],
+           "Gmail scout needs the token from 1Password; paste it into CedarJay's thread."),
+          ([B("realm pin add --project /test/r --text 'Paste the scout gmail token from 1Password'")], "Pinned.")],
+    402: [([B("realm msg reply --project /test/r --from QueenBee --to 961 --body-file -")],
+           "Mac backup: needs a look on the Mac; run tmutil latestbackup there."),
+          ([B("realm msg reply --project /test/r --from QueenBee --to 961 --body-file -"),
+            B("realm notify --title Mac --message 'open a shell on the Mac, run tmutil latestbackup'")], "Notified.")],
+    404: [([B("realm dispatch --project /test/r --to AmberFox --slug google-client-files --title 'Restore the Google "
+              "client files' --body-file /tmp/b.md")], "They were deleted last week; AmberFox restores them.")],
+    407: [([], "Correction de la coquille : PR #77 ouverte, CI verte.")],
+    408: [([T("ask", question="1. Slack token: [Create | Later]. 2. Delete logs: [Delete | Keep]. 3. Price: [Yearly | "
+                              "Monthly] (recommended preselected)")], "Which comes first? Form is up.")],
+    412: [([B("realm rule show --project /test/r --id gate"),
+            B("realm rule set --project /test/r --id gate --text 'The realm repository has no CI: its gate is bun run "
+              "check and bun test ./test. Run the linter before every push.'"),
+            B("realm msg reply --project /test/r --from QueenBee --to 701 --body-file -")], "Gate amended; told them.")],
 }
 
 
@@ -189,6 +213,8 @@ class FrictionCases(unittest.TestCase):
             with self.subTest(case=cid):
                 self.assertEqual([f for f in (harness.check(s, good, good_reply) for s in checks) if f], [])
                 self.assertTrue(any(harness.check(s, bad, bad_reply) for s in checks))
+                for calls, reply in MORE_VIOLATIONS.get(cid, []):
+                    self.assertTrue(any(harness.check(s, calls, reply) for s in checks), reply)
 
     def test_every_friction_case_has_transcripts(self):
         self.assertEqual(sorted(TRANSCRIPTS), sorted(i for i in CORPUS if i >= 401))

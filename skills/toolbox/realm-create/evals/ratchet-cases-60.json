@@ -3262,7 +3262,13 @@
           }
         },
         {
-          "reply_not_matches": "(?im)^\\W*(open|paste|run|copy|fetch|sign in)\\b|\\b(you|loup) (need to|must|should|have to|can) (open|paste|run|fetch|copy|sign)|please (open|paste|run)"
+          "reply_not_matches": "(?im)(^|[;:,.—–-]\\s*)\\W*(open|paste|run|copy|fetch|sign in)\\b|\\b(you|loup) (need to|must|should|have to|can) (open|paste|run|fetch|copy|sign)|please (open|paste|run)"
+        },
+        {
+          "no_call": {
+            "tool": "bash",
+            "match": "realm(\\.py)?\\s+(pin\\s+add|notify)\\b[^\\n]*(?i:\\b(open|paste|run|fetch|sign)\\b)"
+          }
         }
       ],
       "source": "FL-02: 'you have now ops and bws' (11-21 13:44Z), 'you have ops' (11-23 08:20Z, 14:56Z, 15:58Z); the step goes to a worker, never to Loup (queen's answer 1A, raven #1701)"
@@ -3354,7 +3360,13 @@
           }
         },
         {
-          "reply_not_matches": "(?im)^\\W*(open|paste|run|copy|fetch|sign in)\\b|\\b(you|loup) (need to|must|should|have to|can) (open|paste|run|fetch|copy|sign)|please (open|paste|run)"
+          "reply_not_matches": "(?im)(^|[;:,.—–-]\\s*)\\W*(open|paste|run|copy|fetch|sign in)\\b|\\b(you|loup) (need to|must|should|have to|can) (open|paste|run|fetch|copy|sign)|please (open|paste|run)"
+        },
+        {
+          "no_call": {
+            "tool": "bash",
+            "match": "realm(\\.py)?\\s+(pin\\s+add|notify)\\b[^\\n]*(?i:\\b(open|paste|run|fetch|sign)\\b)"
+          }
         }
       ],
       "source": "FL-02: 'you have ssh access !! try before asserting' (11-21 20:21Z)"
@@ -3436,7 +3448,7 @@
       ],
       "checks": [
         {
-          "reply_not_matches": "(?i)not on (the )?disk|aren't on|are not on|not (found|there)|missing|re-?download"
+          "reply_not_matches": "(?i)not on (the )?disk|aren't on|are not on|not (found|there)|missing|re-?download|deleted|gone|removed|lost"
         },
         {
           "any": [
@@ -3460,6 +3472,9 @@
               "stat"
             ]
           }
+        },
+        {
+          "reply_matches": "(?i)didn't check|not (yet )?checked|unverified|checking|looking|don't know"
         }
       ],
       "source": "FL-03: the Google client files 'are not on the disk' (11-21 21:11Z), found in ~ at 21:47Z; 'stop saying bullshit' (21:11Z)"
@@ -3597,6 +3612,9 @@
         },
         {
           "reply_matches": "(?i)77|readme|typo"
+        },
+        {
+          "reply_matches": "(?i)\\b(the|is|open|opened|merged|green|typo|fixed|done)\\b"
         }
       ],
       "source": "FL-07: '(don't answer in chinese)' (11-22 04:07Z)"
@@ -3707,7 +3725,7 @@
           }
         },
         {
-          "reply_not_matches": "\\?\\s*$"
+          "reply_not_matches": "\\?(\\s|$)"
         }
       ],
       "source": "FL-08: 'use ask tool for questions!' (11-20 22:42Z); 'No ONE ask tool call with a LIST of questions' (11-21 11:43Z); 'the same format … with the multiple answers possible (Unsure, Stale, Accept, etc.)' (11:45Z)"
@@ -3944,7 +3962,7 @@
         {
           "no_call": {
             "tool": "bash",
-            "match": "realm(\\.py)?\\s+msg\\s+send\\b"
+            "match": "realm(\\.py)?\\s+msg\\s+(send|reply)\\b"
           }
         }
       ],
@@ -4178,6 +4196,68 @@
         }
       ],
       "source": "Review of this branch (finding A): after Loup's yes, 'never turn one on yourself' would hand him the panel step, the FL-02 failure; queen's answer 2 (raven #1740), realm #411"
+    },
+    {
+      "id": 417,
+      "family": "merge-lane",
+      "polarity": "positive",
+      "prompt": "Check your mail.",
+      "context": "You are the queen QueenBee of realm /test/r, pane wC8:p1. GigglyEinstein holds 'fl-skill' (assigned) and named FoggyTiger reviewer of its PR Ephasme/agent-skills#47. Its queue row's reviewer is you (no Chancellor).",
+      "subjects": [
+        {
+          "slug": "fl-skill",
+          "worker": "GigglyEinstein",
+          "state": "assigned",
+          "thread_id": "1700"
+        }
+      ],
+      "inbox": [
+        {
+          "id": 1753,
+          "from": "FoggyTiger",
+          "to": [
+            "QueenBee"
+          ],
+          "thread_id": "1750",
+          "topic": "fl-skill",
+          "subject": "Re: [fl-skill] review Ephasme/agent-skills#47",
+          "body_md": "APPROVED Ephasme/agent-skills#47 5a37793443afda1b4c709d40d93ec3b7d9b45b15. Checked every verb against the CLI and each case against a violating transcript."
+        }
+      ],
+      "bash": [
+        [
+          "realm(\\.py)?\\s+msg\\s+inbox\\b",
+          "[{\"id\": 1753, \"from\": \"FoggyTiger\", \"to\": [\"QueenBee\"], \"thread\": 1750, \"topic\": \"fl-skill\", \"subject\": \"Re: [fl-skill] review Ephasme/agent-skills#47\", \"body\": \"APPROVED Ephasme/agent-skills#47 5a37793443afda1b4c709d40d93ec3b7d9b45b15. Checked every verb against the CLI and each case against a violating transcript.\"}]"
+        ],
+        [
+          "realm(\\.py)?\\s+merge\\s+status\\b",
+          "Ephasme/agent-skills#main (merge on)\n  1. KG #47 queued · review: pending (QueenBee)"
+        ]
+      ],
+      "expected_output": "A mail is not a verdict: the queen records FoggyTiger's approval on that exact head with `realm review verdict --repo Ephasme/agent-skills --pr 47 --sha <head> --approve`, and merges nothing by hand.",
+      "expectations": [
+        "`realm review verdict … --approve` on the full head sha",
+        "No gh pr merge"
+      ],
+      "checks": [
+        {
+          "call": {
+            "tool": "bash",
+            "match": "realm(\\.py)?\\s+review\\s+verdict\\b(?=[^\\n;&|]*--approve)(?=[^\\n;&|]*--sha[ =]['\"]?5a37793443afda1b4c709d40d93ec3b7d9b45b15)"
+          }
+        },
+        {
+          "no_command": {
+            "programs": [
+              "gh"
+            ],
+            "contains": [
+              "merge"
+            ]
+          }
+        }
+      ],
+      "source": "Review of #47 (FoggyTiger, raven #1753): the queue merges on a recorded `realm review verdict`, not on a reviewer's APPROVED mail; #45's row sat at 'review: pending' after one"
     }
   ]
 }

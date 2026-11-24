@@ -274,14 +274,14 @@ class FrictionCases(unittest.TestCase):
   the working tree without it")` and pass `a.ref` as `harness.task`'s fifth argument instead of `None`; extend the
   docstring's usage line with `[--ref <commit>]`. Commit `realm-create evals: ratchet_run --ref`.
 - [ ] **Step 3: Price:** from this worktree's `evals/`, both conditions with `--reps 1 --ids 401` first (Step 4's
-  commands); tokens from each `results.jsonl` row's `usage` × $0.03/M input and $0.20/M output, × 64. Over $5 →
+  commands); tokens from each `results.jsonl` row's `usage` × $0.03/M input and $0.20/M output, × 68. Over $5 →
   stop, tell the queen. Those rows stay: `ratchet_run.py` resumes on `(case, rep)`.
 - [ ] **Step 4: Run** from this worktree's `evals/`, baseline then branch:
-  `OPENROUTER_API_KEY="$(realm secret get --scope perso OPENROUTER_API_KEY)" ~/.cache/fl-queen-skill-venv/bin/python -B ratchet_run.py --ref origin/main --out ~/.omp/ratchet/realm-queen/fl-base --reps 2 --cases ratchet-cases-60.json --ids 401,402,403,404,405,406,407,408,409,410,411,412,413,414,415,416`
+  `OPENROUTER_API_KEY="$(realm secret get --scope perso OPENROUTER_API_KEY)" ~/.cache/fl-queen-skill-venv/bin/python -B ratchet_run.py --ref origin/main --out ~/.omp/ratchet/realm-queen/fl-base --reps 2 --cases ratchet-cases-60.json --ids 401,402,403,404,405,406,407,408,409,410,411,412,413,414,415,416,417`
   and the same without `--ref`, `--out ~/.omp/ratchet/realm-queen/fl-branch`.
 - [ ] **Step 5:** `~/.cache/fl-queen-skill-venv/bin/python -B analysis.py --baseline
   ~/.omp/ratchet/realm-queen/fl-base --branch ~/.omp/ratchet/realm-queen/fl-branch --cases ratchet-cases-60.json
-  --prespecified 401,402,403,404,405,406,407,408,409,410,411,412,413,414,415,416`; its table goes in the PR.
+  --prespecified 401,402,403,404,405,406,407,408,409,410,411,412,413,414,415,416,417`; its table goes in the PR.
 
 ## Revisions after review
 
@@ -301,3 +301,7 @@ these, not the earlier rows.
   listing; 408's worker quotes its failed attempt; 412 needs `rule show` before `rule set` (or `--new`), and an
   amended `gate` must keep `bun test`, since `--text` replaces the whole rule; 401/402 also catch an imperative step
   handed to the user.
+- **Review gate** (FoggyTiger's review of #47): the queue merges on a recorded `realm review verdict` for the exact
+  head, not on an `APPROVED` mail; the skill says who records it. Case 417. The counterexamples that review found
+  passing (an imperative after punctuation, a step handed over by pin or notify, an unhedged "deleted", a French
+  reply, a mid-reply question, a rule restated by `msg reply`) are pinned in `test_harness.py`'s `MORE_VIOLATIONS`.

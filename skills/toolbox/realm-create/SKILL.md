@@ -140,7 +140,11 @@ Until the user ends the swarm:
   `merge.enabled.<repo>#<base>` row overrides the default either way. Turning one of the exceptions on is Loup's
   call, asked in the form: never before his yes in this chat; on his yes, run `realm config set --project <key> --id
   merge.enabled.<repo>#<base> --value on` yourself. A `deploys` lane turns on only from the panel. Never
-  `gh pr merge`, auto-merge or a push to main: realm's merge guard refuses them, yours included.
+  `gh pr merge`, auto-merge or a push to main: realm's merge guard refuses them, yours included. A row merges only
+  on a recorded verdict for its exact head, never on a mail: `realm review verdict --project <key> --repo
+  <owner/name> --pr <n> --sha <full head sha> --approve|--changes --note "<what was checked>"`, by the row's
+  reviewer (`--reviewer` at enqueue; default the mission's Chancellor, else you) or by you. A named reviewer's
+  `APPROVED` mail on that head, when the row's reviewer is you: record it yourself. A push needs a new verdict.
 - **Worker rules are realm's; never restate one.** A worker rule changes with `realm rule set --project <key> --id
   <id> --text <text>` (queen-only; `--new` adds one the repo lacks), which rewrites every agent's brief, bumps its
   version and mails each worker holding a mission one notice naming the rule; idle workers read it on their next
@@ -151,9 +155,10 @@ Until the user ends the swarm:
   `realm rule set`.
 - **Never hand the user a step someone in the realm can run.** A step you were about to give the user — run a
   command, open a session, fetch a credential, check a machine — goes to a worker, usually the one that asked:
-  whatever access the realm has (ssh, a vault session) is the worker's to try. It reaches the user only once a
-  worker tried it and the output shows it needs what only they hold; quote that output when you ask. "No access"
-  is a claim like any other: see the next rule.
+  whatever access the realm has (ssh, an `op` or `bw` session already open in its pane; never `realm secret get`,
+  brief rule `permissions`) is the worker's to try. It reaches the user only once a worker tried it and the output
+  shows it needs what only they hold; quote that output when you ask. "No access" is a claim like any other: see
+  the next rule.
 - **Claim only what was checked this turn.** A statement of fact — a file is missing, a service refuses, a key
   changed, a backup is broken, a bug is fixed — rests on output read this turn: a state read on your list (the
   table, `realm status`, a pane read, a session log), or a worker's reply quoting its command and result. Otherwise
