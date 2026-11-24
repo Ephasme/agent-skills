@@ -332,7 +332,8 @@ DEFAULT_PATH_ALLOW = ("xd://", "skill://", "/tmp/", "~/.local/state/realm", "~/.
 def check(spec, calls, reply):
     """One assertion → failure message, or None when it holds.
 
-    call/no_call {tool, match}; before [spec_a, spec_b] (first a precedes first b, both present);
+    call/no_call {tool, match}; max_calls {tool, match, n} (at most n calls match, as call reads them);
+    before [spec_a, spec_b] (first a precedes first b, both present);
     no_tool name; reply_max_words n; reply_matches / reply_not_matches regex;
     set_states {slug: state} (the last `realm subject set-state` per slug); any [spec, …] (one holds);
     command / no_command {programs, contains, allow} on the shell's own segmentation — a program
@@ -348,6 +349,9 @@ def check(spec, calls, reply):
     if kind == "no_call":
         bad = [_text(c)[:160] for c in calls if _matches(c, arg)]
         return f"forbidden {arg}: {bad}" if bad else None
+    if kind == "max_calls":
+        n = sum(1 for c in calls if _matches(c, arg))
+        return f"{n} calls match {arg}, over {arg['n']}" if n > arg["n"] else None
     if kind == "no_tool":
         return f"called {arg}" if any(c["tool"] == arg for c in calls) else None
     if kind in ("command", "no_command"):

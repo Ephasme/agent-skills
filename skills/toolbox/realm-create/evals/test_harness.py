@@ -65,6 +65,12 @@ class Checks(unittest.TestCase):
         self.assertIsNone(c({"any": [{"no_tool": "bash"}, {"reply_matches": "hi"}]}, calls, "hi there"))
         self.assertIsNotNone(c({"reply_max_words": 1}, calls, "two words"))
 
+    def test_max_calls_counts_matching_calls(self):
+        calls = [{"tool": "ask", "args": {"question": "token?"}}, {"tool": "ask", "args": {"question": "delete?"}}]
+        self.assertIsNotNone(harness.check({"max_calls": {"tool": "ask", "n": 1}}, calls, ""))
+        self.assertIsNone(harness.check({"max_calls": {"tool": "ask", "n": 2}}, calls, ""))
+        self.assertIsNone(harness.check({"max_calls": {"tool": "ask", "match": "token", "n": 1}}, calls, ""))
+
     def test_every_case_check_is_known(self):
         for case in CASES.values():
             for spec in case.get("checks", []):
