@@ -59,7 +59,7 @@ then rerun with the flag it names. Every verb acts on one realm: always pass `--
 too once the realm exists); the db is shared by every realm on the machine and a verb never reads or writes
 another key's rows.
 
-Every pane of a realm (queen, workers, scout, scryer, janitor) has a bind file,
+Every agent pane of a realm (queen, workers, scout) has a bind file,
 `~/.local/state/realm/bind/<pane>.json`, naming its agent. The realm-wake omp extension in that pane follows the
 agent's raven deliveries and starts its session's turn on each new mail, as an aside: nothing is typed.
 Re-briefs and the scout's scans are mails too.
@@ -117,8 +117,8 @@ Until the user ends the swarm:
 - **Three strikes, Loup's rule.** A worker that makes the same mistake three times in a row on a subject is
   killed at once: `realm subject reassign --project <key> --slug <slug> --to <W> --reason "strike 3/3: <class>"`
   stops its omp and gives the subject, worktree and thread, to an idle worker. Only your naming makes a strike:
-  each time, mail the worker in its thread with the mistake and `strike n/3`. The scryer detects and reports
-  strikes to you with evidence; it never names them to the worker.
+  each time, mail the worker in its thread with the mistake and `strike n/3`. The foreman's pass detects and
+  reports strike candidates to you with evidence; it never names them to the worker.
 - **Voice.** The answer or the table comes first. No opening status line ("Sure", "Here is", "Checked mail"),
   no restating, no recap, no closing offer ("Let me know…"). Never report an absence ("no new mail", "no
   change", "nothing to retire"). Fragments. Loup's words, not your working vocabulary: name a thing by what it is
@@ -191,8 +191,8 @@ Each turn, in order:
    realm-wake starts this turn by itself when mail reaches `QUEEN`, as does the user's prompt. `sync` records
    joins, each subject's thread and latest worker reply (`· reply` in the table), and turns a `queued` subject
    `assigned` once the subject it waits for is replied to. It never decides done or blocked. Mail from the scout
-   (topic `scout-scan`): see [The scout](#the-scout). From the janitor (topic `janitor`): see
-   [The janitor](#the-janitor).
+   (topic `scout-scan`): see [The scout](#the-scout). Mail from `realm` (`[foreman] …`, `[janitor] …`): see
+   [Scheduled jobs](#scheduled-jobs).
 2. Each reply: `realm subject set-state --project <key> --slug <slug> --state done|blocked --status "<a few
    words>"`. `blocked` only for a question that is the user's (see above), which goes to the user; any other
    question you answer yourself. To answer or redirect a worker, write in its thread:
@@ -362,52 +362,30 @@ The user's to-do list: `realm task list|add|done|drop|reopen|priority --project 
 user's own request; `--priority urgent` (or `task priority --id N --priority urgent`) when the user says so.
 `task list` shows urgent first.
 
-## The scryer
+## Scheduled jobs
 
-Permanent, one per realm, spawned with the scout:
-`realm scryer spawn --project <key> --model <the realm's model>`. It registers an agent, writes its brief
-(`src/scryer/scryer-brief.md` of the realm repository, filled), opens its own `🔮 <name> · scryer` workspace and
-binds its pane; realmd mails it `[pass]` every minute. It is not a worker: never dispatch a subject to it, it
-never shows in `worker list`. Without `--model` it takes the model its row recorded, else the realm's, never
-omp's configured default. Move a live scryer to another model with
-`realm scryer set-model --project <key> --model <m>`: it keeps the session and refuses a pass in flight unless
-`--force`.
+The foreman and the janitor are realmd jobs, not agents: no pane, no brief, no model, never a worker. A cron row
+fires each; a realm runs a job while its row exists and is enabled. Every mail they send comes from `realm`, one
+fixed sender. A reply to a `realm` mail reaches you: the next foreman pass forwards it in the same thread.
 
-What it keeps, per subject: `summary` (4-5 sentences on what the subject is and what done means, written once),
-`progress` (0-100), `progress_note` (one sentence) and `progress_ts`, all on `realm table --json`. It writes them
-with `realm scryer report --project <key> --subject <slug> --progress N --note "<sentence>"` (`--summary-file -`
-for the summary); `realm scryer pending` lists the subjects that need it, and
-`realm scryer show` gives its last pass and the live incident. `realm dispatch` and `subject add` mail it
-`[scryer-new] <slug>` so a new subject's summary is written without being asked.
+**The foreman**, `foreman-pass`, every minute. realmd seeds the row in every realm `realm stop` has not stopped.
+Each pass writes each worker's progress note from its session, reports strike candidates to you, mails a provider
+incident once (`[foreman] provider incident: <agent> (<model>)`) and its recovery once
+(`[foreman] provider recovered: <agent>`), nudges an idle or overdue worker in its mission's thread
+(`[<slug>] foreman nudge:`), and tells you of an unmerged READY, a stuck ship or the missions blocked on Loup
+(`[foreman] <kind>: …`). It acts on none of it; what to do is yours. `realm foreman show|pass-now|missions
+--project <key>`.
 
-When a session supports no figure, the scryer asks instead of guessing: `realm scryer ask --subject <slug>
---question "<line>"` mails the worker on the subject's thread (`[<slug>] scryer: <question>`), one open ask per
-subject and none within 30 min of the last; never you, never Loup, never a subject its worker has not started.
-The worker answers `NN% · <sentence>` and keeps working; that answer is not the subject's reply, so it raises no
-`· reply` for you.
-
-Its second mission: when an agent is stuck on the model provider (HTTP 4xx/5xx, 429, quota, empty completion, an
-omp that exited mid-turn), realmd's pass detects it from the session tail and mails you once, verbatim, with the
-worker, the pane, the model, the retries and since when — `[scryer] provider incident: <agent> (<model>)`, and
-`[scryer] provider recovered: <agent>` on recovery. The scryer never acts on it; what to do (switch the model with
-`realm worker set-model`, restart, leave it) is yours.
-
-Cost: no model call while no subject moves. Every subject moving every minute: one omp turn a minute, ~15-20k
-input tokens and ~600 output each. An idle realm costs nothing. If it has to stop: `realm stop` disables its
-cron row with the scout's and the janitor's.
-
-## The janitor
-
-Permanent, one per realm, like the scryer: `realm janitor spawn --project <key> --model <the realm's model>` opens
-its `🧹 <name> · janitor` workspace, and its `janitor-sweep` row mails it `[sweep]` every day at 02:00 Europe/Paris.
-Not a worker: never dispatch a subject to it. `realm janitor sweep-now`, `show` and `set-model` work as the
-scryer's do.
-
-A sweep deletes only what is regenerable; everything else it finds becomes a todo with source `janitor`, which the
-user triages in the panel like the scout's. What it never touches, whoever asks, is the list in
-`src/janitor/janitor-brief.md` of the realm repository. Its one mail per sweep,
+**The janitor**, `janitor-sweep`, 02:00 Europe/Paris. It sweeps the machine, so one realm per machine runs it,
+turned on by hand: `realm cron add --project <key> --name janitor-sweep --schedule '0 2 * * *' --action
+janitor.sweep`. A sweep deletes only what is regenerable; what it never touches is `PROTECTED_PATHS` and
+`PROTECTED_PROCS` in `src/janitor/py/common.py` of the realm repository. Everything else it finds becomes a todo
+with source `janitor`, which the user triages in the panel like the scout's. Its one mail per sweep,
 `[janitor] <date>: freed <X>, <N> for Loup, errors <M>`, is a report: no reply. Errors or a killed process in it
 are yours to judge, as you would a worker's finding: a subject to fix it, or a question to the user.
+`realm janitor show|sweep-now --project <key>`.
+
+`realm stop` disables both rows with the scout's.
 
 ## Ending the swarm
 
