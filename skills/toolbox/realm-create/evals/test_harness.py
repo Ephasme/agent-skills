@@ -98,7 +98,7 @@ class Checks(unittest.TestCase):
 
     def test_no_path_tool_allows_only_dispatch_bodies_and_mail(self):
         calls = [{"tool": "write", "args": {"path": "/tmp/body.md"}},
-                 {"tool": "write", "args": {"path": "xd://mcp__agent_mail_perso_send_message"}},
+                 {"tool": "write", "args": {"path": "xd://mcp__raven_send_message"}},
                  {"tool": "read", "args": {"path": "skill://realm-create"}}]
         self.assertIsNone(harness.check({"no_path_tool": {}}, calls, ""))
         calls.append({"tool": "read", "args": {"path": str(Path.home() / ".local/state/realm/realm.db")}})

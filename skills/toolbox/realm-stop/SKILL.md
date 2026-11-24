@@ -16,8 +16,8 @@ disable-model-invocation: true
 
 **Explicit invocation only.** It kills every worker session of the realm; never run it on a guess.
 
-Below, `realm` is the realm CLI on the container's PATH and `<realm>` this realm's Agent Mail
-project key or its name (`realm realms` lists both).
+Below, `realm` is the realm CLI on the container's PATH and `<realm>` this realm's project key or its name
+(`realm realms` lists both).
 
 ## 1. Stop
 
@@ -31,7 +31,7 @@ another realm, never on your own pane, and never on a workspace labelled `👑`.
   deletes its brief directory, sets open subjects to `paused` and retires the closed workers in the db. A close
   that failed or a workspace still open is in `failed`, never retried blindly.
 
-Agent Mail keeps the workers registered and their history readable. Your own tab keeps its `👑 queen` label,
+raven keeps the workers registered and their history readable. Your own tab keeps its `👑 queen` label,
 your workspace its `👑`.
 
 ## 2. Report

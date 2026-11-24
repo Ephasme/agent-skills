@@ -117,13 +117,15 @@ def read_session(path: Path):
     return agent, turns, title
 
 
+MAIL_HANDLE = re.compile(r"xd://mcp__\w+_(?:send|reply)_message$")
+
+
 def _mail(call):
-    """A mail send, however it is reached: the tool directly or a write to its xd:// handle."""
+    """A mail send, however it is reached: the tool directly or a write to an MCP server's xd:// handle."""
     args = call.get("args") or {}
     if call.get("name") in ("send_message", "reply_message"):
         return args
-    if call.get("name") == "write" and "mcp__agent_mail_perso_send_message" in str(args.get("path", "")) \
-            or "mcp__agent_mail_perso_reply_message" in str(args.get("path", "")):
+    if call.get("name") == "write" and MAIL_HANDLE.search(str(args.get("path", ""))):
         try:
             return json.loads(args.get("content") or "{}")
         except json.JSONDecodeError:

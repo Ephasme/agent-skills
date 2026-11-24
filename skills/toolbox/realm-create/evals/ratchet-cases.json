@@ -1,6 +1,6 @@
 {
   "skill_name": "realm-create",
-  "note": "Ratchet case set for flow realm-queen: evals.json cases (3, 4 relabelled by Loup's trivial-task rule) plus cases paraphrased from /perso/realm Agent Mail. `source` names where each expected answer comes from.",
+  "note": "Ratchet case set for flow realm-queen: evals.json cases (3, 4 relabelled by Loup's trivial-task rule) plus cases paraphrased from /perso/realm's mail. `source` names where each expected answer comes from.",
   "evals": [
     {
       "id": 1,

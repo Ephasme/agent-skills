@@ -3,14 +3,14 @@ name: realm-restart
 description: >-
   Makes the current session the queen of a realm that is already running:
   reloads realm-create's queen instructions, then one realm verb resumes the
-  old queen's Agent Mail identity by name, binds this pane to it, re-mails
+  old queen's raven identity by name, binds this pane to it, re-mails
   each worker its rewritten brief, and reloads the subject table from realm's
   SQLite db; then runs the queen loop. Use after the queen's omp session died
   or when continuing a live realm from a new session.
   Invoked as `/realm-restart KEY|NAME`, e.g. `/realm-restart "secret garden"`.
 compatibility: >-
-  Runs inside the realm container, on a realm started by realm-create: the `realm` CLI on PATH, herdr, and an
-  Agent Mail MCP server named agent-mail-perso exposing macro_start_session, list_agents and fetch_topic.
+  Runs inside the realm container, on a realm started by realm-create: the `realm` CLI on PATH, herdr, and
+  raven reachable from realm (`RAVEN_URL` and its admin token in realm's secret store).
 disable-model-invocation: true
 ---
 
@@ -33,7 +33,7 @@ session.
 Below, `realm` is the realm CLI on the container's PATH, and "realm-create" is
 `~/.agents/skills/realm-create/SKILL.md`.
 
-Argument: `<realm>`, the realm's Agent Mail project key (starts with `/`) or its name. Missing: `realm realms`
+Argument: `<realm>`, the realm's project key (starts with `/`) or its name. Missing: `realm realms`
 lists each realm's key and name, `realm status --project <key>` its panes; show them, ask which one, start
 nothing.
 
@@ -49,10 +49,10 @@ anything else, unless the realm repository `spare-cycles/realm` is at `~/code/pe
 and records it as the directory every worker starts in). It:
 
 - labels this tab `👑 queen · <name>` and puts `👑` in front of this workspace's label;
-- picks the queen: the one the db records, else the single `Swarm queen` agent in Agent Mail;
-- stops with `needs` (exit 2) when the old queen may still be running (another `👑` tab in this workspace, or
-  Agent Mail activity in the last 5 min): two sessions reading one inbox lose replies. Show the user what it
-  found and ask; rerun with `--force` only on their word. Several or no queen candidates: `needs` lists them;
+- picks the queen: the one the db records, else the single `Swarm queen` agent in raven;
+- stops with `needs` (exit 2) when the old queen may still be running (another `👑` tab in this workspace): two
+  sessions reading one inbox lose replies. Show the user what it found and ask; rerun with `--force` only on
+  their word. Several or no queen candidates: `needs` lists them;
   ask, rerun with `--queen <name>`;
 - resumes the queen by name (same agent, threads and unread inbox), binds this pane to her, and records this
   pane in the db;
