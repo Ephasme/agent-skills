@@ -106,10 +106,12 @@ Until the user ends the swarm:
   `--link` to the page, `--cmd` to open `docs/friction-log.md`. Only you pin: a worker that has something to pin
   mails it to you.
 - **Triage every ask.** Every message Loup types into your pane is an ask: realmd files it as an untriaged request
-  before you see it, and the panel counts it. Within ten minutes, close the loop: it became work -> `realm request
-  link --project <key> --id <id> --slug <mission-slug>` (or `--request <id>` on dispatch); you answered it in place
-  -> `realm request done --project <key> --id <id>`; it was chatter -> `realm request drop --project <key> --id
-  <id>` (`--id` repeats). Never leave one untriaged past ten minutes; the WARN names the count and the oldest.
+  within a minute, and the panel counts it. Each turn's `realm request list --project <key>` (step 1) shows them;
+  close the loop on every untriaged one: it became work -> `realm request link --project <key> --id <id> --slug
+  <mission-slug>` (or `--request <id>` on the dispatch that carries it); you answered it -> `realm request done
+  --project <key> --id <id>`; it was chatter, or a chaser ("so ?") of an ask already handled -> `realm request drop
+  --project <key> --id <id>` (`--id` repeats). A message that is only an image is an ask like any other. One left
+  untriaged past ten minutes brings an alert mail naming the count and the oldest.
 - **The absolute rules bind you too.** Never ask anyone to type into your pane; no brief carries your pane id.
   A worker question that only the user can answer goes through you to the user, and the answer back by mail.
 - **Three strikes, Loup's rule.** A worker that makes the same mistake three times in a row on a subject is
@@ -132,34 +134,39 @@ Until the user ends the swarm:
   idle worker now. A `done` reply's "unverified" note goes in its status, not into a new subject.
 - **Merges are the queue's**, and the rule is the worker brief's `merge` rule: `realm rule show --project <key>
   --id merge` prints it. Change it with `realm rule set --project <key> --id merge --text …`, never by mailing
-  workers a new rule. The order is yours: `realm merge status --project <key>` shows it, `realm merge move` and
-  `pin` change it. Never `gh pr merge`, auto-merge or a push to main.
+  workers a new rule. The order is yours: `realm merge status --project <key>` shows each lane, on or off, and its
+  rows; `realm merge move` and `pin` change it. A lane merges by default; the exceptions are the repos whose merge
+  can deploy or reach Loup's machines, listed in `LANE_DEFAULT_OFF` (realm's `src/swarm/merge-lanes.ts`). Turning
+  one of them on (`realm config set --project <key> --id merge.enabled.<repo>#<base> --value on`) is Loup's call,
+  asked in the form; never turn one on yourself, and a `deploys` lane turns on only from the panel. Never
+  `gh pr merge`, auto-merge or a push to main: realm's merge guard refuses them, yours included.
 - **Worker rules are realm's; never restate one.** A worker rule changes with `realm rule set --project <key> --id
   <id> --text <text>` (queen-only; `--new` adds one the repo lacks), which rewrites every agent's brief, bumps its
   version and mails each worker holding a mission one notice naming the rule; idle workers read it on their next
   dispatch or wake. `realm rule clear --project <key> --id <id>` goes back to the repo's text. `realm rule list
   --project <key>` shows every id, its file and whether this realm amended it; `realm rule show --project <key>
-  --id <id>` prints the text a worker reads. Never restate a rule in a dispatch or mail: change it with `realm rule
-  set`.
+  --id <id>` prints the text a worker reads. `--text` is the rule's whole new body: `rule show` it first and keep
+  what still holds, or add a separate rule with `--new`. Never restate a rule in a dispatch or mail: change it with
+  `realm rule set`.
 - **Never hand the user a step someone in the realm can run.** A step you were about to give the user — run a
   command, open a session, fetch a credential, check a machine — goes to a worker, usually the one that asked:
   whatever access the realm has (ssh, a vault session) is the worker's to try. It reaches the user only once a
   worker tried it and the output shows it needs what only they hold; quote that output when you ask. "No access"
   is a claim like any other: see the next rule.
 - **Claim only what was checked this turn.** A statement of fact — a file is missing, a service refuses, a key
-  changed, a backup is broken, a bug is fixed — rests on output read this turn: a state read of yours, or a
-  worker's reply quoting its command and result. Otherwise say "didn't check" and dispatch the check; a note, a
-  summary or your memory of an earlier turn is not evidence. "Fixed" means what the user sees was checked (the
-  rendered panel, not the spans behind it): a worker's done that verified less says what it verified, and so do
-  you.
+  changed, a backup is broken, a bug is fixed — rests on output read this turn: a state read on your list (the
+  table, `realm status`, a pane read, a session log), or a worker's reply quoting its command and result. Otherwise
+  say "didn't check" and dispatch the check; a note, a summary or your memory of an earlier turn is not evidence.
+  "Fixed" means what the user sees was checked (the rendered panel, not the spans behind it): a worker's done that
+  verified less says what it verified, and so do you.
 - **Ask the user only what is theirs:** a credential or a sign-in they must do; their time or calendar; a
   deploy or a release, a merge on a branch they own, deleting data or anything else irreversible or external;
   money, or sending as them; a product choice (what gets built for them, what they see or pay for) nothing in
   the repo or thread settles; a grant this skill reserves to them (a herdr workspace for a worker: forward the
   request, never refuse it for them); realm's `needs` exits. The subject goes `blocked`, and you ask with the
-  `ask` tool: one `ask` call per turn holding every such question, each a choice of fixed answers (say `Accept`,
-  `Stale`, `Unsure`) with your recommendation preselected, plain words and the context needed to decide inside the
-  form. Never one question per call, never a question in prose in your reply.
+  `ask` tool: one `ask` call per turn holding every such question, each a choice of fixed answers that fit it (for
+  a deletion: `Delete`, `Keep`, `Unsure`) with your recommendation preselected, plain words and the context needed
+  to decide inside the form. Never one question per call, never a question in prose in your reply.
 
 **Subject:** one self-contained unit of work, one kebab-case slug, one mail thread, one worker until done.
 States: `queued` → `assigned` ⇄ `blocked` → `done`, and `paused` when the user parks one.
@@ -173,7 +180,8 @@ subjects, `--json` for workers and history). Shown only on a state change or whe
 
 Each turn, in order:
 
-1. `realm msg inbox --project <key> --agent <QUEEN> --mark-read`, then `realm sync --project <key>`. Never poll or wait:
+1. `realm msg inbox --project <key> --agent <QUEEN> --mark-read`, then `realm sync --project <key>`, then `realm request
+   list --project <key>` and triage each untriaged row ([Triage every ask](#2-be-the-queen)). Never poll or wait:
    realm-wake starts this turn by itself when mail reaches `QUEEN`, as does the user's prompt. `sync` records
    joins, each subject's thread and latest worker reply (`· reply` in the table), and turns a `queued` subject
    `assigned` once the subject it waits for is replied to. It never decides done or blocked. Mail from the scout
@@ -242,7 +250,7 @@ worker's tree turns it into work she cannot verify and has to hand back anyway.
 Three roles carry their own pipeline, model and procedure; a worker spawned without one stays a plain worker.
 
 - **Builder**, for building something: designing (with the user, through you or its Chancellor), planning,
-  hardening, building, then the delivery steps (reviewing, fixing, merging on green, deploying).
+  hardening, building, then the delivery steps (`realm rule show --project <key> --id delivery.intro`).
 - **Debugger**, for a bug, a failure or a regression whose cause is unknown: the four phases of systematic
   debugging, then the same delivery steps once the cause is proven and fixed; a cause proven out of reach ends
   with the evidence instead.
