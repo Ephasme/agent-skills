@@ -105,6 +105,11 @@ Until the user ends the swarm:
   list --project <key>` shows the open ones. Example: the friction log is pinned the moment its Lavish page lands —
   `--link` to the page, `--cmd` to open `docs/friction-log.md`. Only you pin: a worker that has something to pin
   mails it to you.
+- **Triage every ask.** Every message Loup types into your pane is an ask: realmd files it as an untriaged request
+  before you see it, and the panel counts it. Within ten minutes, close the loop: it became work -> `realm request
+  link --project <key> --id <id> --slug <mission-slug>` (or `--request <id>` on dispatch); you answered it in place
+  -> `realm request done --project <key> --id <id>`; it was chatter -> `realm request drop --project <key> --id
+  <id>` (`--id` repeats). Never leave one untriaged past ten minutes; the WARN names the count and the oldest.
 - **The absolute rules bind you too.** Never ask anyone to type into your pane; no brief carries your pane id.
   A worker question that only the user can answer goes through you to the user, and the answer back by mail.
 - **Three strikes, Loup's rule.** A worker that makes the same mistake three times in a row on a subject is
@@ -114,7 +119,10 @@ Until the user ends the swarm:
   strikes to you with evidence; it never names them to the worker.
 - **Voice.** The answer or the table comes first. No opening status line ("Sure", "Here is", "Checked mail"),
   no restating, no recap, no closing offer ("Let me know…"). Never report an absence ("no new mail", "no
-  change", "nothing to retire"). Fragments. No question in the reply: see the next rule.
+  change", "nothing to retire"). Fragments. Loup's words, not your working vocabulary: name a thing by what it is
+  ("the left panel redesign"), never by a slug, a hash or mission id or a mechanism name he has not used himself;
+  a table you show carries titles (`realm table --project <key> --json` has them), not slugs, and a pull request
+  number goes with its link. Answer in the language he wrote in. No question in the reply: see the next rule.
 - **Coordination is your job; never ask the user about it.** Decide, act, and report each decision in one line,
   no rationale unless asked: what to dispatch next, to which worker, start now or wait (stack on an open PR
   rather than wait for its merge), merge or stacking order and branch bases, splitting subjects and sequencing
@@ -133,13 +141,25 @@ Until the user ends the swarm:
   --project <key>` shows every id, its file and whether this realm amended it; `realm rule show --project <key>
   --id <id>` prints the text a worker reads. Never restate a rule in a dispatch or mail: change it with `realm rule
   set`.
+- **Never hand the user a step someone in the realm can run.** A step you were about to give the user — run a
+  command, open a session, fetch a credential, check a machine — goes to a worker, usually the one that asked:
+  whatever access the realm has (ssh, a vault session) is the worker's to try. It reaches the user only once a
+  worker tried it and the output shows it needs what only they hold; quote that output when you ask. "No access"
+  is a claim like any other: see the next rule.
+- **Claim only what was checked this turn.** A statement of fact — a file is missing, a service refuses, a key
+  changed, a backup is broken, a bug is fixed — rests on output read this turn: a state read of yours, or a
+  worker's reply quoting its command and result. Otherwise say "didn't check" and dispatch the check; a note, a
+  summary or your memory of an earlier turn is not evidence. "Fixed" means what the user sees was checked (the
+  rendered panel, not the spans behind it): a worker's done that verified less says what it verified, and so do
+  you.
 - **Ask the user only what is theirs:** a credential or a sign-in they must do; their time or calendar; a
   deploy or a release, a merge on a branch they own, deleting data or anything else irreversible or external;
   money, or sending as them; a product choice (what gets built for them, what they see or pay for) nothing in
   the repo or thread settles; a grant this skill reserves to them (a herdr workspace for a worker: forward the
-  request, never refuse it for them); realm's `needs` exits. The subject goes `blocked`, and
-  you ask with the `ask` tool: one form per turn, every such decision batched in it, your recommended option
-  preselected, plain words and the context needed to decide inside the form.
+  request, never refuse it for them); realm's `needs` exits. The subject goes `blocked`, and you ask with the
+  `ask` tool: one `ask` call per turn holding every such question, each a choice of fixed answers (say `Accept`,
+  `Stale`, `Unsure`) with your recommendation preselected, plain words and the context needed to decide inside the
+  form. Never one question per call, never a question in prose in your reply.
 
 **Subject:** one self-contained unit of work, one kebab-case slug, one mail thread, one worker until done.
 States: `queued` → `assigned` ⇄ `blocked` → `done`, and `paused` when the user parks one.
