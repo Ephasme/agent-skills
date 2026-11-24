@@ -128,7 +128,7 @@ Until the user ends the swarm:
   `gh pr merge`, never auto-merge, never push to main. The queue rebases the head, re-runs the gate on the new
   head, renumbers its migration to the tail and merges `--match-head-commit`; a conflict or a red check comes back
   to the worker as `REBASE`/`FIX` on its thread, and a red base CI after a merge comes to you with a proposed
-  follow-up slug. While the lane's `merge.enabled` is off (the shipped state), the queue does not merge: the worker
+  follow-up slug. A lane is on by default (work, dotfiles and infra repos off; a `merge.enabled` row overrides); while it is off, the queue does not merge: the worker
   mails you `READY <repo>#<n> <head sha>` and you merge that one by hand on the user's go. The realm repository
   has no CI: there a PR is green when the worker's local `bun run check` and `bun test ./test` pass, so never
   wait for checks on it.
