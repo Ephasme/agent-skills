@@ -21,6 +21,10 @@ flowchart LR
   refine-document -.->|pass 2| cite-or-refuse
   refine-document -.->|pass 2| fact-check-document
   execute-autonomously -->|re-hardens a plan with| harden-plan
+  feature -->|stage 1| write-plan
+  feature -.->|open requirements| brainstorm-design
+  feature -->|stage 2| harden-plan
+  feature -->|stage 3| execute-plan
 ```
 
 Every skill here installs on its own: none requires a skill outside this catalog.
