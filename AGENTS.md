@@ -5,7 +5,8 @@ format, one directory per skill at `skills/<category>/<skill>/SKILL.md`. The rep
 
 ## Critical constraints
 
-- `node scripts/validate.mjs` must exit 0 before every commit.
+- `node scripts/validate.mjs` must exit 0 before every commit. It checks only files git tracks:
+  `git add` new files first, or the run skips them and passes.
 - Keep the repo dependency-free: no package manager, no build step, nothing `scripts/validate.mjs`
   needs at runtime.
 - Every `SKILL.md` lives at `skills/<category>/<skill>/SKILL.md`. The CLI also installs any

@@ -16,10 +16,13 @@
 //
 // --root checks another catalog instead of this one. --also loads a second catalog's skill
 // names without checking it: both install into one flat store, so a name in both is an error.
+//
+// Only files git tracks are checked, since only those ship: `git add` a new file to have it checked.
 
 import { readdir, readFile, stat } from 'node:fs/promises';
-import { join, relative, dirname, resolve } from 'node:path';
+import { join, relative, dirname, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { execFileSync } from 'node:child_process';
 
 
 const flag = (name) =>
@@ -134,15 +137,20 @@ function parseFrontmatter(content) {
   return { data, keys, body: content.slice(end + 4) };
 }
 
-async function walk(dir) {
-  const out = [];
-  for (const entry of await readdir(dir, { withFileTypes: true })) {
-    const path = join(dir, entry.name);
-    if (entry.isDirectory()) out.push(...(await walk(path)));
-    else out.push(path);
-  }
-  return out;
+// Tracked files under skills/, as absolute paths. Deleted-but-unstaged files are dropped:
+// they no longer exist to read, and the next commit does not ship them either.
+function trackedFiles() {
+  const ls = (...args) =>
+    execFileSync('git', ['-C', ROOT, 'ls-files', '-z', ...args, '--', 'skills'], { encoding: 'utf-8' })
+      .split('\0')
+      .filter(Boolean);
+  const deleted = new Set(ls('--deleted'));
+  return ls().filter((f) => !deleted.has(f)).map((f) => join(ROOT, f));
 }
+
+const TRACKED = trackedFiles();
+const TRACKED_SET = new Set(TRACKED);
+const isTracked = (path) => TRACKED_SET.has(path) || TRACKED.some((f) => f.startsWith(path + sep));
 
 const found = new Map(); // skill name -> path, for the uniqueness check
 
@@ -150,13 +158,8 @@ async function checkSkill(category, slug) {
   const dir = join(SKILLS, category, slug);
   const skillMd = join(dir, 'SKILL.md');
 
-  let content;
-  try {
-    content = await readFile(skillMd, 'utf-8');
-  } catch {
-    fail(dir, 'no SKILL.md');
-    return;
-  }
+  if (!TRACKED_SET.has(skillMd)) return fail(dir, 'no tracked SKILL.md');
+  const content = await readFile(skillMd, 'utf-8');
 
   const parsed = parseFrontmatter(content);
   if (!parsed) return fail(skillMd, 'no parseable YAML frontmatter');
@@ -212,7 +215,7 @@ async function checkSkill(category, slug) {
     fail(skillMd, `body is ${bodyLines} lines, over the ${MAX_BODY_LINES} limit — move detail into references/`);
   }
 
-  const files = await walk(dir);
+  const files = TRACKED.filter((f) => f.startsWith(dir + sep));
   // Extensionless files under scripts/ are executables with a shebang; they were
   // invisible to an extension-only filter and drifted.
   const textFiles = files.filter(
@@ -271,11 +274,7 @@ async function checkSkill(category, slug) {
   for (const ref of mentioned) {
     if (ref.endsWith('/')) continue; // a directory reference, e.g. `scripts/`
     if (ref.includes('/.venv')) continue; // created at runtime, gitignored
-    try {
-      await stat(join(dir, ref));
-    } catch {
-      fail(skillMd, `references missing file \`${ref}\``);
-    }
+    if (!isTracked(join(dir, ref))) fail(skillMd, `references missing or untracked file \`${ref}\``);
   }
 
   // Keep reference chains one level deep: an agent following a reference from
@@ -295,9 +294,9 @@ async function checkSkill(category, slug) {
 }
 
 async function main() {
-  const categories = (await readdir(SKILLS, { withFileTypes: true }))
-    .filter((e) => e.isDirectory())
-    .map((e) => e.name);
+  // skills/<category>/<slug>/…: the tree as git tracks it, never the working directory's.
+  const parts = TRACKED.map((f) => relative(SKILLS, f).split(sep)).filter((p) => p.length >= 3);
+  const categories = [...new Set(parts.map((p) => p[0]))];
 
   for (const c of categories) {
     if (!CATEGORIES.includes(c)) fail(join(SKILLS, c), 'undeclared category (add it to CATEGORIES + README)');
@@ -317,9 +316,7 @@ async function main() {
   }
 
   for (const category of categories.filter((c) => CATEGORIES.includes(c))) {
-    const slugs = (await readdir(join(SKILLS, category), { withFileTypes: true }))
-      .filter((e) => e.isDirectory())
-      .map((e) => e.name);
+    const slugs = [...new Set(parts.filter((p) => p[0] === category).map((p) => p[1]))];
     for (const slug of slugs) await checkSkill(category, slug);
   }
 
