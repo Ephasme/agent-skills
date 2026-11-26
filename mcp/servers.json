@@ -89,6 +89,19 @@
     "type": "http",
     "url": "https://mcp.notion.com/mcp?account=perso"
   },
+  "raven": {
+    "type": "stdio",
+    "command": "sh",
+    "args": [
+      "-c",
+      "eval \"$(\"$HOME/.local/bin/overlord\" secret env --scope perso --env RAVEN_TOKEN)\"; exec \"$HOME/.local/bin/overlord\" raven-mcp"
+    ],
+    "env": {
+      "RAVEN_AGENT": "${RAVEN_AGENT}",
+      "OVERLORD_KEY": "${OVERLORD_KEY}",
+      "RAVEN_URL": "http://127.0.0.1:7811"
+    }
+  },
   "slack": {
     "type": "http",
     "url": "https://mcp.slack.com/mcp",
