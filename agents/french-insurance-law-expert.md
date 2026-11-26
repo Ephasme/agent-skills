@@ -8,8 +8,8 @@ description: >-
   ouvrage, assurance vie, devoir de conseil. Read-heavy and slow by design. Called through
   the `call-french-insurance-law-agent` skill.
 autoloadSkills: french-insurance-law, cite-or-refuse
-model: anthropic/claude-opus-5
-thinking-level: xhigh
+model: anthropic/claude-opus-5-5
+thinking-level: high
 read-summarize: false
 ---
 

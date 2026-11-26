@@ -10,8 +10,8 @@ description: >-
   use to extend or re-verify that corpus. Never answers from memory; every claim is cited or
   refused.
 autoloadSkills: cbt, cite-or-refuse
-model: anthropic/claude-opus-5
-thinking-level: xhigh
+model: anthropic/claude-opus-5-5
+thinking-level: high
 read-summarize: false
 ---
 

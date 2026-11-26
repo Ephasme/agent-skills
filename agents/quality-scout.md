@@ -7,7 +7,7 @@ description: >-
   enough that Deep mode applies: multi-unit, multi-year, or hard-to-reverse commitments. Never
   dispatch for Triage or Standard depth; the skill's own pipeline covers those directly.
 autoloadSkills: assess-true-quality
-model: anthropic/claude-opus-5
+model: anthropic/claude-opus-5-5
 thinking-level: high
 read-summarize: false
 ---
