@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import argparse
 import json
-from pathlib import Path
 import os
 import re
 import subprocess
@@ -162,25 +161,7 @@ def git_facts(path):
     return facts
 
 
-STEP_LABEL = re.compile(
-    r"^(?:\U0001F441|\U0001F5FA|\U0001F6E1|\u2692|\U0001F50D|\u27F3|\u2935|\u2714)\s+(SEE|PLAN|HRD|WORK|REV|REB|MRG|DONE)\b"
-)
-
-REGISTRY = Path.home() / ".local" / "state" / "summon-the-overlord" / "worktrees.json"
-
-
-def owned_paths():
-    """Worktrees the overlord registers as its own; empty when it has spawned none."""
-    try:
-        return {str(Path(path)) for path in json.loads(REGISTRY.read_text())}
-    except (OSError, json.JSONDecodeError):
-        return set()
-
-def is_mine(entry):
-    """True for a worktree the overlord maintains: its label carries a step prefix."""
-    return bool(STEP_LABEL.match(entry.get("label") or ""))
-
-def survey(lines, only, mine=False):
+def survey(lines, only):
     out = {"generated_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"), "targets": [], "skipped": []}
     for ws in herdr_json("workspace", "list")["workspaces"]:
         worktree = ws.get("worktree") or {}
@@ -197,9 +178,6 @@ def survey(lines, only, mine=False):
             out["skipped"].append(dict(entry, why="primary checkout"))
             continue
         if only and entry["workspace_id"] not in only:
-            continue
-        if mine and str(Path(path).resolve()) not in owned_paths():
-            out["skipped"].append(dict(entry, why="not registered as an overlord worktree"))
             continue
         path = worktree.get("checkout_path")
         if not path or not os.path.isdir(path):
@@ -245,9 +223,8 @@ def main(argv=None):
     parser.add_argument("--json", default="herdr-survey.json", help="where to write the facts (default: herdr-survey.json)")
     parser.add_argument("--lines", type=int, default=60, help="pane lines to read (default: 60)")
     parser.add_argument("--workspace", action="append", default=[], help="survey only this workspace (repeatable)")
-    parser.add_argument("--only-mine", action="store_true", help="only worktrees the overlord maintains (step-prefixed label)")
     args = parser.parse_args(argv)
-    state = survey(args.lines, set(args.workspace), args.only_mine)
+    state = survey(args.lines, set(args.workspace))
     with open(args.json, "w") as handle:
         json.dump(state, handle, indent=2)
     print(brief(state))
