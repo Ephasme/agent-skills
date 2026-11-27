@@ -27,6 +27,7 @@ flowchart LR
   feature -.->|open requirements| brainstorm-design
   feature -->|stage 2| harden-plan
   feature -->|stage 3| execute-plan
+  campaign -->|stage 4, per feature| feature
 ```
 
 Every skill here installs on its own: none requires a skill outside this catalog.
