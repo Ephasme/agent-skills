@@ -17,8 +17,21 @@ Empty description → ask for it, then start. Nothing else is worth a question b
 
 ## Track the pipeline
 
-Before any work, create a todo list with one item per stage below, and keep it current. The list is
-what keeps a long run from silently dropping the review or the merge at the end.
+Before any work, create this todo list, each item verbatim, and keep it current. Mark an item done
+only when the outcome after its colon holds. The list is what keeps a long run from silently
+dropping the review or the merge at the end.
+
+```text
+0. Isolate: worktree created per repository, dependencies installed
+1. Plan: plan written
+2. Harden: plan hardened in fix mode
+3. Implement: plan executed
+4. Open pull requests: one opened per repository
+5. Review: every pull request reviewed
+6. Fix: every finding fixed or rejected, checks rerun
+7. Commit and push: fixes pushed to every branch
+8. Merge: pull requests merged in dependency order
+```
 
 ## Isolate the work
 

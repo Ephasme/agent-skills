@@ -1,32 +1,48 @@
 ---
 name: research
-description: Answers a research question through a fixed seven-step pipeline (clarify, research, draft, review, verify, fix, publish) and delivers a written report in which every claim carries its citation, every uncitable claim is marked refused and every claim that could not be run is marked unverified. Use whenever the user invokes /research, or asks to research, investigate, dig into, survey, compare options for, or write up a sourced report on a technical, legal, scientific or product question whose answer deserves a document rather than a chat reply. Prefer cite-or-refuse for a single sourced answer in chat, fact-check-document for auditing claims in a document the user already has, and assess-true-quality for whether a product or vendor is actually good.
+description: Answers a research question through a fixed seven-stage pipeline (clarify, research, draft, review, verify, fix, publish) and delivers a written report in which every claim carries its citation, every uncitable claim is marked refused and every claim that could not be run is marked unverified. Use whenever the user invokes /research, or asks to research, investigate, dig into, survey, compare options for, or write up a sourced report on a technical, legal, scientific or product question whose answer deserves a document rather than a chat reply. Prefer cite-or-refuse for a single sourced answer in chat, fact-check-document for auditing claims in a document the user already has, and assess-true-quality for whether a product or vendor is actually good.
 ---
 
 # Research
 
 A research question gets one pipeline, always in this order:
 
-**CLARIFYING → RESEARCHING → DRAFTING → REVIEWING → VERIFYING → FIXING → PUBLISHING**
+**Clarify → Research → Draft → Review → Verify → Fix → Publish**
 
-Each step has an exit condition. Do not move to the next step until the current one's is met, and when you
-move on, say so in one line with its evidence (`RESEARCHING done: 14 sources kept, 6 rejected, notes in …`).
-Skipping a step is how a confident wrong report gets written: the order exists because each step catches what
+Each stage has an exit condition. Do not move to the next stage until the current one's is met, and when you
+move on, say so in one line with its evidence (`Research done: 14 sources kept, 6 rejected, notes in …`).
+Skipping a stage is how a confident wrong report gets written: the order exists because each stage catches what
 the previous one let through.
 
 This skill researches and reports. It pushes nothing, opens no pull request, merges nothing and deploys nothing,
 unless the question itself was to change code and the user asked for that change.
 
+## Track the pipeline
+
+Before any work, create this todo list, each item verbatim, and keep it current. Mark an item done
+only when the outcome after its colon holds.
+
+```text
+0. Set up: slug, report path and notes chosen
+1. Clarify: question restated, every ambiguity settled or assumed
+2. Research: notes written for every part of the question
+3. Draft: draft written at the report path
+4. Review: findings listed
+5. Verify: runnable claims run, the rest marked unverified
+6. Fix: every finding fixed or kept with a reason
+7. Publish: answer sent with the report path
+```
+
 ## Setup
 
 - **Slug**: a short kebab-case name for the question (`sqlite-wal-on-nfs`).
 - **Report path**: the one the user named; otherwise `research/<slug>.md` under the working directory. Say which
-  path you chose before RESEARCHING.
+  path you chose before the Research stage.
 - **Notes**: keep working notes (sources taken, what each supports, version and date) as you go, in the
-  conversation or a scratch file beside the report. They are what DRAFTING builds from and what PUBLISHING's
-  source list comes from.
+  conversation or a scratch file beside the report. They are what the Draft stage builds from and what the Publish
+  stage's source list comes from.
 
-## 1. CLARIFYING
+## 1. Clarify
 
 Restate the question in your own words, then list its ambiguities: scope, versions, platform, jurisdiction, what
 "better" means, what decision the answer feeds.
@@ -38,7 +54,7 @@ not to ask, take your recommendation and record it as an assumption in the repor
 **Exit**: a restated question with every ambiguity either settled (and how) or recorded as an assumption. Never
 start researching on a guess: an ambiguity papered over now is a wrong conclusion later.
 
-## 2. RESEARCHING
+## 2. Research
 
 Gather sources and evidence under cite-or-refuse rules. Search before concluding; conclude from sources only,
 never from memory, even when the topic feels familiar.
@@ -73,7 +89,7 @@ another.
 
 **Exit**: notes that cover every part of the restated question, or say which part found no acceptable source.
 
-## 3. DRAFTING
+## 3. Draft
 
 Write the report at the report path, built only on the notes. Use the structure in [Report](#report).
 
@@ -85,7 +101,7 @@ title or quote: a citation you are not certain of does not go in.
 
 **Exit**: the draft file exists at the report path.
 
-## 4. REVIEWING
+## 4. Review
 
 Review the draft for consistency and clarity: does the answer follow from the findings, do two sections
 contradict each other, is anything claimed in the summary that the body does not support.
@@ -97,7 +113,7 @@ claim uses it for.
 
 **Exit**: a list of findings (possibly empty) to fix.
 
-## 5. VERIFYING
+## 5. Verify
 
 Run whatever can be run: reproduce code claims, commands, measurements and API calls. Stay read-only, use none of
 the user's credentials, and spend nothing (paid APIs, cloud resources) without the user's OK.
@@ -108,14 +124,14 @@ findings list.
 **Exit**: each runnable claim marked verified (with what was run and its result) or contradicted; the rest marked
 unverified.
 
-## 6. FIXING
+## 6. Fix
 
-Correct what REVIEWING and VERIFYING found. Re-check only what you changed: its citation resolves and supports it,
+Correct what Review and Verify found. Re-check only what you changed: its citation resolves and supports it,
 and any rerun still passes.
 
 **Exit**: every finding fixed or explicitly kept with a reason.
 
-## 7. PUBLISHING
+## 7. Publish
 
 The Markdown file at the report path is the canonical text. Then reply to the user with:
 
@@ -145,7 +161,7 @@ version, date. Verified claims say what was run. Unverified and refused claims a
 <Each claim that found no acceptable source: what was searched, why what was found was rejected, where to look next.>
 
 ## Assumptions
-<Every ambiguity settled by assumption in CLARIFYING, with the alternative it rules out.>
+<Every ambiguity settled by assumption in Clarify, with the alternative it rules out.>
 
 ## Sources
 ### Used

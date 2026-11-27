@@ -28,9 +28,31 @@ the whole campaign, and a pause between features costs them a context switch for
 
 ## Track the campaign
 
-Before any work, create a todo list with the six stages, and add one item per feature once stage 2
-has listed them. A campaign runs for hours; the list is what stops the global review from being
-dropped at the end.
+Before any work, create this todo list, each item verbatim, and keep it current. Mark an item done
+only when the outcome after its colon holds. A campaign runs for hours; the list is what stops the
+global review from being dropped at the end.
+
+```text
+Define
+  0. Set up: campaign worktree created, campaign files excluded
+  1. Brainstorm: epic.md approved by the user
+  2. Strategy: strategy.md and feature files written
+  3. Review: every draft reviewed, whole-set pass done
+Build
+  4. Coordinate: replaced by feature items after stage 2
+Finish
+  5. Global review: every finding fixed or rejected, pull requests marked ready
+  6. Merge: stack merged, worktrees removed
+```
+
+Where the todo tool has groups or phases, create these three, so that feature items land before
+`Finish`; otherwise keep the items flat, in this order. Once stage 2 has listed the features,
+replace item 4 with two items per feature, in implementation order:
+
+```text
+  4.NN <feature-slug>: pull request opened
+  4.NN <feature-slug>: checkpoint done
+```
 
 ## Campaign files
 
@@ -147,6 +169,11 @@ Then, in order and for each feature, until none is pending:
    skill:
    - It is already on its own branch in a dedicated worktree: work there, create no other branch
      or worktree, and do not edit the campaign files.
+   - Inline only: create no todo list, since replacing the campaign's would drop stages 5 and 6.
+     Insert the feature skill's items 1 to 7 instead, right before
+     `4.NN <feature-slug>: pull request opened`, each numbered `4.NN.K` with K its number there
+     (`4.01.1 Plan: plan written`); its items 0 and 8 do not apply here. Remove them once the
+     feature reports.
    - Open the pull request with `gh stack submit --auto` (a draft whose base is the layer below),
      then set its title and description with `gh pr edit`. The description states the epic in one
      line, the feature's position (`N of M`) and what it builds on.
@@ -160,6 +187,8 @@ Then, in order and for each feature, until none is pending:
    - For each pending feature, decide: keep, amend, split, merge with another, drop, or add a new
      feature that the work revealed. Update the files and append each change with its reason to the
      revision log in `strategy.md`.
+   - Keep the todo list matching the feature files: a dropped feature loses its two items, and a
+     new or split feature gets two in its place in the order.
    - A defect in a layer already built is fixed in that layer: check out its branch, commit the
      fix, `gh stack rebase --upstack`, `gh stack push`, and rerun that layer's checks. New scope
      goes on top as a feature.
