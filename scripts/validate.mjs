@@ -45,6 +45,7 @@ const CATEGORIES = [
   'helpers',
   'legal',
   'meta',
+  'pipelines',
   'research',
   'toolbox',
 ];
