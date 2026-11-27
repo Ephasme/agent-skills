@@ -20,6 +20,8 @@ flowchart LR
   refine-document -->|pass 1| strip-legacy-content
   refine-document -.->|pass 2| cite-or-refuse
   refine-document -.->|pass 2| fact-check-document
+  research -.->|review| refine-document
+  research -.->|review| fact-check-document
   execute-autonomously -->|re-hardens a plan with| harden-plan
   feature -->|stage 1| write-plan
   feature -.->|open requirements| brainstorm-design
