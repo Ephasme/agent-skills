@@ -1,11 +1,11 @@
 ---
 name: campaign
 description: >-
-  Takes a vague, one-line product request to a reviewed stack of pull requests: interrogates the
+  Takes a vague, one-line product request to a merged stack of pull requests: interrogates the
   user until the request is an actionable epic, writes a macro strategy and an ordered list of
   features, has one sub-agent per draft review it against the others, implements the features one
   at a time with the feature skill on a GitHub stacked-PR chain, re-plans the remaining features
-  after each one lands, and closes with an open-code-review pass over the whole stack. Use when the
+  after each one lands, reviews the whole stack with open-code-review, then merges it. Use when the
   user invokes /campaign followed by a request too large for a single /feature.
 compatibility: >-
   Requires git, an authenticated GitHub CLI `gh` with the `gh stack` extension (github/gh-stack),
@@ -18,7 +18,7 @@ disable-model-invocation: true
 
 Explicit invocation only: the text after `/campaign` is the request. A campaign turns it into an
 epic, the epic into a strategy and an ordered list of features, and the features into one stacked
-pull request each, reviewed as a whole at the end.
+pull request each, reviewed as a whole and merged at the end.
 
 Empty request → ask for it, then start.
 
@@ -28,7 +28,7 @@ the whole campaign, and a pause between features costs them a context switch for
 
 ## Track the campaign
 
-Before any work, create a todo list with the five stages, and add one item per feature once stage 2
+Before any work, create a todo list with the six stages, and add one item per feature once stage 2
 has listed them. A campaign runs for hours; the list is what stops the global review from being
 dropped at the end.
 
@@ -150,7 +150,7 @@ Then, in order and for each feature, until none is pending:
    - Open the pull request with `gh stack submit --auto` (a draft whose base is the layer below),
      then set its title and description with `gh pr edit`. The description states the epic in one
      line, the feature's position (`N of M`) and what it builds on.
-   - Do not merge. Nothing in a campaign merges until the user decides.
+   - Do not merge. The stack merges whole, once, after the global review.
    - Report: pull request link, what shipped against the feature file, deviations, contracts
      actually created (names, paths, signatures), review findings rejected and why, anything
      unverified, and any sign that a later feature is now wrong.
@@ -185,8 +185,19 @@ names and patterns that drifted between features, leftovers of changed plans.
    and `gh stack push`. A finding you reject gets a comment on its pull request saying why.
 3. Rerun the checks on every layer that changed: each must stay green on its own.
 4. If the fixes changed behaviour, run the global review once more.
-5. Mark every pull request of the stack ready for review (`gh pr ready`). Do not merge: the stack is
-   handed to the user, who merges it, for example with `gh stack merge`.
+5. Mark every pull request of the stack ready for review (`gh pr ready`).
+
+### 6. Merge
+
+1. `gh stack sync` so the stack sits on the current trunk, then wait for every pull request's
+   checks to finish (`gh pr checks <pr> --watch`). Each must be green.
+2. Merge the whole stack with `gh stack merge --yes` and the merge method the repository uses
+   (`--squash`, `--rebase` or `--merge`; `gh repo view --json` lists the allowed ones). The merge is
+   atomic: either every layer lands or none does. With several repositories, merge their stacks
+   providers first: a library or schema before its consumers, a backend before its frontend.
+3. A merge the repository refuses (required approvals, branch protection, a merge queue rejection)
+   is reported, never bypassed. Merging is the finish line: deploy and release nothing.
+4. Remove the campaign worktrees.
 
 ## Stop conditions
 
@@ -197,7 +208,7 @@ resolution needs a product decision. Finish everything that does not depend on t
 ## Report
 
 - The epic in one line and the stack (`gh stack view` output, plus its URL).
-- Per layer: pull request link, feature, and state.
+- Per layer: pull request link, feature, and merge state.
 - Revisions made between features, each with its reason.
 - Global review findings fixed, and rejected with the reason.
 - Anything left unverified.
