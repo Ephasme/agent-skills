@@ -6,7 +6,7 @@ description: >-
   looks at both sides with its own eyes and reports what differs, with measurements that let the
   reader act. Read-only by construction — its tool list has no `edit`. Dispatch it to re-verify a
   previous verdict rather than trusting it.
-model: anthropic/claude-opus-5-5
+model: mimic/claude-opus-5-5
 thinking-level: high
 read-summarize: false
 tools: read, grep, glob, eval, write, bash
