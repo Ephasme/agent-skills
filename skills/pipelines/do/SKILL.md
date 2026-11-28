@@ -52,13 +52,15 @@ deep reading in their own first stage; reading more here duplicates it.
 |---|---|
 | `research` | asks a question whose answer deserves a sourced document, or depends on an unknown that only outside sources settle: a library or vendor choice, a protocol's or a law's behaviour |
 | `bugfix` | reports existing behaviour that contradicts what it should do: an error, a failing test, a regression, an issue describing a defect |
-| `feature` | asks for behaviour that does not exist yet, within one repository or a coordinated change across two or three: a new endpoint, a screen, an integration, a module-wide refactor. Size alone does not rule it out: a moderately large change spanning many files and several pull requests is still a feature |
-| `campaign` | asks for a vast endeavour: a whole application or product, a goal spanning thousands of lines, many independent features and often several repositories (`build me an app that manages my invoices`, `build a billing platform with an API, a dashboard and a mobile client`) |
+| `feature` | asks for one capability that does not exist yet (a new endpoint, a screen, an integration), or for a few huge but simple tasks (a refactor, a rewrite, a framework or language migration, an upgrade), within one repository or coordinated across two or three. Size alone never rules it out: thousands of lines are still a feature when the work is one task, or a few, applied across the code |
+| `campaign` | asks for many distinct pieces of work: lots of tasks in one repository, an epic whose features land in different and almost unrelated parts of the codebase, or a whole application or product, often across several repositories (`build me an app that manages my invoices`, `build a billing platform with an API, a dashboard and a mobile client`) |
 
-`campaign` is the rare route: it costs an epic interview, a stacked-PR chain and hours of runtime,
-so it must be earned by scale. Default to `feature` and pick `campaign` only when the request
-unmistakably cannot be one feature. Vagueness is not scale: a vague request for one capability is a
-`feature`, which plans it itself. Between these two, decide without asking.
+Breadth earns `campaign`, size does not: count the distinct pieces of work and how unrelated the
+parts of the codebase they touch are, not the lines they change. `campaign` is the rare route: it
+costs an epic interview, a stacked-PR chain and hours of runtime. Default to `feature` and pick
+`campaign` only when the request clearly holds many distinct pieces of work. Vagueness is not
+breadth: a vague request for one capability is a `feature`, which plans it itself. Between these
+two, decide without asking.
 
 Chain skills when the request needs more than one, in this order: `research` first, since its answer
 shapes everything after it; then `bugfix`, since new work should build on fixed code; then
