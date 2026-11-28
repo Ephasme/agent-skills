@@ -1,9 +1,10 @@
-// Promptfoo provider that asks a model to route a request the way the `do` skill would.
+// Promptfoo provider that runs one decision of a skill as a dry run and returns the model's JSON.
 //
-// The system prompt is the do skill's SKILL.md at a git ref (`config.ref`), or the working tree
-// when the ref is `WORKTREE`, followed by a harness that limits the run to the routing stage and
-// asks for JSON. The model runs through `omp -p` with tools, skills, context files and extensions
-// disabled, so only the skill text and the test case reach it.
+// The system prompt is the skill's SKILL.md (`config.skill`, repo-relative) at a git ref
+// (`config.ref`), or the working tree when the ref is `WORKTREE`, followed by a harness
+// (`config.harness`, repo-relative, always read from the working tree) that limits the run to one
+// decision and fixes the JSON reply. The model runs through `omp -p` with tools, skills, context
+// files and extensions disabled, so only the skill text, the harness and the test case reach it.
 
 import { execFileSync, spawn } from 'node:child_process';
 import { readFileSync } from 'node:fs';
@@ -11,38 +12,21 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
-const SKILL = 'skills/pipelines/do/SKILL.md';
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const TIMEOUT_MS = 300_000;
 
-const HARNESS = `
-# Evaluation harness
+const fileText = new Map();
 
-The user invoked the skill above. Their message holds the request (the text after \`/do\`) and a
-description of the repository the session starts in; treat that description as what you saw when
-you glanced at the repository. This is a routing dry run: perform only the routing step. Do not
-run any skill, create todos or ask anything in prose.
-
-Reply with only one JSON object, no prose and no code fence:
-
-{"action": "route" | "ask", "route": ["research" | "bugfix" | "feature" | "campaign", ...], "reason": "<one line>"}
-
-- "route": you would announce the route and start. "route" lists the skills in run order.
-- "ask": the skill tells you to ask the user which route to take before starting. "route" is the
-  one you would recommend in that question.
-`;
-
-const skillText = new Map();
-
-function loadSkill(ref) {
-  if (!skillText.has(ref)) {
+function load(path, ref) {
+  const key = `${ref}:${path}`;
+  if (!fileText.has(key)) {
     const text =
       ref === 'WORKTREE'
-        ? readFileSync(join(ROOT, SKILL), 'utf-8')
-        : execFileSync('git', ['-C', ROOT, 'show', `${ref}:${SKILL}`], { encoding: 'utf-8' });
-    skillText.set(ref, text);
+        ? readFileSync(join(ROOT, path), 'utf-8')
+        : execFileSync('git', ['-C', ROOT, 'show', `${ref}:${path}`], { encoding: 'utf-8' });
+    fileText.set(key, text);
   }
-  return skillText.get(ref);
+  return fileText.get(key);
 }
 
 function runOmp(args) {
@@ -79,15 +63,17 @@ function lastAssistantMessage(stdout) {
   return message;
 }
 
-export default class DoRouteProvider {
+export default class SkillDryRunProvider {
   constructor(options) {
     this.providerId = options.id;
     this.config = options.config ?? {};
-    if (!this.config.ref) throw new Error('provider config needs a `ref` (git ref or WORKTREE)');
+    for (const key of ['skill', 'harness', 'ref']) {
+      if (!this.config[key]) throw new Error(`provider config needs \`${key}\``);
+    }
   }
 
   id() {
-    return `do-route:${this.config.ref}`;
+    return `skill-dry-run:${this.config.skill}@${this.config.ref}`;
   }
 
   async callApi(prompt) {
@@ -101,7 +87,8 @@ export default class DoRouteProvider {
       '--no-rules',
       '--no-extensions',
       '--no-lsp',
-      '--system-prompt', loadSkill(this.config.ref) + HARNESS,
+      '--system-prompt',
+      `${load(this.config.skill, this.config.ref)}\n${load(this.config.harness, 'WORKTREE')}`,
     ];
     if (this.config.model) args.push('--model', this.config.model);
     if (this.config.thinking) args.push('--thinking', this.config.thinking);
