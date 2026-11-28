@@ -79,7 +79,9 @@ committed to this public repo, so the secrets are only as safe as the age key.
     - Claude Code: `"headersHelper": "sops exec-env <store> 'printf \"{\\\"<Header>\\\":\\\"<prefix>%s\\\"}\" \"${<VAR>:?}\"'"`,
       one `%s` and one `${<VAR>:?}` per header. `:?` makes a missing key fail instead of sending
       an empty value.
-    Never write a bare `${VAR}`: neither agent expands it, so the literal text gets sent.
+    Never write a bare `${VAR}` for a store secret: both agents expand `${VAR}` only from the
+    environment, where these secrets aren't. omp then sends the literal text, and Claude Code
+    fails to load the server.
 - After rotating a secret, restart omp. stdio servers read the store when they start; omp caches a
   resolved header.
 - Never print, paste or commit a decrypted value.
