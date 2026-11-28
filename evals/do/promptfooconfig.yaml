@@ -1,0 +1,260 @@
+# Routing eval for the `do` skill: does it pick the right pipelines for a request?
+#
+# Each case is a request, the repository it starts in, and the route the skill should announce.
+# Two providers run the same cases against the skill at two revisions:
+#   do-old  the skill before campaign was narrowed to vast, product-scale requests (386907c)
+#   do-new  the working tree
+# Change `ref` to compare any other pair of revisions.
+#
+# Run from the repo root (needs `omp` on PATH and a configured model):
+#   npx -y promptfoo@latest eval -c evals/do/promptfooconfig.yaml --no-cache
+#   npx -y promptfoo@latest view
+# Add `--repeat 1` for a quick pass; the default repeats each case to expose unstable routing.
+
+description: do skill routing, old vs new
+
+prompts:
+  - |-
+    Repository:
+    {{repo}}
+
+    Request:
+    {{request}}
+
+providers:
+  - id: file://provider.mjs
+    label: do-old
+    config:
+      ref: 386907c
+  - id: file://provider.mjs
+    label: do-new
+    config:
+      ref: WORKTREE
+
+evaluateOptions:
+  repeat: 3
+  maxConcurrency: 6
+
+x-repos:
+  app: &app >-
+    invoicer: a TypeScript/Next.js invoicing web app, about 45k lines, Postgres through Prisma, a
+    tRPC API, Playwright end-to-end tests, CI on GitHub Actions. One repository, actively
+    maintained.
+  lib: &lib >-
+    fastq: a Go job-queue library, about 6k lines, Redis backend, well tested. One repository.
+  empty: &empty >-
+    A new git repository holding only a README.md with a title. No code yet.
+  platform: &platform >-
+    shop-api: the Go backend of a small e-commerce product, about 20k lines. The web client and the
+    mobile app live in two other repositories, shop-web and shop-mobile.
+
+defaultTest:
+  options:
+    # `expected` is a list; keep it whole instead of fanning it into one test per element.
+    disableVarExpansion: true
+  assert:
+    - type: javascript
+      metric: route
+      value: |
+        const text = String(output).trim().replace(/^```(?:json)?\s*|\s*```$/g, '');
+        let answer;
+        try {
+          answer = JSON.parse(text);
+        } catch {
+          return { pass: false, score: 0, reason: `not JSON: ${text.slice(0, 200)}` };
+        }
+        const expected = context.vars.expected;
+        const route = Array.isArray(answer.route) ? answer.route : [];
+        const same = route.length === expected.length && route.every((s, i) => s === expected[i]);
+        const got = `${answer.action} ${route.join(' → ') || '∅'}`;
+        const want = `route ${expected.join(' → ')}`;
+        if (same && answer.action === 'route') return { pass: true, score: 1, reason: got };
+        // Asking with the right recommendation is a wasted round trip, not a wrong route.
+        if (same && answer.action === 'ask') return { pass: false, score: 0.5, reason: `${got}; wanted ${want}` };
+        return { pass: false, score: 0, reason: `${got}; wanted ${want}. ${answer.reason ?? ''}` };
+
+tests:
+  # Feature: new behaviour in one repository, including moderately large changes.
+  - description: 'feature: small addition'
+    metadata: { group: feature }
+    vars: { repo: *app, expected: [feature], request: add CSV export to the invoices list }
+  - description: 'feature: vague but small'
+    metadata: { group: feature }
+    vars: { repo: *app, expected: [feature], request: add dark mode }
+  - description: 'feature: third-party login'
+    metadata: { group: feature }
+    vars: { repo: *app, expected: [feature], request: let users log in with their Google account }
+  - description: 'feature: payments integration'
+    metadata: { group: feature }
+    vars: { repo: *app, expected: [feature], request: add Stripe so clients can pay their invoices online }
+  - description: 'feature: library capability'
+    metadata: { group: feature }
+    vars: { repo: *lib, expected: [feature], request: add delayed jobs and retries with exponential backoff }
+  - description: 'feature: audit log'
+    metadata: { group: feature }
+    vars:
+      repo: *app
+      expected: [feature]
+      request: add an audit log of every change made to an invoice, viewable by admins
+
+  # Feature at the boundary: large, several pull requests, still one repository.
+  - description: 'boundary: recurring invoices'
+    metadata: { group: boundary }
+    vars:
+      repo: *app
+      expected: [feature]
+      request: >-
+        add recurring invoices: users schedule an invoice to be re-issued monthly or yearly,
+        emailed to the client automatically, with a page to pause or edit schedules
+  - description: 'boundary: multi-currency'
+    metadata: { group: boundary }
+    vars:
+      repo: *app
+      expected: [feature]
+      request: support multiple currencies across invoices, payments and reports
+  - description: 'boundary: API migration'
+    metadata: { group: boundary }
+    vars:
+      repo: *app
+      expected: [feature]
+      request: migrate the API from tRPC to REST with OpenAPI docs, keeping the frontend working
+  - description: 'boundary: client portal'
+    metadata: { group: boundary }
+    vars:
+      repo: *app
+      expected: [feature]
+      request: add a client portal where customers log in to view, download and pay their invoices
+  - description: 'boundary: cross-repo change'
+    metadata: { group: boundary }
+    vars:
+      repo: *platform
+      expected: [feature]
+      request: add wishlists, with the endpoints here and the screens in shop-web and shop-mobile
+
+  # Campaign: vast endeavours, whole products, thousands of lines.
+  - description: 'campaign: invoice app from scratch'
+    metadata: { group: campaign }
+    vars: { repo: *empty, expected: [campaign], request: build me an app that manages my invoices }
+  - description: 'campaign: finance tracker'
+    metadata: { group: campaign }
+    vars:
+      repo: *empty
+      expected: [campaign]
+      request: build a personal finance tracker with bank sync, budgets, a web dashboard and a mobile app
+  - description: 'campaign: product clone'
+    metadata: { group: campaign }
+    vars: { repo: *empty, expected: [campaign], request: build an open-source alternative to Calendly }
+  - description: 'campaign: SaaS overhaul'
+    metadata: { group: campaign }
+    vars:
+      repo: *app
+      expected: [campaign]
+      request: >-
+        turn invoicer into a multi-tenant SaaS: organisations, roles and permissions, per-plan
+        billing, an admin back office, and a public API with TypeScript and Python SDKs
+  - description: 'campaign: multi-repo product'
+    metadata: { group: campaign }
+    vars:
+      repo: *platform
+      expected: [campaign]
+      request: >-
+        turn the shop into a marketplace where independent sellers list products: seller
+        onboarding, listings, split checkout, payouts and reviews, across the API, web and mobile
+
+  # Bugfix and research, alone.
+  - description: 'bugfix: wrong date'
+    metadata: { group: bugfix }
+    vars:
+      repo: *app
+      expected: [bugfix]
+      request: invoices created after midnight UTC show the previous day's date on the PDF
+  - description: 'bugfix: flaky test'
+    metadata: { group: bugfix }
+    vars: { repo: *lib, expected: [bugfix], request: TestRetryBackoff fails intermittently on CI with a data race }
+  - description: 'research: regulation question'
+    metadata: { group: research }
+    vars:
+      repo: *app
+      expected: [research]
+      request: which e-invoicing formats must French B2B invoices support from 2026, and how do they compare?
+  - description: 'research: backend choice'
+    metadata: { group: research }
+    vars: { repo: *lib, expected: [research], request: should our backend be Redis Streams or NATS JetStream? compare them }
+
+  # Chains.
+  - description: 'chain: research then feature'
+    metadata: { group: chain }
+    vars:
+      repo: *app
+      expected: [research, feature]
+      request: add Factur-X e-invoice export; I don't know which profile French law requires
+  - description: 'chain: bugfix then feature'
+    metadata: { group: chain }
+    vars:
+      repo: *app
+      expected: [bugfix, feature]
+      request: >-
+        PDF export crashes on invoices with more than 50 lines; fix that, then add a paginated
+        PDF layout with a summary page
+  - description: 'chain: research then campaign'
+    metadata: { group: chain }
+    vars:
+      repo: *empty
+      expected: [research, campaign]
+      request: >-
+        build a SaaS for French freelancers to issue legally compliant e-invoices; work out the
+        2026 regulation first
+
+  # Hard: surface cues point at the wrong route.
+  - description: 'hard: vague capability'
+    metadata: { group: hard }
+    vars: { repo: *app, expected: [feature], request: invoicer needs reporting }
+  - description: 'hard: "build" verb, feature scope'
+    metadata: { group: hard }
+    vars:
+      repo: *app
+      expected: [feature]
+      request: build an admin dashboard showing revenue, overdue invoices and top clients
+  - description: 'hard: empty repo, small tool'
+    metadata: { group: hard }
+    vars:
+      repo: *empty
+      expected: [feature]
+      request: write a CLI that converts CSV bank statements to OFX files
+  - description: 'hard: small change across repos'
+    metadata: { group: hard }
+    vars:
+      repo: *platform
+      expected: [feature]
+      request: >-
+        show an estimated delivery date on product pages, computed by the API and displayed in
+        shop-web and shop-mobile
+  - description: 'hard: code question, then change'
+    metadata: { group: hard }
+    vars:
+      repo: *app
+      expected: [feature]
+      request: find out how invoice numbering works today, then make it a separate sequence per client
+  - description: 'hard: missing feature called a bug'
+    metadata: { group: hard }
+    vars:
+      repo: *app
+      expected: [feature]
+      request: it's a bug that you can't attach files to an invoice, users keep asking for it
+  - description: 'hard: regression phrased as a request'
+    metadata: { group: hard }
+    vars:
+      repo: *app
+      expected: [bugfix]
+      request: the invoices list should be sorted by due date again, like before last week's release
+  - description: 'hard: vast rewrite in one repo'
+    metadata: { group: hard }
+    vars: { repo: *app, expected: [campaign], request: rewrite invoicer from Next.js to Ruby on Rails }
+  - description: 'hard: product suite in one repo'
+    metadata: { group: hard }
+    vars:
+      repo: *app
+      expected: [campaign]
+      request: >-
+        add full accounting to invoicer: a general ledger, bank reconciliation, VAT returns,
+        expense tracking with receipt scanning, and year-end closing
