@@ -2,10 +2,11 @@
 name: do
 description: >-
   Routes a request to the pipeline skills that carry it to the end: reads it just enough to tell a
-  question from a bug, a feature or an epic, announces a route made of research, bugfix, feature
-  and campaign, alone or chained (research then feature, bugfix then feature, research then
-  campaign), and runs each skill in turn, handing each one what the previous one produced. Use when
-  the user invokes /do followed by a request and leaves the choice of pipeline to the agent.
+  question from a bug, a feature or a product-scale endeavour, announces a route made of research,
+  bugfix, feature and campaign, alone or chained (research then feature, bugfix then feature,
+  research then campaign), and runs each skill in turn, handing each one what the previous one
+  produced. Use when the user invokes /do followed by a request and leaves the choice of pipeline
+  to the agent.
 disable-model-invocation: true
 ---
 
@@ -51,8 +52,13 @@ deep reading in their own first stage; reading more here duplicates it.
 |---|---|
 | `research` | asks a question whose answer deserves a sourced document, or depends on an unknown that only outside sources settle: a library or vendor choice, a protocol's or a law's behaviour |
 | `bugfix` | reports existing behaviour that contradicts what it should do: an error, a failing test, a regression, an issue describing a defect |
-| `feature` | asks for behaviour that does not exist yet and fits pull requests a reviewer reads in one sitting |
-| `campaign` | asks for more than that: several features, a product-level goal, a request vague enough to need an epic first |
+| `feature` | asks for behaviour that does not exist yet, within one repository or a coordinated change across two or three: a new endpoint, a screen, an integration, a module-wide refactor. Size alone does not rule it out: a moderately large change spanning many files and several pull requests is still a feature |
+| `campaign` | asks for a vast endeavour: a whole application or product, a goal spanning thousands of lines, many independent features and often several repositories (`build me an app that manages my invoices`, `build a billing platform with an API, a dashboard and a mobile client`) |
+
+`campaign` is the rare route: it costs an epic interview, a stacked-PR chain and hours of runtime,
+so it must be earned by scale. Default to `feature` and pick `campaign` only when the request
+unmistakably cannot be one feature. Vagueness is not scale: a vague request for one capability is a
+`feature`, which plans it itself. Between these two, decide without asking.
 
 Chain skills when the request needs more than one, in this order: `research` first, since its answer
 shapes everything after it; then `bugfix`, since new work should build on fixed code; then

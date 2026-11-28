@@ -1,13 +1,16 @@
 ---
 name: campaign
 description: >-
-  Takes a vague, one-line product request to a merged stack of pull requests: interrogates the
+  Takes a product-scale request to a merged stack of pull requests: interrogates the
   user until the request is an actionable epic, writes a macro strategy and a list of features,
   schedules them as a dependency graph with conflict-aware priorities, has one sub-agent per draft
   review it against the others, implements independent features in parallel with the feature
   skill and lands each on a GitHub stacked-PR chain as it finishes, re-plans the remaining
   features after each one lands, reviews the whole stack with open-code-review, then merges it.
-  Use when the user invokes /campaign followed by a request too large for a single /feature.
+  Use when the user invokes /campaign followed by a vast endeavour: a whole application or
+  product, thousands of lines across many features and often several repositories, such as
+  "build me an app that manages my invoices". A moderately large change within one repository is
+  a /feature, not a campaign.
 compatibility: >-
   Requires git, an authenticated GitHub CLI `gh` with the `gh stack` extension (github/gh-stack),
   and a GitHub repository with stacked pull requests available. Uses the feature skill;
