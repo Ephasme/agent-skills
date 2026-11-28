@@ -1,0 +1,159 @@
+# Research-trigger eval: when do `do` and `feature` decide a request needs the `research` skill?
+#
+# Every case is a build request with a label, `needsResearch`: true when the work hangs on an
+# unknown only outside sources settle (a law, a third-party protocol, a vendor or library choice),
+# false when the description and the code are enough, including well-known integrations.
+#   do       routing dry run; passes when `research` is in the route exactly when needsResearch
+#   feature  dry run of the start of its Plan stage; passes when it would run the `research` skill
+#            exactly when needsResearch. Its reply also says whether it would look things up
+#            inline instead, and lists the unknowns it saw.
+# The feature skill never mentions research, so its column measures what the agent does unprompted.
+#
+# Run from the repo root (needs `omp` on PATH and a configured model):
+#   npx -y promptfoo@latest eval -c evals/research/promptfooconfig.yaml --no-cache
+#   npx -y promptfoo@latest view
+
+description: research trigger, do vs feature
+
+prompts:
+  - |-
+    Repository:
+    {{repo}}
+
+    Request:
+    {{request}}
+
+providers:
+  - id: file://../provider.mjs
+    label: do
+    config:
+      skill: skills/pipelines/do/SKILL.md
+      harness: evals/do/harness.md
+      ref: WORKTREE
+  - id: file://../provider.mjs
+    label: feature
+    config:
+      skill: skills/pipelines/feature/SKILL.md
+      harness: evals/research/feature-harness.md
+      ref: WORKTREE
+
+evaluateOptions:
+  repeat: 3
+  maxConcurrency: 6
+
+x-repos:
+  app: &app >-
+    invoicer: a TypeScript/Next.js invoicing web app, about 45k lines, Postgres through Prisma, a
+    tRPC API, Playwright end-to-end tests, CI on GitHub Actions. PDFs are rendered with
+    Puppeteer. One repository, actively maintained.
+  lib: &lib >-
+    fastq: a Go job-queue library, about 6k lines, Redis backend through go-redis v8, logging
+    through logrus, well tested. One repository.
+
+defaultTest:
+  assert:
+    - type: javascript
+      metric: research-trigger
+      value: |
+        const text = String(output).trim().replace(/^```(?:json)?\s*|\s*```$/g, '');
+        let answer;
+        try {
+          answer = JSON.parse(text);
+        } catch {
+          return { pass: false, score: 0, reason: `not JSON: ${text.slice(0, 200)}` };
+        }
+        const want = context.vars.needsResearch;
+        let triggered;
+        let got;
+        if (Array.isArray(answer.route)) {
+          triggered = answer.route.includes('research');
+          got = `${answer.action} ${answer.route.join(' → ')}`;
+        } else {
+          triggered = answer.research === 'research-skill';
+          got = `${answer.research}; unknowns: ${(answer.unknowns ?? []).join(' | ') || 'none'}`;
+        }
+        const pass = triggered === want;
+        return {
+          pass,
+          score: pass ? 1 : 0,
+          reason: `${got}${pass ? '' : `; wanted research ${want ? 'triggered' : 'not triggered'}`}`,
+        };
+
+tests:
+  # Needs research: the work hangs on outside knowledge.
+  - description: 'yes: law, user flags the unknown'
+    metadata: { group: needs-research }
+    vars:
+      repo: *app
+      needsResearch: true
+      request: add Factur-X e-invoice export; I don't know which profile French law requires
+  - description: 'yes: law, unknown left implicit'
+    metadata: { group: needs-research }
+    vars:
+      repo: *app
+      needsResearch: true
+      request: make our invoices compliant with the EU's VAT in the Digital Age rules
+  - description: 'yes: niche government platform'
+    metadata: { group: needs-research }
+    vars:
+      repo: *app
+      needsResearch: true
+      request: send invoices to French public-sector clients through Chorus Pro
+  - description: 'yes: network protocol'
+    metadata: { group: needs-research }
+    vars:
+      repo: *app
+      needsResearch: true
+      request: deliver invoices over the Peppol network for our Belgian clients
+  - description: 'yes: library choice'
+    metadata: { group: needs-research }
+    vars:
+      repo: *app
+      needsResearch: true
+      request: Puppeteer PDF rendering is too slow; pick a faster PDF library and switch to it
+  - description: 'yes: vendor choice'
+    metadata: { group: needs-research }
+    vars:
+      repo: *app
+      needsResearch: true
+      request: >-
+        collect recurring invoices by SEPA direct debit, through whichever provider charges us
+        the lowest fees
+  - description: 'yes: regulatory requirement'
+    metadata: { group: needs-research }
+    vars:
+      repo: *app
+      needsResearch: true
+      request: add two-factor authentication at payment that satisfies PSD2 strong customer authentication
+
+  # No research: the description and the code settle everything.
+  - description: 'no: plain addition'
+    metadata: { group: no-research }
+    vars: { repo: *app, needsResearch: false, request: add CSV export to the invoices list }
+  - description: 'no: well-known integration'
+    metadata: { group: no-research }
+    vars: { repo: *app, needsResearch: false, request: let users log in with their Google account }
+  - description: 'no: vendor already chosen'
+    metadata: { group: no-research }
+    vars: { repo: *app, needsResearch: false, request: add Stripe so clients can pay their invoices online }
+  - description: 'no: code answers the unknown'
+    metadata: { group: no-research }
+    vars:
+      repo: *app
+      needsResearch: false
+      request: find out how invoice numbering works today, then make it a separate sequence per client
+  - description: 'no: target stack chosen'
+    metadata: { group: no-research }
+    vars:
+      repo: *app
+      needsResearch: false
+      request: migrate the API from tRPC to REST with OpenAPI docs, keeping the frontend working
+  - description: 'no: documented upgrade'
+    metadata: { group: no-research }
+    vars:
+      repo: *lib
+      needsResearch: false
+      request: upgrade fastq from go-redis v8 to v9 and replace logrus with log/slog everywhere
+  - description: 'no: vague but internal'
+    metadata: { group: no-research }
+    vars: { repo: *app, needsResearch: false, request: invoicer needs reporting }

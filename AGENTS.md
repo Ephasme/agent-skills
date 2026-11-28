@@ -22,6 +22,7 @@ format, one directory per skill at `skills/<category>/<skill>/SKILL.md`. The rep
 | Install this working tree into the store | `npx -y skills@latest add . --skill '*' -g --yes --agent universal` |
 | Edit or rotate a secret | `sops mcp/secrets.sops.yaml` |
 | Eval the `do` skill's routing, old vs new | `npx -y promptfoo@latest eval -c evals/do/promptfooconfig.yaml --no-cache` (needs `omp`) |
+| Eval when `do` and `feature` trigger research | `npx -y promptfoo@latest eval -c evals/research/promptfooconfig.yaml --no-cache` (needs `omp`) |
 
 Always pass `--agent universal` with `-g`. Without it the CLI also targets `promptscript`, which has
 no global skills directory, and fails once per skill. The install copies into
@@ -97,4 +98,4 @@ committed to this public repo, so the secrets are only as safe as the age key.
 | Which skill depends on which | `dependencies.md` |
 | Working papers for `assess-true-quality` | `docs/` |
 | MCP server list and SOPS store | `mcp/` |
-| Routing eval for `do`: cases, provider, how to run | `evals/do/` |
+| Skill evals: shared `omp` provider, one directory per eval with its cases | `evals/` |

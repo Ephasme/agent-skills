@@ -22,13 +22,17 @@ prompts:
     {{request}}
 
 providers:
-  - id: file://provider.mjs
+  - id: file://../provider.mjs
     label: do-old
     config:
+      skill: skills/pipelines/do/SKILL.md
+      harness: evals/do/harness.md
       ref: 410a8f4
-  - id: file://provider.mjs
+  - id: file://../provider.mjs
     label: do-new
     config:
+      skill: skills/pipelines/do/SKILL.md
+      harness: evals/do/harness.md
       ref: WORKTREE
 
 evaluateOptions:
