@@ -148,13 +148,16 @@ build the graph with care, then let a greedy rule run it.
 1. **Depends-on edges.** Start from the feature table's "depends on" and check each edge against
    the contracts: B depends on A when B consumes something A provides. Renames and removals are
    ordered in step 2. Add an edge the contracts call for and the table lacks; remove one that no
-   contract and no stated reason supports, since every false edge costs parallelism.
+   contract and no stated reason supports, since every false edge costs parallelism. From here on
+   `schedule.md` holds the edges: replace the table's "depends on" column with a pointer to it.
 2. **Conflicts.** Two features conflict when their Touches lists share a source file, function,
    class or registry (routes, dependency-injection bindings, migration index, changelog).
    - Before comparing, widen each list with the files that change alongside its files: for each
      file, list the commits that touched it (`git log -n 50 --format=%H -- <file>`) and add the
-     files that appear in at least three of them (`git show --name-only --format= <sha>`).
-     Coupling the code does not show lives there.
+     files that appear in at least three of them and in at least a third of them
+     (`git show --name-only --format= <sha>`). Coupling the code does not show lives there. Never
+     widen with a file most of the repository's commits touch (changelog, manifest, version file)
+     unless the feature's own list names it.
    - Skip generated files that are regenerated rather than merged.
    - A conflict is not an order: either feature may go first, never both at once. A feature that
      renames or removes a symbol others use is an order, not a conflict: add the depends-on edge
@@ -165,11 +168,11 @@ build the graph with care, then let a greedy rule run it.
      "Consumes" point at it. Never add a feature that only holds stubs: it serves no criterion,
      and its layer may merge alone.
    - A file or registry most features must edit gets one owner feature; the others consume what it
-     exposes.
+     exposes, and it leaves their lists, widened ones included.
    - A feature whose small part causes an edge is split, the part moving to the feature it depends
      on or to a new feature.
-   Update the feature files and the table with each change, and record it with its reason in
-   `schedule.md`.
+   Update the feature files and the `schedule.md` table with each change, and record it with its
+   reason in `schedule.md`.
 4. **Validate.** Remove features with no remaining parent, repeatedly; features left over form a
    cycle: split or merge them until none remains. In the drawn graph, drop edges implied by others
    (A → B → C makes A → C redundant).
@@ -261,11 +264,12 @@ Repeat until no feature is pending or in progress:
 3. **Implement.** Run the `feature` skill with the feature file's description, in a fresh
    sub-agent, or inline without sub-agents. Hand it the absolute paths of `epic.md`,
    `strategy.md`, `schedule.md` and its feature file, and these overrides of the feature skill:
-   - It is already on its own branch in a dedicated worktree. It works there, creates no other
-     branch or worktree, and does not edit the campaign files.
+   - It is already on its own branch in a dedicated worktree, one per repository it touches. It
+     works there, creates no other branch or worktree, and does not edit the campaign files.
    - It skips its stage 0 (isolate) and stage 4 (open pull requests).
    - Its stage 5 reviews the branch's own commits instead of a pull request: `open-code-review` in
-     branch comparison mode from the dispatch base to `HEAD`, with the same fallbacks.
+     branch comparison mode from the dispatch base to `HEAD` in each worktree, with the same
+     fallbacks.
    - Its stage 6 records rejected findings in its report instead of on a pull request.
    - Its stage 7 commits without pushing.
    - It skips its stage 8: the stack merges whole, once, after the global review.
@@ -274,22 +278,25 @@ Repeat until no feature is pending or in progress:
      paths, signatures), files changed outside its Touches list, review findings rejected and why,
      anything unverified, and any sign that another feature is now wrong.
    - Inline only (no sub-agents, so k is 1): create no todo list, since replacing the campaign's
-     would drop stages 6 and 7. Insert the feature skill's items 1, 2, 3, 5 and 6 instead, and its
-     item 7 as `Commit: fixes committed`, since nothing is pushed. Put them right before
+     would drop stages 6 and 7. Insert the feature skill's items 1, 2, 3 and 6 instead, its item 5
+     as `Review: branch commits reviewed` and its item 7 as `Commit: fixes committed`, since there
+     is no pull request and nothing is pushed. Put them right before
      `5.NN <feature-slug>: integrated, pull request opened`, each numbered `5.NN.K` with K its
      number there (`5.01.1 Plan: plan written`). Remove them once the feature reports.
 
 #### Integrate a feature
 
-1. **Rebase.** In the feature's worktree, move its own commits onto the current top:
+1. **Rebase.** In the feature's worktree, unless its commits already sit on the current top
+   (`git merge-base --is-ancestor <top> HEAD` succeeds), move them there:
    `git rebase --onto <top> <dispatch base>`. The recorded base replays only the feature's commits,
-   even when a lower layer was rewritten after dispatch. Once the rebase completes, record `<top>`'s
-   commit as the feature's dispatch base: its commits are now `<top>..HEAD`, so a retry from this
-   step replays only them.
-2. **Check.** Rerun the feature's checks there.
-3. **Failures go back.** A rebase conflict or a red check goes back to the feature's sub-agent, or
-   to a fresh one given the feature file, the dispatch base and the failure; inline, you resolve it.
-   The author of the change resolves it, then integration resumes from step 1. Other reports wait
+   even when a lower layer was rewritten after dispatch. Then record `<top>`'s commit as the
+   feature's dispatch base, whoever finished the rebase: a retry replays only the feature's commits.
+2. **Check.** Rerun the feature's checks there, reinstalling the dependencies first if the rebase
+   changed a lockfile or manifest.
+3. **Failures go back.** On a rebase conflict, run `git rebase --abort` first. Then hand the
+   conflict or the red check to the feature's sub-agent, or to a fresh one given the feature file,
+   the dispatch base, the top and the failure; inline, you handle it. The author reruns the same
+   rebase, resolves it, commits any fix, and integration resumes from step 1. Other reports wait
    their turn meanwhile, so the top does not move under the fix.
 4. **Free the branch.** `git worktree remove <campaign-worktree>-NN`; the branch stays. If it
    refuses over untracked files, confirm none belongs to the feature, then add `--force`.
@@ -299,6 +306,8 @@ Repeat until no feature is pending or in progress:
      dependencies.
    - Every later feature: `gh stack top`, then `gh stack add campaign/<slug>/NN-<feature-slug>`,
      which adopts the branch and checks it out.
+   - Whenever the campaign worktree moves to a commit whose lockfile or manifest differs, reinstall
+     the dependencies before running checks there.
 6. **Open its pull request** with `gh stack submit --auto`: a draft whose base is the layer below.
    Then set its title and description with `gh pr edit`. The description states:
    - the epic in one line;
