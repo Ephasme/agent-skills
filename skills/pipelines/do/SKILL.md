@@ -37,8 +37,8 @@ N. Campaign: stack merged
 
 Each skill creates its own todo list, which would replace this one and drop the rest of the route.
 When a skill starts, insert its items right after its route item instead, flattening any groups and
-prefixing each item's number with `N.` (`2.1 Plan: plan written`, `3.4.01 <feature-slug>: pull
-request opened`), and remove them once the skill reports.
+prefixing each item's number with `N.` (`2.1 Plan: plan written`, `3.5.01 <feature-slug>:
+integrated, pull request opened`), and remove them once the skill reports.
 
 ## Route the request
 
