@@ -27,7 +27,7 @@ flowchart LR
   feature -.->|open requirements| brainstorm-design
   feature -->|stage 2| harden-plan
   feature -->|stage 3| execute-plan
-  campaign -->|stage 4, per feature| feature
+  campaign -->|stage 5, per feature| feature
   bugfix -->|stages 1-3| debug-systematically
   do -->|routes to| research
   do -->|routes to| bugfix
