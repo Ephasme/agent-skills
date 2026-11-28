@@ -247,6 +247,14 @@ tests:
       repo: *app
       expected: [bugfix]
       request: the invoices list should be sorted by due date again, like before last week's release
+  - description: 'hard: 4k-line feature in one repo'
+    metadata: { group: hard }
+    vars:
+      repo: *app
+      expected: [feature]
+      request: >-
+        add time tracking: timers, weekly timesheets, manager approval, and turning approved
+        hours into invoice lines. I'd estimate around 4,000 lines
   - description: 'hard: vast rewrite in one repo'
     metadata: { group: hard }
     vars: { repo: *app, expected: [campaign], request: rewrite invoicer from Next.js to Ruby on Rails }
